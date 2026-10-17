@@ -1,0 +1,21 @@
+name: Decode app icons
+on:
+  push:
+    branches: [main]
+    paths: ['icons.tar.b64', '.github/workflows/icons.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode base64 icons into PNGs at the site root
+        run: |
+          base64 -d icons.tar.b64 | tar -x
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- *.png
+          git diff --cached --quiet || git commit -m "Decode app icons"
+          git push origin HEAD:main
