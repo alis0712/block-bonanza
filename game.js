@@ -136,7 +136,10 @@ function audioUnlock() {
       A.master = c.createGain(); A.master.gain.value = settings.sound ? 0.8 : 0;
       A.mus = c.createGain(); A.mus.gain.value = 0.42;
       A.sfx = c.createGain(); A.sfx.gain.value = 0.9;
-      A.mus.connect(A.master); A.sfx.connect(A.master); A.master.connect(comp); comp.connect(c.destination);
+      A.mus.connect(A.master); A.sfx.connect(A.master); A.master.connect(comp);
+      const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
+      lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+      comp.connect(lim); lim.connect(c.destination);
       const len = c.sampleRate | 0, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       A.noise = buf;
@@ -244,51 +247,570 @@ const sfx = {
   rumble() { if (!aok()) return; for (let i = 0; i < 5; i++) { tone(45 + i * 3, 0.5, 'sawtooth', 0.12, { lp: 180, when: anow() + i * 0.45 }); noise(0.4, 0.2, 'lowpass', 200, { when: anow() + i * 0.45 }); } },
   glitchWarn() { if (!aok()) return; for (let i = 0; i < 6; i++) tone(rand(800, 2400), 0.04, 'square', 0.05, { when: anow() + i * 0.18 }); },
   glitch() { if (!aok()) return; for (let i = 0; i < 8; i++) tone(rand(200, 3000), 0.03, 'square', 0.08, { when: anow() + i * 0.025 }); noise(0.15, 0.2, 'highpass', 3000); },
+  danger() { if (!aok()) return; const t = anow(); [0, 0.16, 0.32].forEach((d, i) => tone(i % 2 ? 660 : 880, 0.12, 'square', 0.07, { when: t + d, lp: 3000 })); },
   cheer() { if (!aok()) return; const t = anow(); [72, 76, 79, 84, 88, 91, 96].forEach((n, i) => tone(mf(n), 0.25, 'square', 0.09, { when: t + i * 0.06, lp: 4000 })); },
 };
 
-// procedural techno: 16th-note step sequencer with look-ahead scheduling
-const M = { timer: null, next: 0, step: 0, stage: 0 };
-function mKick(t) {
-  const c = A.ctx, o = c.createOscillator(), gn = c.createGain();
-  o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-  gn.gain.setValueAtTime(0.9, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-  o.connect(gn); gn.connect(A.mus); o.start(t); o.stop(t + 0.3);
+// ---------------------------------------------------------------- music engine (procedural electro techno)
+// One engine per AudioContext (live or offline). All drums are pre-rendered into small buffers once,
+// synths use short-lived oscillators with a global voice cap, effects are shared nodes reused forever.
+const TRACKS = [
+  { name: 'TITLE', bpm: 128, root: 33, swing: 0, chords: [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]],
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.', hat16: 'xxoxxxoxxxoxxxox', perc: '................',
+    bass: 'rolling', bpat: '.x.x.x.x.x.x.x.x', acid: false, apat: 'x.xa.xx.xa.x.xxa', anotes: [0, 0, 12, 0, 3, 0, 7, 12, 0, 0, 12, 10, 0, 7, 3, 12],
+    arp: 'xxxxxxxxxxxxxxxx', arpOrder: [0, 1, 2, 3, 2, 1, 4, 2], fm: [2, 1.6], pad: 'sus', padGate: null,
+    lead: 'x..x..x.x.x.x...', leadDeg: [4, 3, 2, 3, 4, 5, 4, 2], leadV: 5, leadCut: 5200, kickType: 0, duck: 0.22,
+    dly: 0.75, fb: 0.38, rev: 0.32, zap: 0.35, glitch: 0.15, drive: 0, alarm: [24, 27] },
+  { name: 'NEON CITY', bpm: 120, root: 33, swing: 0, chords: [[0, 3, 7], [0, 3, 7], [-4, 0, 3], [-2, 2, 5]],
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.', hat16: 'x.oxx.ox x.oxx.ox'.replace(/ /g, ''), perc: '......x.......x.',
+    bass: 'octave', bpat: 'xoxoxoxoxoxoxoxo', acid: false, apat: 'x..x..x.x..x..x.', anotes: [0, 0, 12, 0, 0, 7, 0, 12, 0, 0, 12, 0, 3, 0, 7, 0],
+    arp: 'x.xxx.xxx.xxx.xx', arpOrder: [0, 2, 1, 3, 2, 4], fm: [1, 2.2], pad: 'gate', padGate: 'x.x.xxx.x.x.xx.x',
+    lead: 'x...x.x...x.x.x.', leadDeg: [3, 2, 1, 2, 3, 4], leadV: 3, leadCut: 3600, kickType: 0, duck: 0.3,
+    dly: 0.75, fb: 0.32, rev: 0.4, zap: 0.15, glitch: 0.08, drive: 0, alarm: [24, 31] },
+  { name: 'DEEP SPACE', bpm: 126, root: 38, swing: 0, chords: [[0, 3, 7], [3, 7, 10], [-2, 2, 5], [5, 8, 12]],
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', hat16: 'xxxxxxxxxxxxxxxx', perc: '...x.......x....',
+    bass: 'rolling', bpat: '.xxx.xxx.xxx.xxx', acid: false, apat: 'x.x.x.xax.x.x.xa', anotes: [0, 12, 0, 12, 0, 12, 0, 15, 0, 12, 0, 12, 0, 12, 7, 12],
+    arp: 'x..x..x..x..x.x.', arpOrder: [0, 2, 4, 3, 1, 4, 2, 5], fm: [3, 1.2], pad: 'gate', padGate: 'x.xx.xx.x.xx.x.x',
+    lead: 'x.xx.xx.x.xx.x.x', leadDeg: [4, 4, 3, 4, 5, 4, 3, 2], leadV: 5, leadCut: 4800, kickType: 0, duck: 0.18,
+    dly: 0.75, fb: 0.5, rev: 0.55, zap: 0.25, glitch: 0.1, drive: 0, alarm: [26, 29] },
+  { name: 'CYBER JUNGLE', bpm: 130, root: 40, swing: 0.14, chords: [[0, 3, 7], [0, 3, 7], [3, 7, 10], [5, 9, 12]],
+    kick: 'x.....x...x.....', snare: '....x.......x..x', hat: 'x.xxx.xxx.xxx.xx', hat16: 'xxoxxxoxxxoxxoxx', perc: '..x..x...x..x.x.',
+    bass: 'sub', bpat: 'x.........x.....', acid: true, apat: 'x.xa.xxsx.ax.xsa', anotes: [0, 0, 12, 0, 3, 0, 0, 7, 0, 10, 12, 0, 3, 0, 7, 12],
+    arp: 'xx.xx.xx.xx.xx.x', arpOrder: [0, 1, 2, 1, 3, 2], fm: [3.5, 2.5], pad: 'sus', padGate: null,
+    lead: 'x..x...x..x.x...', leadDeg: [2, 4, 3, 1, 2], leadV: 3, leadCut: 3000, kickType: 1, duck: 0.35,
+    dly: 0.5, fb: 0.35, rev: 0.3, zap: 0.3, glitch: 0.12, drive: 0.3, alarm: [24, 30] },
+  { name: 'VOLCANO CORE', bpm: 136, root: 36, swing: 0, chords: [[0, 3, 7], [1, 5, 8], [0, 3, 7], [-2, 2, 5]],
+    kick: 'x...x...x...x.x.', snare: '....x.......x...', hat: '..x...x...x...x.', hat16: 'x.xxx.xxx.xxx.xx', perc: '.x.x.x.x.x.x.x.x',
+    bass: 'sub', bpat: 'x...x...x...x...', acid: true, apat: 'xxaxxsxaxxaxxsxa', anotes: [0, 0, 1, 0, 12, 0, 1, 0, 0, 0, 13, 0, 12, 7, 1, 0],
+    arp: 'x.x.x.x.x.x.x.x.', arpOrder: [0, 1, 0, 2, 0, 3], fm: [1.41, 4], pad: 'sus', padGate: null,
+    lead: 'x.x...x.x.x...x.', leadDeg: [1, 2, 1, 0, 3, 2], leadV: 3, leadCut: 2400, kickType: 2, duck: 0.3,
+    dly: 0.375, fb: 0.3, rev: 0.35, zap: 0.2, glitch: 0.12, drive: 0.75, alarm: [24, 25] },
+  { name: 'GLITCH DIMENSION', bpm: 145, root: 42, swing: 0, chords: [[0, 3, 7], [-5, -2, 2], [2, 5, 9], [-3, 0, 4]],
+    kick: 'x...x...x...x...', snare: '....x..x....x...', hat: 'xxxxxxxxxxxxxxxx', hat16: 'xxxxxxxxxxxxxxxx', perc: '...x......x..x..',
+    bass: 'rolling', bpat: '.x.x.x.x.x.x.x.x', acid: true, apat: 'xaxxsaxxxaxsxaxx', anotes: [0, 12, 0, 7, 0, 12, 3, 0, 0, 12, 0, 10, 0, 12, 7, 15],
+    arp: 'xxxxxxxxxxxxxxxx', arpOrder: [0, 4, 1, 5, 2, 6, 3, 7], fm: [5.01, 3], pad: 'gate', padGate: 'xx.xx.x.xx.x.xx.',
+    lead: 'x.x.xx.x..x.x.xx', leadDeg: [4, 6, 3, 5, 2, 4, 1], leadV: 3, leadCut: 4200, kickType: 3, duck: 0.25,
+    dly: 0.375, fb: 0.42, rev: 0.3, zap: 0.5, glitch: 0.35, drive: 0.4, alarm: [24, 36] },
+];
+// 56-bar arrangement, then loops from bar 4 (build). Each pass through the loop flips the lead variant.
+const SECTIONS = [['intro', 4], ['build', 8], ['drop', 16], ['break', 8], ['build', 4], ['drop', 16]];
+const SEC_BAR = []; SECTIONS.forEach(([n, len]) => { for (let i = 0; i < len; i++) SEC_BAR.push([n, i, len]); });
+function secAt(bar) {
+  const loopLen = SEC_BAR.length - 4;
+  const b = bar < SEC_BAR.length ? bar : 4 + ((bar - 4) % loopLen);
+  const pass = bar < 4 ? 0 : Math.floor((bar - 4) / loopLen);
+  const s = SEC_BAR[b];
+  return { name: s[0], i: s[1], len: s[2], pass, alt: (pass + (b >= 36 ? 1 : 0)) % 2 };
 }
-function mVoice(f, t, d, type, v, lp, q) {
-  const c = A.ctx, o = c.createOscillator(), fl = c.createBiquadFilter(), gn = c.createGain();
-  o.type = type; o.frequency.setValueAtTime(f, t);
-  fl.type = 'lowpass'; fl.frequency.setValueAtTime(lp, t); fl.frequency.exponentialRampToValueAtTime(Math.max(120, lp * 0.25), t + d); fl.Q.value = q || 4;
-  gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(v, t + 0.006); gn.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  o.connect(fl); fl.connect(gn); gn.connect(A.mus); o.start(t); o.stop(t + d + 0.02);
+const DROP_BAR = 12;
+// tiny DSP helpers for pre-rendering drum buffers
+function mkBuf(c, secs, fn) {
+  const sr = c.sampleRate, n = Math.max(1, (secs * sr) | 0), b = c.createBuffer(1, n, sr), d = b.getChannelData(0);
+  fn(d, sr, n);
+  let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i]));
+  if (pk > 0.98) { const k = 0.98 / pk; for (let i = 0; i < n; i++) d[i] *= k; }
+  return b;
 }
-function playStep(step, t, st, spb) {
-  const s = step % 16, bar = Math.floor(step / 16) % 4, root = st.root + st.prog[bar];
-  if (st.kick[s] === 'x') mKick(t);
-  if (st.hat[s] === 'x') noise(0.04, 0.12, 'highpass', 8000, { when: t, dest: A.mus });
-  else if (st.hat[s] === 'o') noise(0.16, 0.12, 'highpass', 6500, { when: t, dest: A.mus });
-  if (st.clap[s] === 'x') noise(0.13, 0.3, 'bandpass', 1500, { when: t, dest: A.mus, q: 1.2 });
-  if (st.perc[s] === 'x') tone(st.glitch ? rand(300, 1500) : 220, 0.08, st.glitch ? 'square' : 'sine', 0.18, { when: t, to: st.glitch ? 80 : 140, dest: A.mus });
-  if (st.bass[s] !== '.') mVoice(mf(root + (st.bass[s] === 'o' ? 12 : 0)), t, spb * 0.95, st.bw, 0.26, 900, 6);
-  if (st.arp[s] === 'x') {
-    let n = root + 24 + st.chord[step % st.chord.length];
-    if (st.glitch && hash(step * 7.7) < 0.2) n += 12;
-    mVoice(mf(n), t, spb * 1.6, st.aw, 0.07, st.alp, 3);
-    if (st.echo) mVoice(mf(n + 12), t + spb * 3, spb * 2, 'sine', 0.025, st.alp, 1);
+function biq(d, sr, type, f, q) { // in-place RBJ biquad
+  const w = 2 * Math.PI * f / sr, al = Math.sin(w) / (2 * q), cs = Math.cos(w);
+  let b0, b1, b2; const a0 = 1 + al, a1 = -2 * cs, a2 = 1 - al;
+  if (type === 'hp') { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; } else if (type === 'bp') { b0 = al; b1 = 0; b2 = -al; } else { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; }
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < d.length; i++) { const x = d[i], y = (b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0; x2 = x1; x1 = x; y2 = y1; y1 = y; d[i] = y; }
+}
+const METAL = [205.3, 304.4, 369.6, 522.7, 540, 800];
+function metal(d, sr, mul, dec, hp) {
+  const ph = METAL.map(() => Math.random());
+  for (let i = 0; i < d.length; i++) {
+    let s = 0;
+    for (let k = 0; k < 6; k++) { ph[k] += METAL[k] * mul / sr; s += (ph[k] % 1) < 0.5 ? 1 : -1; }
+    d[i] = (s / 6 * 0.8 + (Math.random() * 2 - 1) * 0.35);
   }
-  if (s === 0 && bar === 0) noise(1.2, 0.05, 'highpass', 9000, { when: t, dest: A.mus });
-  if (st.glitch && hash(step * 3.1) < 0.12) { // stutter repeats
-    for (let i = 1; i < 4; i++) tone(mf(root + 36 + ((i * 5) % 12)), spb / 4, 'square', 0.04, { when: t + i * spb / 4, dest: A.mus });
+  biq(d, sr, 'hp', hp, 0.7); biq(d, sr, 'hp', hp, 0.7);
+  for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.exp(-t / dec) * Math.min(1, i / 20); }
+}
+function kickBuf(c, type) {
+  // type 0 punchy club, 1 tight break kick, 2 industrial (distorted), 3 hard/gabber-ish
+  const drive = [1.2, 1.6, 4.5, 3.2][type], tail = [0.42, 0.3, 0.38, 0.5][type], f0 = [190, 220, 160, 240][type], f1 = [46, 52, 42, 48][type];
+  return mkBuf(c, 0.75, (d, sr, n) => {
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, f = f1 + (f0 - f1) * Math.exp(-t / 0.035);
+      ph += f / sr;
+      const body = Math.sin(2 * Math.PI * ph) * Math.exp(-t / 0.16);
+      const sub = Math.sin(2 * Math.PI * ph) * 0.65 * Math.exp(-t / tail) * Math.min(1, t / 0.02);
+      const click = (Math.random() * 2 - 1) * Math.exp(-t / 0.0025) * 0.5;
+      d[i] = Math.tanh((body + sub + click) * drive) * Math.min(1, (n - i) / 400);
+    }
+    if (type === 2) for (let i = 0; i < n; i++) { const t = i / sr; d[i] += (Math.random() * 2 - 1) * 0.12 * Math.exp(-t / 0.06); }
+  });
+}
+function snareBuf(c, rough) {
+  return mkBuf(c, 0.4, (d, sr, n) => {
+    const nz = new Float32Array(n); for (let i = 0; i < n; i++) nz[i] = Math.random() * 2 - 1;
+    biq(nz, sr, 'hp', 1200, 0.7);
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr; ph += (185 + 60 * Math.exp(-t / 0.02)) / sr;
+      d[i] = Math.sin(2 * Math.PI * ph) * 0.6 * Math.exp(-t / 0.05) + nz[i] * 0.8 * Math.exp(-t / (rough ? 0.12 : 0.09));
+      if (rough) d[i] = Math.tanh(d[i] * 2.5);
+    }
+  });
+}
+function clapBuf(c) {
+  return mkBuf(c, 0.45, (d, sr, n) => {
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      let e = Math.exp(-t / 0.11) * 0.7;
+      for (let k = 0; k < 3; k++) { const tk = t - k * 0.011; if (tk >= 0 && tk < 0.011) e = Math.max(e, Math.exp(-tk / 0.004)); }
+      d[i] = (Math.random() * 2 - 1) * e;
+    }
+    biq(d, sr, 'bp', 1400, 1.1); biq(d, sr, 'hp', 600, 0.7);
+  });
+}
+function crashBuf(c) {
+  return mkBuf(c, 2.2, (d, sr, n) => {
+    const m = new Float32Array(n); metal(m, sr, 2.4, 0.9, 5000);
+    const nz = new Float32Array(n); for (let i = 0; i < n; i++) nz[i] = Math.random() * 2 - 1;
+    biq(nz, sr, 'hp', 4000, 0.6);
+    for (let i = 0; i < n; i++) { const t = i / sr; d[i] = m[i] * 0.6 + nz[i] * 0.6 * Math.exp(-t / 0.7) * Math.min(1, t / 0.004); }
+  });
+}
+function irBuf(c, secs) { // stereo reverb impulse, darkened exponential noise
+  const sr = c.sampleRate, n = (secs * sr) | 0, b = c.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.6);
+    biq(d, sr, 'lp', 6500, 0.7); biq(d, sr, 'hp', 180, 0.7);
+  }
+  return b;
+}
+function makeMusic(c, out, fanOut) {
+  const E = { c, voices: [], stats: { notes: 0, skipped: 0, fills: 0, risers: 0, uplifts: 0, zaps: 0, fanfares: 0 }, danger: false };
+  const G = (v, to) => { const n = c.createGain(); n.gain.value = v; if (to) n.connect(to); return n; };
+  const pan = (p, to) => { if (c.createStereoPanner) { const n = c.createStereoPanner(); n.pan.value = p; n.connect(to); return n; } return G(1, to); };
+  // --- buses: everything -> pre -> (clean | bitcrush) -> gate (stutter) -> bus compressor -> out
+  const glue = c.createDynamicsCompressor();
+  glue.threshold.value = -10; glue.knee.value = 6; glue.ratio.value = 3; glue.attack.value = 0.01; glue.release.value = 0.12;
+  glue.connect(out);
+  E.gate = G(1, glue);
+  E.clean = G(1, E.gate);
+  E.crushAmt = G(0, E.gate);
+  const crush = c.createWaveShaper(); const cv = new Float32Array(2048);
+  for (let i = 0; i < 2048; i++) { const x = i / 1023.5 - 1; cv[i] = Math.round(x * 7) / 7; }
+  crush.curve = cv; crush.connect(E.crushAmt);
+  E.pre = G(1); E.pre.connect(E.clean); E.pre.connect(crush);
+  // sidechain duck: bass, synths and effect returns pump on every kick
+  E.duck = G(1, E.pre);
+  E.drums = G(0.95, E.pre);
+  E.hats = pan(-0.22, E.drums); E.perc = pan(0.28, E.drums);
+  E.bass = G(0.9, E.duck);
+  const dshape = c.createWaveShaper(); const dc = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; dc[i] = Math.tanh(x * 4) / Math.tanh(4); }
+  dshape.curve = dc; dshape.oversample = 'none';
+  E.driveIn = G(0.6); E.driveIn.connect(dshape); E.driveOut = G(0.55, E.duck); dshape.connect(E.driveOut);
+  E.synth = G(1); E.normXf = G(1, E.duck); E.synth.connect(E.normXf);
+  E.dang = G(1); E.dangXf = G(0, E.duck); E.dang.connect(E.dangXf);
+  E.fx = G(0.9, E.pre);
+  // ping-pong delay (L -> R -> L ...), darkened feedback
+  E.dSend = G(0.25); const dl = c.createDelay(2), dr = c.createDelay(2), fb1 = G(0.35), fb2 = G(0.35), dlp = c.createBiquadFilter();
+  dlp.type = 'lowpass'; dlp.frequency.value = 3800;
+  const merge = c.createChannelMerger(2), dRet = G(0.7, E.duck);
+  E.dSend.connect(dlp); dlp.connect(dl); dl.connect(merge, 0, 0); dl.connect(fb1); fb1.connect(dr); dr.connect(merge, 0, 1); dr.connect(fb2); fb2.connect(dl);
+  merge.connect(dRet); E.dl = dl; E.dr = dr; E.fb1 = fb1; E.fb2 = fb2;
+  // convolution reverb
+  E.rSend = G(0.3); const conv = c.createConvolver(); conv.buffer = irBuf(c, 1.9); E.rSend.connect(conv); conv.connect(G(0.6, E.duck));
+  E.drumRev = G(0.12, E.rSend); E.drums.connect(E.drumRev);
+  E.synth.connect(E.dSend); E.synth.connect(E.rSend); E.dang.connect(E.dSend);
+  E.fx.connect(E.dSend); E.fx.connect(E.rSend);
+  E.fan = G(1, fanOut || out); E.fanRev = G(0.5, E.rSend); E.fan.connect(E.fanRev);
+  // noise + drum buffers (rendered once)
+  const nb = c.createBuffer(1, c.sampleRate, c.sampleRate), nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  E.noise = nb;
+  E.kicks = [0, 1, 2, 3].map((t) => kickBuf(c, t));
+  E.snare = snareBuf(c, false); E.snareR = snareBuf(c, true); E.clap = clapBuf(c);
+  E.hatC = mkBuf(c, 0.09, (d, sr) => metal(d, sr, 1.6, 0.022, 7500));
+  E.hatO = mkBuf(c, 0.5, (d, sr) => metal(d, sr, 1.6, 0.16, 7000));
+  E.ride = mkBuf(c, 1.3, (d, sr) => { metal(d, sr, 3.1, 0.5, 4500); for (let i = 0; i < d.length; i++) d[i] += Math.sin(i / sr * 2 * Math.PI * 3200) * 0.18 * Math.exp(-i / sr / 0.4); });
+  E.crash = crashBuf(c);
+  E.track = 0;
+  E.setTrack = function (i, t) {
+    const tr = TRACKS[i], spb = 60 / tr.bpm;
+    E.track = i;
+    E.dl.delayTime.setValueAtTime(spb * tr.dly, t); E.dr.delayTime.setValueAtTime(spb * tr.dly, t);
+    E.fb1.gain.setValueAtTime(tr.fb, t); E.fb2.gain.setValueAtTime(tr.fb, t);
+    E.rSend.gain.setValueAtTime(tr.rev, t);
+  };
+  E.setTrack(0, 0);
+  return E;
+}
+// --- voice management: cap simultaneous oscillators (prio 0 = essential, 1 = normal, 2 = decoration)
+const VCAP = [72, 44, 30];
+function vAlloc(E, t, end, n, prio) {
+  const v = E.voices;
+  for (let i = v.length - 1; i >= 0; i--) if (v[i] < t) { v[i] = v[v.length - 1]; v.pop(); }
+  if (v.length + n > VCAP[prio]) { E.stats.skipped++; return false; }
+  for (let i = 0; i < n; i++) v.push(end);
+  E.stats.notes++;
+  return true;
+}
+function smp(E, buf, t, v, dest, rate) {
+  const s = E.c.createBufferSource(); s.buffer = buf; if (rate) s.playbackRate.value = rate;
+  const g = E.c.createGain(); g.gain.value = v; s.connect(g); g.connect(dest); s.start(t);
+}
+// detuned supersaw stack through one resonant filter + one amp envelope
+function supersaw(E, notes, t, d, o) {
+  const n = o.n || 5, c = E.c;
+  if (!vAlloc(E, t, t + d + (o.rel || 0.1), notes.length * n, o.prio == null ? 1 : o.prio)) return;
+  const fl = c.createBiquadFilter(), g = c.createGain();
+  fl.type = 'lowpass'; fl.Q.value = o.q || 1.5;
+  const c0 = o.cut || 3000, c1 = o.cutEnd || c0 * 0.4, att = o.att || 0.01, rel = o.rel || 0.1, v = (o.v || 0.1) / Math.sqrt(notes.length * n);
+  fl.frequency.setValueAtTime(o.cutStart || c0, t);
+  if (o.cutStart) fl.frequency.exponentialRampToValueAtTime(c0, t + (o.cutAtt || 0.05));
+  fl.frequency.exponentialRampToValueAtTime(Math.max(150, c1), t + d + rel);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + att);
+  g.gain.setValueAtTime(v, t + Math.max(att, d)); g.gain.exponentialRampToValueAtTime(0.0001, t + d + rel);
+  fl.connect(g); g.connect(o.dest || E.synth);
+  const spread = o.det || 18;
+  for (const m of notes) {
+    const f = mf(m);
+    for (let k = 0; k < n; k++) {
+      const os = c.createOscillator(); os.type = 'sawtooth'; os.frequency.setValueAtTime(f, t);
+      os.detune.value = n === 1 ? 0 : (k / (n - 1) - 0.5) * 2 * spread;
+      if (o.glideTo) os.frequency.exponentialRampToValueAtTime(mf(o.glideTo), t + d);
+      os.connect(fl); os.start(t); os.stop(t + d + rel + 0.02);
+    }
   }
 }
+// 2-operator FM pluck / bell
+function fmPluck(E, m, t, d, ratio, index, v, dest, prio) {
+  if (!vAlloc(E, t, t + d, 2, prio == null ? 1 : prio)) return;
+  const c = E.c, f = mf(m), car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), g = c.createGain();
+  car.frequency.value = f; mod.frequency.value = f * ratio;
+  mg.gain.setValueAtTime(f * index, t); mg.gain.exponentialRampToValueAtTime(f * 0.05 + 1, t + d * 0.6);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  mod.connect(mg); mg.connect(car.frequency); car.connect(g); g.connect(dest || E.synth);
+  car.start(t); mod.start(t); car.stop(t + d + 0.02); mod.stop(t + d + 0.02);
+}
+// 303-style acid: saw -> resonant lowpass with accent-driven envelope, optional slide from previous note
+function acid(E, m, t, d, accent, slideFrom, drive) {
+  if (!vAlloc(E, t, t + d + 0.05, 1, 0)) return;
+  const c = E.c, os = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain();
+  os.type = 'sawtooth';
+  if (slideFrom != null) { os.frequency.setValueAtTime(mf(slideFrom), t); os.frequency.exponentialRampToValueAtTime(mf(m), t + 0.06); } else os.frequency.setValueAtTime(mf(m), t);
+  fl.type = 'lowpass'; fl.Q.value = accent ? 17 : 11;
+  const peak = accent ? 3200 : 1500;
+  fl.frequency.setValueAtTime(peak, t); fl.frequency.exponentialRampToValueAtTime(accent ? 260 : 200, t + d + (accent ? 0.12 : 0.04));
+  const v = accent ? 0.2 : 0.13;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.004);
+  g.gain.setValueAtTime(v, t + d * 0.85); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.04);
+  os.connect(fl); fl.connect(g); g.connect(drive ? E.driveIn : E.bass);
+  os.start(t); os.stop(t + d + 0.06);
+}
+function bassNote(E, m, t, d, type, v, cut) {
+  if (!vAlloc(E, t, t + d, type === 'sub' ? 1 : 2, 0)) return;
+  const c = E.c, g = c.createGain(), fl = c.createBiquadFilter();
+  fl.type = 'lowpass'; fl.Q.value = 2; fl.frequency.setValueAtTime(cut, t); fl.frequency.exponentialRampToValueAtTime(Math.max(120, cut * 0.35), t + d);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.005);
+  g.gain.setValueAtTime(v, t + d * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  fl.connect(g); g.connect(E.bass);
+  const o1 = c.createOscillator(); o1.type = type === 'sub' ? 'sine' : 'sawtooth'; o1.frequency.value = mf(m); o1.connect(fl); o1.start(t); o1.stop(t + d + 0.02);
+  if (type !== 'sub') { const o2 = c.createOscillator(); o2.type = 'square'; o2.frequency.value = mf(m) * 0.5; o2.detune.value = 6; o2.connect(fl); o2.start(t); o2.stop(t + d + 0.02); }
+}
+function laser(E, t, v) {
+  if (!vAlloc(E, t, t + 0.2, 1, 2)) return;
+  E.stats.zaps++;
+  const c = E.c, os = c.createOscillator(), g = c.createGain();
+  os.type = 'square'; const f0 = 1800 + Math.random() * 2400;
+  os.frequency.setValueAtTime(f0, t); os.frequency.exponentialRampToValueAtTime(90, t + 0.17);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  os.connect(g); g.connect(E.fx); os.start(t); os.stop(t + 0.2);
+}
+// white-noise uplifter (band-pass sweep up + swell) ending at tEnd
+function uplifter(E, t0, tEnd, v) {
+  const c = E.c, d = Math.max(0.3, tEnd - t0);
+  E.stats.uplifts++;
+  const s = c.createBufferSource(); s.buffer = E.noise; s.loop = true;
+  const fl = c.createBiquadFilter(), g = c.createGain();
+  fl.type = 'bandpass'; fl.Q.value = 1.8;
+  fl.frequency.setValueAtTime(350, t0); fl.frequency.exponentialRampToValueAtTime(9500, tEnd);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v || 0.3, tEnd - 0.01); g.gain.exponentialRampToValueAtTime(0.0001, tEnd + 0.08);
+  s.connect(fl); fl.connect(g); g.connect(E.fx); s.start(t0); s.stop(tEnd + 0.1);
+  return d;
+}
+// pitch riser (detuned saws gliding up an octave or two)
+function riser(E, root, t0, tEnd) {
+  E.stats.risers++;
+  supersaw(E, [root + 24], t0, tEnd - t0, { n: 3, det: 30, v: 0.07, att: tEnd - t0 - 0.02, cut: 6000, cutStart: 400, cutAtt: tEnd - t0, rel: 0.05, glideTo: root + 48, dest: E.fx, prio: 2 });
+}
+// schedule one 16th step of track ti at time t
+function chordAt(tr, bar) { return tr.chords[bar % tr.chords.length]; }
+function chordTone(tr, bar, deg, base) { const ch = chordAt(tr, bar); const o = Math.floor(deg / 3); return tr.root + base + ch[((deg % 3) + 3) % 3] + o * 12; }
+function musicStep(E, ti, step, t) {
+  const tr = TRACKS[ti], spb = 60 / tr.bpm / 4, s = step % 16, bar = Math.floor(step / 16), beat = s >> 2;
+  const sec = secAt(bar), nm = sec.name, drop = nm === 'drop', build = nm === 'build', brk = nm === 'break', intro = nm === 'intro';
+  const lastBar = sec.i === sec.len - 1, nextIsDrop = (build && lastBar) || (bar === DROP_BAR - 1);
+  const sw = (s & 1) ? spb * tr.swing : 0, ts = t + sw;
+  const ch = chordAt(tr, bar), r = tr.root;
+  const fill16 = bar % 16 === 15, fill8 = bar % 8 === 7;
+  const inFill = (fill16 && s >= 8) || (fill8 && s >= 12);
+  // ---- drums
+  const kickOn = !brk && !(nextIsDrop && s >= 12) && !(intro && ti === 0 && bar < 2);
+  if (kickOn && tr.kick[s] === 'x') {
+    smp(E, E.kicks[tr.kickType], t, 0.95, E.drums);
+    const dk = E.duck.gain; dk.setTargetAtTime(tr.duck, t, 0.004); dk.setTargetAtTime(1, t + 0.03, 60 / tr.bpm * 0.17);
+  }
+  if (brk && s === 0 && sec.i % 2 === 0) smp(E, E.kicks[tr.kickType], t, 0.35, E.drumRev); // distant boom
+  if (!intro || sec.i >= 2) {
+    if (!brk && tr.snare[s] === 'x') { smp(E, tr.drive > 0.5 ? E.snareR : E.snare, ts, 0.5, E.drums); if (ti !== 3) smp(E, E.clap, ts + 0.004, 0.42, E.drums); }
+    if (ti === 3 && !brk && (s === 7 || s === 10) && bar % 2) smp(E, E.snare, ts, 0.16, E.drums); // ghost notes (breakbeat)
+  }
+  // snare roll building into drops
+  if (nextIsDrop && (build || bar === DROP_BAR - 1)) {
+    const dens = s < 8 ? (s % 2 === 0) : true;
+    if (dens) smp(E, E.snare, ts, 0.12 + 0.3 * s / 16, E.drums);
+  } else if (build && sec.i === sec.len - 2 && s % 4 === 0) smp(E, E.snare, ts, 0.2, E.drums);
+  const hp = drop ? tr.hat16 : tr.hat, hv = drop ? 1 : (brk ? 0.5 : 0.8);
+  if (!(brk && sec.i < 4)) {
+    const hc = hp[s];
+    if (hc === 'x') smp(E, E.hatC, ts, (s % 4 === 2 ? 0.34 : 0.2) * hv, E.hats);
+    else if (hc === 'o') smp(E, E.hatO, ts, 0.26 * hv, E.hats);
+  }
+  if (drop && s % 4 === 0) smp(E, E.ride, t, 0.17, E.perc);
+  if ((drop || build) && tr.perc[s] === 'x') {
+    if (tr.drive > 0.5) fmPluck(E, r + 36, ts, 0.16, 1.41, 9, 0.09, E.perc, 2); // metallic clang
+    else if (ti === 5) fmPluck(E, r + 36 + ((step * 7) % 24), ts, 0.07, 5.01, 6, 0.06, E.perc, 2); // glitch bleep
+    else fmPluck(E, r + 24 + (s % 3) * 5, ts, 0.12, 1, 2.5, 0.12, E.perc, 2); // tom/conga
+  }
+  if (s === 0 && (sec.i === 0 && (drop || (nm === 'build' && bar > 4)) || bar === 0)) smp(E, E.crash, t, 0.38, E.perc);
+  // ---- bass
+  if (!brk) {
+    const bc = tr.bpat[s];
+    if (bc !== '.' && (tr.bass !== 'sub' || !intro || sec.i >= 1)) {
+      const m = r + ch[0] + (bc === 'o' ? 12 : 0);
+      const cut = intro ? 500 : (build ? 600 + sec.i * 120 : 1300);
+      if (tr.bass === 'sub') bassNote(E, m, t, spb * 6, 'sub', 0.5, 300);
+      else bassNote(E, m, ts, spb * (tr.bass === 'rolling' ? 0.9 : 0.85), tr.bass, 0.32, cut);
+    }
+    if (tr.acid && (drop || (build && sec.i >= 2)) && tr.apat[s] !== '.') {
+      const ac = tr.apat[s], prev = tr.apat[(s + 15) % 16];
+      const m = r + 12 + ch[0] + tr.anotes[s] + (sec.alt && s >= 8 ? 0 : 0);
+      const slide = prev === 's' ? r + 12 + ch[0] + tr.anotes[(s + 15) % 16] : null;
+      acid(E, m, ts, spb * (ac === 's' ? 1.05 : 0.7), ac === 'a', slide, tr.drive > 0);
+    }
+  } else if (s === 0) bassNote(E, r + ch[0], t, spb * 16, 'sub', 0.32, 200);
+  // ---- pads (supersaw chord once per bar; gated variants use 8th/16th stabs from the same stack)
+  const padOn = !intro || sec.i >= 2;
+  if (padOn) {
+    const notes = ch.map((x) => r + 24 + x).concat(drop || brk ? [r + 36 + ch[0]] : []);
+    if (tr.pad === 'gate' && (drop || build) && tr.padGate) {
+      if (tr.padGate[s] === 'x') supersaw(E, notes, t, spb * 0.8, { n: 3, det: 22, v: drop ? 0.16 : 0.1, cut: drop ? 3400 : 1400 + sec.i * 250, cutEnd: 900, att: 0.005, rel: 0.05, q: 2 });
+    } else if (s === 0) supersaw(E, notes, t, spb * 15, { n: 3, det: 20, v: brk ? 0.14 : 0.1, cut: brk ? 2200 : (drop ? 2600 : 1200), cutEnd: brk ? 900 : 700, att: brk ? 0.5 : 0.08, rel: 0.4, prio: 1 });
+  }
+  // ---- arpeggio (FM plucks)
+  if ((build || drop || brk) && tr.arp[s] === 'x') {
+    const deg = tr.arpOrder[step % tr.arpOrder.length] + (sec.alt ? 1 : 0);
+    const m = chordTone(tr, bar, deg, 36) + (ti === 5 && hash(step * 7.7) < 0.2 ? 12 : 0);
+    fmPluck(E, m, ts, spb * 1.8, tr.fm[0], tr.fm[1] * (brk ? 0.6 : 1), drop ? 0.075 : 0.06, E.synth, 1);
+  }
+  // ---- lead (big detuned supersaw)
+  if ((drop || (brk && sec.i >= 4)) && tr.lead[s] === 'x') {
+    let k = 0; for (let i = 0; i < s; i++) if (tr.lead[i] === 'x') k++;
+    let nx = 1; while (nx < 8 && tr.lead[(s + nx) % 16] !== 'x') nx++;
+    const deg = tr.leadDeg[(k + (bar % 2) * 3) % tr.leadDeg.length] + (sec.alt ? 2 : 0);
+    const m = chordTone(tr, bar, deg, 36);
+    supersaw(E, [m, m + 12 * (ti === 0 || ti === 2 ? 1 : 0)].slice(0, ti === 0 || ti === 2 ? 2 : 1), ts, spb * Math.min(nx, 4) * 0.92,
+      { n: tr.leadV, det: 24, v: brk ? 0.08 : 0.14, cut: brk ? 1600 : tr.leadCut, cutEnd: tr.leadCut * 0.35, att: 0.006, rel: 0.09, q: 3, dest: tr.drive > 0.5 ? E.driveIn : E.synth, prio: 1 });
+  }
+  // ---- effects: laser zaps, risers + uplifters before drops, glitch/bitcrush fills every 8/16 bars
+  if (drop && (s === 14 || s === 6) && hash(step * 1.37 + ti) < tr.zap) laser(E, ts, 0.06);
+  if (s === 0 && nextIsDrop) { const tEnd = t + spb * 16; uplifter(E, t, tEnd, 0.22); riser(E, r, t, tEnd); }
+  if (s === 0 && brk && lastBar) uplifter(E, t, t + spb * 16, 0.16);
+  if (!brk && !intro && inFill && s === (fill16 ? 8 : 12)) {
+    const len = spb * (fill16 ? 8 : 4);
+    E.stats.fills++;
+    const cr = E.crushAmt.gain, cl = E.clean.gain, gt = E.gate.gain;
+    if (fill16 || hash(bar * 3.3 + ti) < 0.5 + tr.glitch) { cr.setValueAtTime(1, t); cl.setValueAtTime(0, t); cr.setValueAtTime(0, t + len); cl.setValueAtTime(1, t + len); }
+    // stutter: chop the whole mix on 32nds, accelerating
+    const st0 = t + len * 0.5, n = fill16 ? 8 : 4;
+    for (let i = 0; i < n; i++) { const a = st0 + i * len / (2 * n); gt.setValueAtTime(0.08, a + len / (4 * n)); gt.setValueAtTime(1, a + len / (2 * n) - 0.002); }
+    for (let i = 0; i < n; i++) smp(E, E.snare, st0 + i * len / (2 * n), 0.18, E.drums, 1 + i * 0.06);
+    if (fill16) { laser(E, t, 0.07); laser(E, t + spb * 2, 0.07); }
+  }
+  // ---- danger layer: two-tone alarm + open-hat rush (crossfaded via E.dangXf)
+  if (E.danger) {
+    if (s % 4 === 0) supersaw(E, [r + tr.alarm[beat % 2]], t, spb * 3.6, { n: 2, det: 12, v: 0.09, cut: 2600, cutEnd: 1200, att: 0.01, rel: 0.05, q: 6, dest: E.dang, prio: 1 });
+    if (s % 2 === 1) smp(E, E.hatO, ts, 0.12, E.dang);
+  }
+}
+// comeback fanfare: synth-brass stab on t, rising arpeggio for 2 beats, crash + impact on t + 2 beats
+function fanfare(E, ti, t) {
+  const tr = TRACKS[ti], beat = 60 / tr.bpm, r = tr.root + 24, f = E.fan;
+  E.stats.fanfares++;
+  const maj = [0, 4, 7, 12];
+  supersaw(E, maj.map((x) => r + 12 + x), t, beat * 0.9, { n: 4, det: 16, v: 0.34, cutStart: 300, cut: 5200, cutAtt: 0.06, cutEnd: 900, att: 0.012, rel: 0.25, q: 2, dest: f, prio: 0 });
+  supersaw(E, [r], t, beat * 0.9, { n: 3, det: 10, v: 0.18, cut: 1500, cutEnd: 300, att: 0.01, rel: 0.2, dest: f, prio: 0 });
+  const arp = [0, 4, 7, 12, 16, 19, 24, 28];
+  arp.forEach((x, i) => fmPluck(E, r + 24 + x, t + beat * 0.25 * i + beat * 0.0, beat * 0.5, 2, 2.2, 0.14, f, 0));
+  arp.forEach((x, i) => supersaw(E, [r + 12 + x], t + beat * 0.25 * i, beat * 0.22, { n: 3, det: 14, v: 0.09, cut: 4000, cutEnd: 1500, att: 0.004, rel: 0.05, dest: f, prio: 0 }));
+  const hit = t + beat * 2;
+  smp(E, E.crash, hit, 0.6, f); smp(E, E.kicks[2], hit, 0.9, f, 0.7); smp(E, E.snareR, hit, 0.5, f);
+  supersaw(E, [r + 12, r + 16, r + 19, r + 24, r + 31], hit, beat * 1.6, { n: 4, det: 20, v: 0.3, cutStart: 500, cut: 6000, cutAtt: 0.05, cutEnd: 1200, att: 0.01, rel: 0.6, q: 1.5, dest: f, prio: 0 });
+  return hit;
+}
+// live sequencer: look-ahead scheduler (setInterval 25 ms, schedules 150 ms ahead), bar-quantized track switches
+const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: [0, 0, 0, 0, 0, 0], lastT: [0, 0], fanAt: 0 };
+function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
+const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
 function musicTick() {
-  if (!A.ctx || A.ctx.state !== 'running') return;
-  const st = STAGES[M.stage], spb = 60 / st.bpm / 4, now = A.ctx.currentTime;
+  if (!A.ctx || A.ctx.state !== 'running' || !M.E) return;
+  const now = A.ctx.currentTime;
   if (M.next < now - 0.2) M.next = now + 0.05;
-  while (M.next < now + 0.12) { playStep(M.step, M.next, st, spb); M.next += spb; M.step++; }
+  let guard = 0;
+  while (M.next < now + 0.15 && guard++ < 64) {
+    if (M.pending && M.next >= M.pending.at - 0.001) {
+      M.track = M.pending.track; M.step = M.pending.bar * 16; M.E.setTrack(M.track, M.next); M.pending = null;
+      smp(M.E, M.E.crash, M.next, 0.5, M.E.perc);
+    }
+    musicStep(M.E, M.track, M.step, M.next);
+    M.sched[M.track]++; M.lastT[0] = M.lastT[1]; M.lastT[1] = M.next;
+    M.next += stepDur(M.track); M.step++;
+  }
 }
-function musicStart() { if (!A.ctx || M.timer) return; M.next = A.ctx.currentTime + 0.08; M.step = 0; M.timer = setInterval(musicTick, 25); }
-function musicStop() { if (M.timer) { clearInterval(M.timer); M.timer = null; } }
+function musicStart() {
+  if (!A.ctx || M.timer) return;
+  ensureEngine();
+  M.next = A.ctx.currentTime + 0.08; M.step = 0; M.pending = null;
+  M.track = desiredTrack(); M.E.setTrack(M.track, M.next);
+  M.timer = setInterval(musicTick, 25); musicTick();
+}
+function musicStop() { if (M.timer) { clearInterval(M.timer); M.timer = null; } M.pending = null; if (M.E) setDanger(false, true); }
+function desiredTrack() { return (state === 'play' || state === 'dying') ? Math.min(4, g.stage || 0) + 1 : 0; }
+// time of the next bar line that is at least minLead seconds away
+function nextBarTime(minLead) {
+  const spb = stepDur(M.track), now = A.ctx.currentTime;
+  let t = M.next + ((16 - (M.step % 16)) % 16) * spb;
+  while (t - now < minLead) t += spb * 16;
+  return t;
+}
+function nextBeatTime() {
+  const spb = stepDur(M.track), now = A.ctx.currentTime;
+  let t = M.next + ((4 - (M.step % 4)) % 4) * spb;
+  while (t - now < 0.06) t += spb * 4;
+  return t;
+}
+function requestTrack(ti, startBar, minLead, lift) {
+  if (!M.timer || !M.E) return 0;
+  const at = nextBarTime(minLead);
+  M.pending = { track: ti, at, bar: startBar };
+  if (lift) { const t0 = Math.max(A.ctx.currentTime + 0.05, at - Math.min(3, stepDur(M.track) * 32)); uplifter(M.E, t0, at, 0.3); riser(M.E, TRACKS[M.track].root, t0, at); }
+  return at;
+}
+// stage changes: noise uplifter rises into the next bar line, then the new stage track drops in with the banner
+let pendBanner = null;
+function stageBanner(i) {
+  const show = () => showBanner('STAGE ' + (i + 1), STAGES[i].name, STAGES[i].c1, TWISTS[i]);
+  if (M.timer && aok()) { const at = requestTrack(i + 1, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
+}
+function syncTrack() {
+  if (!M.timer || M.pending || pendBanner) return;
+  const want = desiredTrack();
+  if (want !== M.track) requestTrack(want, want === 0 || state === 'play' && g.popped === 0 ? 0 : DROP_BAR, 0.15, false);
+}
+function setDanger(on, instant) {
+  M.danger = on;
+  if (!M.E) return;
+  const c = A.ctx, t = c.currentTime, E = M.E;
+  E.danger = on;
+  E.dangXf.gain.cancelScheduledValues(t); E.normXf.gain.cancelScheduledValues(t);
+  E.dangXf.gain.setTargetAtTime(on ? 1 : 0, t, instant ? 0.01 : (on ? 0.4 : 0.6));
+  E.normXf.gain.setTargetAtTime(on ? 0.5 : 1, t, instant ? 0.01 : (on ? 0.4 : 0.6));
+}
+// ---- offline previews (used by tests and to export WAVs)
+function renderPreview(ti, secs, startBar) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const sr = 44100, oc = new OAC(2, Math.round(sr * secs), sr);
+  const comp = oc.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+  const lim = oc.createDynamicsCompressor(); lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+  const master = oc.createGain(); master.gain.value = 0.8; const mus = oc.createGain(); mus.gain.value = 0.42 * 1.6; // preview a bit hotter to stress the limiter
+  mus.connect(master); master.connect(comp); comp.connect(lim); lim.connect(oc.destination);
+  const E = makeMusic(oc, mus, master); E.setTrack(ti, 0);
+  const spb = stepDur(ti); let t = 0.02, step = (startBar || 0) * 16;
+  while (t < secs) { musicStep(E, ti, step, t); t += spb; step++; }
+  return oc.startRendering().then((buf) => {
+    const L0 = buf.getChannelData(0), R0 = buf.getChannelData(1), n = buf.length;
+    let peak = 0, clip = 0; const rms = [];
+    for (let sIdx = 0; sIdx < Math.floor(secs); sIdx++) {
+      let acc = 0; for (let i = sIdx * sr; i < (sIdx + 1) * sr && i < n; i++) acc += L0[i] * L0[i] + R0[i] * R0[i];
+      rms.push(Math.sqrt(acc / (2 * sr)));
+    }
+    for (let i = 0; i < n; i++) { const a = Math.max(Math.abs(L0[i]), Math.abs(R0[i])); if (a > peak) peak = a; if (a >= 0.999) clip++; }
+    const wav = new DataView(new ArrayBuffer(44 + n * 4)), ws = (o, s) => { for (let i = 0; i < s.length; i++) wav.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); wav.setUint32(4, 36 + n * 4, true); ws(8, 'WAVE'); ws(12, 'fmt '); wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 2, true);
+    wav.setUint32(24, sr, true); wav.setUint32(28, sr * 4, true); wav.setUint16(32, 4, true); wav.setUint16(34, 16, true); ws(36, 'data'); wav.setUint32(40, n * 4, true);
+    for (let i = 0, o = 44; i < n; i++, o += 4) { wav.setInt16(o, Math.max(-1, Math.min(1, L0[i])) * 32767, true); wav.setInt16(o + 2, Math.max(-1, Math.min(1, R0[i])) * 32767, true); }
+    const bytes = new Uint8Array(wav.buffer); let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return { peak, clip, rms, stats: E.stats, wav: btoa(bin) };
+  });
+}
+// ---------------------------------------------------------------- danger zone + comeback
+const DANGER_IN = 15, DANGER_OUT = 11, DANGER_MIN = 3;
+let pendFX = null;
+function stackHeight() { for (let y = 0; y < ROWS; y++) { const r = g.board[y]; for (let x = 0; x < COLS; x++) if (r[x]) return ROWS - y; } return 0; }
+function updateDanger(dt) {
+  if (g.danger) { g.dangerT += dt; if (!M.danger && M.timer) setDanger(true); }
+  if (g.res) return; // judge only a settled board
+  const h = stackHeight();
+  if (!g.danger && h >= DANGER_IN) { g.danger = true; g.dangerT = 0; g.dangerCount++; setDanger(true); sfx.danger(); }
+  else if (g.danger && h <= DANGER_OUT) {
+    g.danger = false;
+    if (g.dangerT >= DANGER_MIN) comeback(); else setDanger(false);
+  }
+}
+function comeback() {
+  g.comebacks++;
+  const bonus = 500 * g.level;
+  const fire = () => {
+    if (state !== 'play') return;
+    addScore(bonus); g.pop = 1;
+    showBanner('COMEBACK!', '+' + fmt(bonus) + ' BONUS', '#2bf0ff');
+    const c = L.cell, cx = L.bx + c * 5, cy = L.by + c * 10;
+    floatText('+' + fmt(bonus), cx, cy + c * 2.5, '#7dffb0', Math.min(c * 1.3, W * 0.1), 1.8);
+    flashA = 0.5; shake(0.35, 9);
+    const cols = ['#2bf0ff', '#3dff7a', '#7dffb0', '#00E5FF', '#1DE9B6', '#ffffff'];
+    for (let i = 0; i < 110; i++) { const a = rand(0, 6.28), v = rand(160, 640); part(cx, cy, Math.cos(a) * v, Math.sin(a) * v - 120, rand(0.6, 1.3), rand(4, 9), cols[i % 6], 420, i % 3 === 0 ? 1 : 0); }
+    RINGS.push({ x: cx, y: cy, r: c * 10, t: 0, color: '#3dff7a' }, { x: cx, y: cy, r: c * 6, t: 0, color: '#2bf0ff' });
+  };
+  if (aok() && ensureEngine()) {
+    const t = M.timer ? nextBeatTime() : A.ctx.currentTime + 0.05;
+    const hit = fanfare(M.E, M.track, t);
+    M.fanAt = t; M.E.danger = false; M.danger = false;
+    // crossfade back to the normal track once the impact lands
+    const E = M.E; E.dangXf.gain.cancelScheduledValues(t); E.normXf.gain.cancelScheduledValues(t);
+    E.normXf.gain.setTargetAtTime(0.25, t, 0.03); E.dangXf.gain.setTargetAtTime(0, t, 0.05);
+    E.normXf.gain.setTargetAtTime(1, hit, 0.7);
+    pendFX = { at: t, fire };
+  } else { setDanger(false); fire(); }
+}
+function updatePending() {
+  const now = A.ctx ? A.ctx.currentTime : 0;
+  if (pendBanner && (!A.ctx || !M.timer || now >= pendBanner.at - 0.03)) { const p = pendBanner; pendBanner = null; p.show(); }
+  if (pendFX && (!A.ctx || now >= pendFX.at - 0.02)) { const p = pendFX; pendFX = null; p.fire(); }
+}
+function drawDanger() {
+  if (!g.danger || state !== 'play') return;
+  const c = L.cell, x = L.bx, y = L.by, w = c * COLS, h = c * VIS, k = 0.5 + 0.5 * Math.sin(T * 9);
+  ctx.save();
+  const gr = ctx.createLinearGradient(0, y, 0, y + c * 5);
+  gr.addColorStop(0, 'rgba(255,40,60,' + (0.18 + 0.22 * k) + ')'); gr.addColorStop(1, 'rgba(255,40,60,0)');
+  ctx.fillStyle = gr; ctx.fillRect(x, y, w, c * 5);
+  ctx.strokeStyle = 'rgba(255,50,70,' + (0.45 + 0.5 * k) + ')'; ctx.lineWidth = 3 + 2 * k; ctx.shadowColor = '#ff2040'; ctx.shadowBlur = 14;
+  ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+  ctx.restore();
+  txt('DANGER!', x + w / 2, y + c * 1.1, Math.min(c * 0.95, 30) * (1 + 0.06 * k), '#ff4050', '#2a0008');
+}
 // ---------------------------------------------------------------- layout + caches
 let sprites = [];
 const cache = {};
@@ -603,6 +1125,7 @@ function newGame() {
   g.score = 0; g.disp = 0; g.popped = 0; g.level = 1; g.pop = 0; g.time = 0; g.megas = 0; g.maxChain = 0;
   g.grav = 0; g.lock = 0; g.resets = 0; g.lowY = 0; g.res = null; g.chain = 0; g.piece = null; g.soft = false;
   g.twistT = 0; g.warn = null; g.glitch = null; g.events = [];
+  g.danger = false; g.dangerT = 0; g.dangerCount = 0; g.comebacks = 0; pendFX = null; pendBanner = null; if (M.E) setDanger(false, true);
   P.length = 0; FT.length = 0; TUMBLE.length = 0; RINGS.length = 0; TRAILS.length = 0;
   for (const k in holds) delete holds[k];
   setBG(0); M.stage = 0;
@@ -783,7 +1306,7 @@ function beginPop(pop) {
   if (nl > g.level) {
     g.level = nl;
     const ns = Math.min(4, Math.floor(g.popped / STAGE_POPS));
-    if (ns !== g.stage) { g.stage = ns; M.stage = ns; setBG(ns); g.twistT = 0; g.warn = null; g.glitch = null; showBanner('STAGE ' + (ns + 1), STAGES[ns].name, STAGES[ns].c1, TWISTS[ns]); }
+    if (ns !== g.stage) { g.stage = ns; M.stage = ns; setBG(ns); g.twistT = 0; g.warn = null; g.glitch = null; stageBanner(ns); }
     else showBanner('LEVEL ' + nl, 'FASTER! FASTER!', STAGES[g.stage].c2);
     setTimeout(sfx.level, 350);
   }
@@ -864,6 +1387,7 @@ function updateGame(dt) {
   g.wob = Math.max(0, (g.wob || 0) - dt * 6);
   const gap = g.score - g.disp;
   g.disp = gap > 0 ? Math.min(g.score, g.disp + Math.max(60, gap * 7) * dt) : g.score;
+  updateDanger(dt);
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
   updateTwists(dt);
@@ -892,7 +1416,7 @@ function gameOver() {
     TUMBLE.push({ x: sx + c / 2, y: sy + c / 2, vx: rand(-220, 220), vy: rand(-650, -150) - (ROWS - y) * 8, r: 0, vr: rand(-8, 8), c: spr(v), s: c });
     g.board[y][x] = 0;
   }
-  musicStop(); sfx.over(); shake(0.4, 8);
+  g.danger = false; pendFX = null; musicStop(); sfx.over(); shake(0.4, 8);
   overJoke = OVER_JOKES[Math.random() * OVER_JOKES.length | 0];
 }
 function submitEntry() {
@@ -913,7 +1437,9 @@ const dbg = {
     g.res = null; g.glitch = null; g.warn = null; g.twistT = 0;
     if (piece) { g.piece = { t: piece.t, r: piece.r || 0, x: piece.x, y: piece.y == null ? 2 : piece.y, cols: [...piece.cols].map((ch) => LETTERS[ch]) }; g.lock = 0; g.resets = 0; g.lowY = g.piece.y; }
   },
-  setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; g.stage = i; M.stage = i; setBG(i); bgFade = 0; g.twistT = 0; showBanner('STAGE ' + (i + 1), STAGES[i].name, STAGES[i].c1, TWISTS[i]); },
+  setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; g.stage = i; M.stage = i; setBG(i); bgFade = 0; g.twistT = 0; stageBanner(i); },
+  musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); return true; },
+  renderPreview,
   setTwistT(v) { g.twistT = v; },
   twistNow() { g.twistT = 999; if (g.stage === 3) g.warn = { t: 3 }; },
   rows() { return g.board.map((r) => [...r].map((v) => Object.keys(LETTERS).find((k) => LETTERS[k] === v) || '?').join('')); },
@@ -1458,6 +1984,7 @@ function syncMusic() {
   const want = A.ctx && settings.sound && settings.music && (state === 'title' || state === 'scores' || state === 'howto' || (state === 'play' && !paused));
   if (want && !M.timer) musicStart(); else if (!want && M.timer) musicStop();
   if (state !== 'play') M.stage = 0;
+  syncTrack(); updatePending();
 }
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now; T += dt;
@@ -1489,7 +2016,7 @@ function frame(now) {
       let sx = 0, sy = 0;
       if (shakeT > 0) { const m = shakeM * (shakeT / shakeD); sx = rand(-m, m); sy = rand(-m, m); }
       ctx.save(); ctx.translate(sx, sy);
-      drawBoard(); drawSide(); drawFX();
+      drawBoard(); drawDanger(); drawSide(); drawFX();
       ctx.restore();
       if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA + ')'; ctx.fillRect(0, 0, W, H); }
       drawHUD(); drawControls(); drawBannerUI();
@@ -1505,6 +2032,8 @@ layout();
 window.__bb = {
   get state() { return state; }, get paused() { return paused; }, get piece() { return g.piece ? Object.assign({}, g.piece) : null; },
   get score() { return g.score; }, get popped() { return g.popped; }, get stage() { return g.stage; }, get chain() { return g.maxChain; }, get resolving() { return !!g.res; }, dbg, get audio() { return A.ctx ? A.ctx.state : 'none'; },
+  get danger() { return { on: !!g.danger, t: g.dangerT || 0, count: g.dangerCount || 0, comebacks: g.comebacks || 0, height: g.board ? stackHeight() : 0, banner: banner ? banner.title : null }; },
+  get music() { const E = M.E; return { running: !!M.timer, track: M.track, name: TRACKS[M.track].name, bpm: TRACKS[M.track].bpm, step: M.step, section: secAt(Math.floor(M.step / 16)).name, sched: M.sched.slice(), dt: M.lastT[1] - M.lastT[0], pending: M.pending ? M.pending.track : -1, danger: M.danger, voices: E ? E.voices.length : 0, stats: E ? Object.assign({}, E.stats) : null, fanAt: M.fanAt, next: M.next, now: A.ctx ? A.ctx.currentTime : 0 }; },
   get layout() { return Object.assign({ W, H }, L); }, get buttons() { return UI.map((b) => Object.assign({}, b)); },
 };
 requestAnimationFrame(frame);
