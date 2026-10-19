@@ -32,6 +32,26 @@ Pop 50 blocks to level up (faster gravity). Pop 150 to reach the next stage, and
 switches into an alarm layer. Get back below the safe line after at least 3 seconds in danger and you earn a **COMEBACK!**:
 a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x level** bonus, then the normal track fades back in.
 
+## Wallet + STORE
+Every game's cash is **banked** into a wallet when the game ends ("Banked +$X"), saved on the device. The wallet shows on the
+title screen and in the **STORE** (title menu). Everything is bought with in-game cash only; there are no real-money purchases.
+
+- **Power-ups** (kept in inventory): **Row Wipe** $1,000 (a laser sweeps the bottom row away) and **Bomb Block** $2,000
+  (your next piece is a bomb that blasts a 3x3 area). In a game, tap the ⚡ button in the HUD: the game pauses and a quick
+  menu shows how many you own and lets you USE one or BUY more with wallet cash.
+- **Backgrounds** (cosmetic, overrides the stage scenery): any stage theme ($5,000–$12,500; Tropical Tides is free)
+  plus store exclusives **Candy Land** $20,000, **Retro Arcade** $25,000, **Sunset Desert** $30,000. Pick STAGE THEMES to go back to automatic.
+- **Block skins**: Classic Glossy (free), Neon Outline $8,000, Pixel Retro $10,000, Jelly $15,000, Gemstone $40,000.
+  Every skin keeps the colors and symbols readable.
+
+## Editions
+- **FREE** (with ads, the default): the wallet starts at $0. No ads are shown yet; `maybeShowAd()` is the hook.
+- **FULL** (purchased): one-time **$1,000** starting bonus. Switching FREE → FULL grants it once (never again, even after switching back).
+- The title shows a FREE / FULL badge. **UPGRADE TO FULL** in the store is a placeholder ("coming soon").
+- **Developer toggle:** tap the BLOCK BONANZA logo **5 times** quickly to switch editions, or open the game with
+  `?edition=full` / `?edition=free` (e.g. https://alis0712.github.io/block-bonanza/?edition=full).
+- Code hooks for real IAP and ads later: `isFullEdition()`, `grantFullEditionBonus()`, `setEdition()`, `IAP.purchaseFullEdition()`, `maybeShowAd()`.
+
 ## Music
 Every track is generated live in Web Audio, with no audio files: a punchy kick with a sub tail and sidechain pumping, detuned
 supersaw leads and pads, a 303-style acid bass, FM arpeggios, metallic hats and rides, laser zaps, risers and white-noise
@@ -43,7 +63,7 @@ Storm Planet: industrial 136, Event Horizon: hard glitch 145. A new stage drops 
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
 Also: ghost piece, lock delay, SRS wall kicks, particles and screen shake, animated backgrounds and a procedural techno
-track per stage, top-10 best scores with initials (saved on the device).
+track per stage, top-10 best scores with initials, wallet and store items (all saved on the device).
 
 ## Sound on iPhone
 Tap anywhere once to turn sound on (the title screen shows SOUND ON / TAP FOR SOUND). If it's still silent,
