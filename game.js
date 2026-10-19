@@ -955,7 +955,7 @@ const IAP = { // hook: wire a real store purchase here, then call setEdition('fu
   available: false,
   purchaseFullEdition() { return Promise.resolve(false); },
 };
-function maybeShowAd(where) { // hook: FREE edition ad slot (e.g. where === 'gameover'). Nothing shown yet.
+function maybeShowAd(where) { // hook: FREE edition = minimal ads (e.g. where === 'gameover'); FULL edition = no ads ever. Nothing shown yet.
   if (isFullEdition()) return false;
   BB_ADS.requests++; BB_ADS.last = where; return false;
 }
