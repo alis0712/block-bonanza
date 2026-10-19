@@ -45,8 +45,8 @@ title screen and in the **STORE** (title menu). Everything is bought with in-gam
   Every skin keeps the colors and symbols readable.
 
 ## Editions
-- **FREE** (with ads, the default): the wallet starts at $0. No ads are shown yet; `maybeShowAd()` is the hook.
-- **FULL** (purchased): one-time **$1,000** starting bonus. Switching FREE → FULL grants it once (never again, even after switching back).
+- **FREE** (the default): the wallet starts at $0. Planned to carry minimal ads; none are implemented yet (`maybeShowAd()` is the hook and only counts requests).
+- **FULL** (purchased): no ads at all, plus a one-time **$1,000** starting bonus. Switching FREE → FULL grants it once (never again, even after switching back).
 - The title shows a FREE / FULL badge. **UPGRADE TO FULL** in the store is a placeholder ("coming soon").
 - **Developer toggle:** tap the BLOCK BONANZA logo **5 times** quickly to switch editions, or open the game with
   `?edition=full` / `?edition=free` (e.g. https://alis0712.github.io/block-bonanza/?edition=full).
