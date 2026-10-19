@@ -1076,7 +1076,7 @@ const rgx = (x, cx, cy, r0, r1, stops) => { const gr = x.createRadialGradient(cx
 function bgDt(i, t) { const d = Math.max(0, Math.min(0.1, t - BG.lt[i])); BG.lt[i] = t; BG.draws[i]++; return d; }
 const colX = () => (L.sx ? L.sx + L.sw / 2 : W * 0.85);
 function initBG() {
-  BG.L = {}; BG.sprinkles = BG.pix = BG.sand = null; if (typeof shop !== 'undefined') shop.thumbs = {};
+  BG.L = {}; BG.water = null; BG.sprinkles = BG.pix = BG.sand = null; if (typeof shop !== 'undefined') shop.thumbs = {};
   BG.stars = []; for (let i = 0; i < 150; i++) BG.stars.push({ x: Math.random(), y: Math.random(), z: rand(0.2, 1) });
   for (let l = 0; l < 2; l++) {
     const arr = []; let x = 0;
@@ -1166,6 +1166,18 @@ function bgTropical(t) {
     x.fillStyle = '#6b7a52'; x.beginPath(); x.arc(iw * 0.25, 28, 5, Math.PI, 0); x.arc(iw * 0.82, 29, 4, Math.PI, 0); x.fill();
     x.fillStyle = '#3f9e4a'; for (let k = 0; k < 7; k++) { const gx = 14 + k * iw / 7; x.beginPath(); x.moveTo(gx, 26); x.lineTo(gx + 3, 17 - (k % 3) * 2); x.lineTo(gx + 6, 26); x.fill(); }
   }), cx - iw / 2 - 10, iy - 30, iw + 20, 40);
+  { // shoreline foam lapping around the island
+    const W2 = BG.water || (BG.water = { tb: [], ts: [], sb: [], cur: [], splashes: 0, pops: 0, nextSp: 1 });
+    const fx = cx - 2, rx = iw / 2 + 7, br = Math.sin(t * 1.6) * 2.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(fx, iy + 1, rx + br, 3.2, 0, 0, 7); ctx.stroke();
+    for (let j = 0; j < 2; j++) { const k = (t * 0.45 + j * 0.5) % 1; ctx.strokeStyle = 'rgba(255,255,255,' + (0.55 * (1 - k)) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(fx, iy + 2 + k * 3, rx + 4 + k * 18, 3.5 + k * 4, 0, 0, Math.PI); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let j = 0; j < 9; j++) { const a = j / 9 * Math.PI * 2 + t * 0.3, wob = Math.sin(t * 3 + j * 1.9) * 1.2; ctx.beginPath(); ctx.arc(fx + Math.cos(a) * (rx + br + wob), iy + 1 + Math.sin(a) * 3.2, 1.6 + (j % 3) * 0.5, 0, 7); ctx.fill(); }
+    W2.nextSp -= dt;
+    if (W2.nextSp <= 0) { W2.nextSp = rand(1.4, 3.2); W2.splashes++; const side = Math.random() < 0.5 ? -1 : 1, sx = fx + side * (rx + rand(-4, 6)); for (let j = 0; j < 6 && W2.ts.length < 30; j++) W2.ts.push({ x: sx, y: iy + 1, vx: side * rand(5, 40), vy: rand(-90, -40), t: 0 }); }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = W2.ts.length - 1; i >= 0; i--) { const d = W2.ts[i]; d.t += dt; d.vy += 300 * dt; d.x += d.vx * dt; d.y += d.vy * dt; if (d.y > iy + 3) { W2.ts.splice(i, 1); continue; } ctx.fillRect(d.x - 1, d.y - 1, 2.2, 2.2); }
+  }
   [[-iw * 0.18, 92, -0.18, 0], [iw * 0.16, 70, 0.22, 2]].forEach(([ox, h, lean, p]) => {
     const sw = Math.sin(t * 1.3 + p) * 0.07 + Math.sin(t * 2.9 + p) * 0.025, ang = lean + sw;
     const bx = cx + ox, by = iy - 10, tx = bx + Math.sin(ang) * h, ty = by - Math.cos(ang) * h, mx = bx + Math.sin(ang * 0.4) * h * 0.5 - lean * 18, my = by - h * 0.55;
@@ -1194,6 +1206,17 @@ function bgTropical(t) {
     }
   }
   band(2); band(3);
+  { // shimmering sun-glitter column under the sun + little bubbles rising in the water
+    const W2 = BG.water, sx = W * 0.72;
+    for (let k = 0; k < 16; k++) {
+      const y = hz + (H - hz) * (0.03 + k * 0.06), wv = (5 + k * 2.6) * (0.55 + 0.45 * Math.sin(t * 2.6 + k * 1.7)), a = 0.16 + 0.22 * Math.max(0, Math.sin(t * 3.7 + k * 2.3));
+      ctx.fillStyle = 'rgba(255,250,215,' + a + ')'; ctx.fillRect(sx - wv + Math.sin(t * 1.1 + k * 2.1) * (2 + k * 1.2), y, wv * 2, 1.4 + k * 0.08);
+    }
+    if (W2.tb.length < 12 && Math.random() < dt * 3) W2.tb.push({ x: rand(0.03, 0.97) * W, y: H + 4, r: rand(1.2, 3.2), v: rand(18, 38), p: rand(0, 6) });
+    ctx.strokeStyle = 'rgba(220,250,255,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = W2.tb.length - 1; i >= 0; i--) { const b = W2.tb[i]; b.y -= b.v * dt; if (b.y < hz + (H - hz) * 0.5) { W2.tb.splice(i, 1); continue; } const bx = b.x + Math.sin(t * 2.4 + b.p) * 3; ctx.moveTo(bx + b.r, b.y); ctx.arc(bx, b.y, b.r, 0, 7); }
+    ctx.stroke();
+  }
   // sun sparkles on the water
   for (const s of BG.spark) {
     const a = Math.pow(Math.max(0, Math.sin(t * s.f + s.p)), 10); if (a < 0.05) continue;
@@ -1249,9 +1272,28 @@ function bgSewer(t) {
   });
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   [W * 0.2, W * 0.52, W * 0.84].forEach((lx) => { ctx.fillStyle = '#2b2b22'; ctx.fillRect(lx - 7, 41, 14, 4); ctx.fillStyle = '#ffe9a6'; ctx.beginPath(); ctx.arc(lx, 50, 4.5, 0, 7); ctx.fill(); ctx.strokeStyle = '#2b2b22'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(lx, 50, 6, 0, Math.PI); ctx.moveTo(lx, 45); ctx.lineTo(lx, 56); ctx.stroke(); });
-  // gentle ripples on the murky water
-  ctx.strokeStyle = 'rgba(160,220,120,0.14)'; ctx.lineWidth = 1.2; ctx.beginPath();
-  for (let k = 0; k < 6; k++) { const yy = wy + 6 + k * (H - wy) / 6.5; for (let x = 0; x <= W; x += 14) { const y = yy + Math.sin(x * 0.045 + t * (0.8 + k * 0.2) + k) * (1.2 + k * 0.4); if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); } }
+  { // murky flow: slow current streaks drifting toward the tunnel side, bubbles that rise, sit and pop
+    const W2 = BG.water || (BG.water = { tb: [], ts: [], sb: [], cur: [], splashes: 0, pops: 0, nextSp: 1 });
+    if (!W2.cur.length) for (let i = 0; i < 16; i++) W2.cur.push({ x: Math.random() * W, f: hash(i * 3.7), len: rand(18, 60), v: rand(8, 22) });
+    ctx.strokeStyle = 'rgba(160,215,115,0.3)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath();
+    for (const c of W2.cur) {
+      const y = wy + 8 + c.f * (H - wy - 14), sp = c.v * (0.6 + c.f * 0.8); c.x += sp * dt; if (c.x - c.len > W) { c.x = -rand(0, 40); c.len = rand(18, 60); }
+      const yy = y + Math.sin(c.x * 0.03 + t * 0.6) * 1.5; ctx.moveTo(c.x - c.len, yy); ctx.quadraticCurveTo(c.x - c.len / 2, yy - 2, c.x, yy);
+    }
+    ctx.stroke(); ctx.lineCap = 'butt';
+    if (W2.sb.length < 7 && Math.random() < dt * 0.9) W2.sb.push({ x: Math.random() < 0.6 && L.sx ? rand(L.sx, W - 10) : rand(0.05, 0.95) * W, y: wy + rand(14, 60), r: rand(2, 4.5), v: rand(16, 30), st: 'rise', t: 0 });
+    for (let i = W2.sb.length - 1; i >= 0; i--) {
+      const b = W2.sb[i]; b.t += dt; b.x += 6 * dt;
+      if (b.st === 'rise') { b.y -= b.v * dt; if (b.y <= wy + 2) { b.y = wy + 1; b.st = 'float'; b.t = 0; b.life = rand(0.8, 2.4); } }
+      else if (b.t > b.life) { W2.pops++; if (BG.rings.length < 16) BG.rings.push({ x: b.x, y: wy + 2, t: 0, s: 0.6 }); W2.sb.splice(i, 1); continue; }
+      const r = b.st === 'float' ? b.r * 1.3 : b.r;
+      ctx.strokeStyle = 'rgba(180,230,140,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(b.x, b.y, r, b.st === 'float' ? Math.PI : 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(230,255,200,0.5)'; ctx.fillRect(b.x - r * 0.45, b.y - r * 0.55, 1.4, 1.4);
+    }
+  }
+  // gentle surface ripples
+  ctx.strokeStyle = 'rgba(160,220,120,0.12)'; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let k = 0; k < 3; k++) { const yy = wy + 4 + k * (H - wy) / 4; for (let x = 0; x <= W; x += 14) { const y = yy + Math.sin(x * 0.045 + t * (0.8 + k * 0.2) + k) * (1.2 + k * 0.4); if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); } }
   ctx.stroke();
   // drips
   for (const d of BG.drips) {
@@ -1286,7 +1328,7 @@ function drawGator(dt, t, wy) {
     if (k >= 1) gt.blink = null;
     else lid = b.dbl ? Math.abs(Math.sin(k * Math.PI * 2)) : Math.sin(k * Math.PI);
   }
-  const x = gt.x, y = wy + gt.dy + Math.sin(t * 1.3) * 0.8;
+  const x = gt.x, bob = Math.sin(t * 1.3) * 1.8 + Math.sin(t * 0.55 + 1) * 0.9, y = wy + gt.dy + bob;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, wy + 1); ctx.clip();
   ctx.fillStyle = '#2c4a1f'; ctx.beginPath(); ctx.ellipse(x, y + 3, 22, 7, 0, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(x - 19, y + 2, 6, 3.5, 0, 0, 7); ctx.ellipse(x + 19, y + 2, 6, 3.5, 0, 0, 7); ctx.fill(); // nostril bumps
@@ -1297,7 +1339,8 @@ function drawGator(dt, t, wy) {
     ctx.fillStyle = 'rgba(255,240,170,0.18)'; ctx.beginPath(); ctx.arc(ex, y - 4, 8, 0, 7); ctx.fill();
   }
   ctx.restore();
-  ctx.strokeStyle = 'rgba(190,240,150,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, wy + 2, 30 + Math.sin(t * 2) * 2, 4, 0, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(190,240,150,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, wy + 2, 30 + bob * 1.5, 4 + Math.max(0, -bob) * 0.6, 0, 0, 7); ctx.stroke();
+  const lap = (t * 0.7) % 1; ctx.strokeStyle = 'rgba(190,240,150,' + (0.3 * (1 - lap)) + ')'; ctx.beginPath(); ctx.ellipse(x, wy + 2, 32 + lap * 22, 4 + lap * 4, 0, 0, 7); ctx.stroke();
 }
 // ---- 3. NEO METROPOLIS
 function cityLayer(l) {
@@ -2933,7 +2976,7 @@ window.__bb = {
   get score() { return g.score; }, get popped() { return g.popped; }, get stage() { return g.stage; }, get chain() { return g.maxChain; }, get resolving() { return !!g.res; }, dbg, get audio() { return A.ctx ? A.ctx.state : 'none'; },
   get danger() { return { on: !!g.danger, t: g.dangerT || 0, count: g.dangerCount || 0, comebacks: g.comebacks || 0, height: g.board ? stackHeight() : 0, banner: banner ? banner.title : null }; },
   get music() { const E = M.E; return { running: !!M.timer, track: M.track, name: TRACKS[M.track].name, bpm: TRACKS[M.track].bpm, step: M.step, section: secAt(Math.floor(M.step / 16)).name, sched: M.sched.slice(), dt: M.lastT[1] - M.lastT[0], pending: M.pending ? M.pending.track : -1, danger: M.danger, voices: E ? E.voices.length : 0, stats: E ? Object.assign({}, E.stats) : null, fanAt: M.fanAt, next: M.next, now: A.ctx ? A.ctx.currentTime : 0 }; },
-  get bg() { return { cur: bgCur, fade: bgFade, draws: BG.draws.slice(), layers: Object.keys(BG.L), gator: BG.gator ? { state: BG.gator.state, blinks: BG.gator.blinks, doubles: BG.gator.doubles, sinks: BG.gator.sinks } : null, storm: BG.storm ? { flashes: BG.storm.flashes, thunders: BG.storm.thunders } : null, hole: BG.hole ? { eaten: BG.hole.eaten } : null, particles: { dust: BG.dust.length, fall: BG.fall.length, cars: BG.cars.length } }; },
+  get bg() { return { cur: bgCur, fade: bgFade, draws: BG.draws.slice(), layers: Object.keys(BG.L), gator: BG.gator ? { state: BG.gator.state, blinks: BG.gator.blinks, doubles: BG.gator.doubles, sinks: BG.gator.sinks } : null, storm: BG.storm ? { flashes: BG.storm.flashes, thunders: BG.storm.thunders } : null, hole: BG.hole ? { eaten: BG.hole.eaten } : null, water: BG.water ? { tbub: BG.water.tb.length, splashes: BG.water.splashes, sbub: BG.water.sb.length, pops: BG.water.pops, cur: BG.water.cur.length } : null, particles: { dust: BG.dust.length, fall: BG.fall.length, cars: BG.cars.length } }; },
   get wallet() { return JSON.parse(JSON.stringify(wallet)); }, get edition() { return wallet.edition; }, get shop() { return { tab: shop.tab, modal: shop.modal, msg: shop.msg ? shop.msg.text : null, thumbs: Object.keys(shop.thumbs).length }; }, get pmenu() { return pmenu; }, get stats() { return g.stats ? Object.assign({}, g.stats) : null; }, get queue() { return g.queue ? g.queue.map((q) => q.t) : []; }, get bank() { return g.bank ? { amt: g.bank.amt, from: g.bank.from } : null; }, get ads() { return Object.assign({}, BB_ADS); },
   isFullEdition, get level() { return g.level; }, get time() { return g.time; },
   get layout() { return Object.assign({ W, H }, L); }, get buttons() { return UI.map((b) => Object.assign({}, b)); },
