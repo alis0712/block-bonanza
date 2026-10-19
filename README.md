@@ -22,8 +22,8 @@ Blocks above fall down, and new matches set off **CHAIN x2, x3...** combos. Grou
 Scoring is shown in dollars ($10 per popped block plus a big-group bonus, times chain multiplier, times level). Big gains rain coins and MEGA POP / COMEBACK ring the cash register.
 Pop 50 blocks to level up (faster gravity). Pop 150 to reach the next stage, and each stage adds a twist:
 
-1. **Tropical Tides**: just colors. Sunny ocean, waves with foam, swaying palms, jumping fish, seagulls
-2. **Sewer Lair**: rainbow wildcard blocks match any color. Dripping pipes, flickering lamps, and an alligator whose eyes blink in the water
+1. **Tropical Tides**: just colors. Sunny ocean with gentle rolling wave layers, shimmering sun reflections, foam and little splashes lapping the island shore, rising bubbles, swaying palms, jumping fish, seagulls
+2. **Sewer Lair**: rainbow wildcard blocks match any color. Murky water with slow current streaks, ripples where drips land, bubbles that surface and pop, flickering lamps, and a gently bobbing alligator whose eyes blink in the water
 3. **Neo Metropolis**: steel girder blocks in pieces and rising from below. They break only when a match pops next to them. Parallax skyline, holo billboards, flying cars
 4. **Storm Planet**: a storm rock row surges up every 20 s ("STORM SURGE!"). It breaks only when a match pops next to it. Two moons, howling wind, lightning with delayed thunder
 5. **Event Horizon**: 5 colors and gravity distortion. Space warps and settled blocks swap colors. Black hole with a spinning accretion disk and stars being spaghettified
