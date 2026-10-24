@@ -89,7 +89,14 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
 };
-const settings = Object.assign({ sound: true, music: true, buttons: true }, store.get('bb_settings', {}));
+const settings = (() => { const st = store.get('bb_settings', {}), o = Object.assign({ sound: true, buttons: true, vMusic: 70, vSfx: 70, vAmb: 70, vibrate: true, shake: 2, fx: 'full', ghost: true, cb: false, hand: 'right', fps: false }, st);
+  if (st.music === false && st.vMusic == null) o.vMusic = 0; // the old MUSIC: OFF toggle becomes a 0% music slider
+  delete o.music; ['vMusic', 'vSfx', 'vAmb'].forEach((k) => { o[k] = Math.max(0, Math.min(100, Math.round(+o[k] || 0))); }); return o; })();
+const volK = (v) => (v <= 0 ? 0 : Math.pow(v / 70, 1.6)); // slider % -> gain (70% = the original mix, 100% = +5 dB)
+function applyVolumes() { if (!A.ctx) return; const t = A.ctx.currentTime, set = (n, v) => { if (n) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(v, t, 0.03); } };
+  set(A.mus, 0.42 * volK(settings.vMusic)); set(A.sfx, 0.9 * volK(settings.vSfx)); set(A.amb, 0.42 * volK(settings.vAmb)); }
+const CAN_VIB = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+function vib(p) { if (settings.vibrate && CAN_VIB) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } }
 const saveSettings = () => store.set('bb_settings', settings);
 let scores = store.get('bb_scores_v2', []);
 if (!Array.isArray(scores)) scores = [];
@@ -148,7 +155,7 @@ function audioUnlock() {
       A.master = c.createGain(); A.master.gain.value = settings.sound ? 0.8 : 0;
       A.mus = c.createGain(); A.mus.gain.value = 0.42;
       A.sfx = c.createGain(); A.sfx.gain.value = 0.9;
-      A.mus.connect(A.master); A.sfx.connect(A.master); A.master.connect(comp);
+      A.amb = c.createGain(); A.amb.gain.value = 0.42; A.mus.connect(A.master); A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
       const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
       lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
       comp.connect(lim); lim.connect(c.destination);
@@ -156,6 +163,7 @@ function audioUnlock() {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       A.noise = buf;
       c.onstatechange = () => { if (c.state === 'running') { M.next = 0; } };
+      applyVolumes();
       try { xmPrefetch(0); xmPrefetch(1); } catch (e) { /* optional */ }
     }
     // 'suspended' or iOS 'interrupted' (phone call, Siri, other app): resume inside this gesture
@@ -267,9 +275,9 @@ const sfx = {
   glitchWarn() { if (!aok()) return; tone(520, 1.25, 'sine', 0.09, { to: 70 }); tone(780, 1.2, 'triangle', 0.035, { to: 110 }); noise(1.2, 0.08, 'bandpass', 600, { q: 4 }); }, // gravity warp wind-up
   glitch() { if (!aok()) return; tone(60, 0.35, 'sine', 0.3, { to: 900 }); for (let i = 0; i < 5; i++) tone(rand(300, 1600), 0.05, 'triangle', 0.06, { when: anow() + i * 0.03 }); noise(0.25, 0.18, 'highpass', 2500); },
   thunder(delay) { // low procedural thunder: crack + long rumble, delayed after the flash
-    if (!aok()) return false;
+    if (!aok() || settings.vAmb <= 0) return false;
     const t = anow() + delay;
-    noise(0.3, 0.09, 'lowpass', 1600, { when: t }); noise(2.8, 0.16, 'lowpass', 170, { when: t + 0.04, q: 0.6 }); noise(2.2, 0.11, 'lowpass', 90, { when: t + 0.35 }); tone(46, 1.8, 'sine', 0.07, { when: t + 0.1, to: 30 });
+    const d = A.amb || A.sfx; noise(0.3, 0.09, 'lowpass', 1600, { when: t, dest: d }); noise(2.8, 0.16, 'lowpass', 170, { when: t + 0.04, q: 0.6, dest: d }); noise(2.2, 0.11, 'lowpass', 90, { when: t + 0.35, dest: d }); tone(46, 1.8, 'sine', 0.07, { when: t + 0.1, to: 30, dest: d }); tone(70, 1.4, 'triangle', 0.05, { when: t + 0.1, to: 40, lp: 300, dest: d }); // on the ambience bus
     return true;
   },
   danger() { if (!aok()) return; const t = anow(); [0, 0.16, 0.32].forEach((d, i) => tone(i % 2 ? 660 : 880, 0.12, 'square', 0.07, { when: t + d, lp: 3000 })); },
@@ -901,39 +909,130 @@ function xmFanfare(i, t, alone) {
   return t + beat;
 }
 function xmStopAll() { if (!A.ctx || !XM.bus) return; const t = A.ctx.currentTime; xmStopLoop(t, 0.12); xmDangerStop(t, true); XM.dOn = false; XM.want = -1; XM.duck.gain.cancelScheduledValues(t); XM.duck.gain.setValueAtTime(1, t); }
-// stage 1 ocean ambience: its own gentle layer under the music. Low-passed brown noise (no hiss) shaped into slow,
-// irregular swells: each wave rises ~3 s (filter opens 300 -> ~1.2 kHz) and recedes over ~4-5 s.
-const AMB = { src: null, lp: null, g: null, out: null, next: 0, waves: 0, level: 1.1 };
-function ambBuffer(c) {
+// ---------------------------------------------------------------- stage ambience (own bus A.amb, own volume slider)
+// Every stage gets a gentle procedural layer under the music. Rules for phone speakers: no white noise. Noise is always
+// brown (deep) and low-passed or narrowly band-passed; the rest is tonal (sines, triangles, filtered saws).
+// Layers crossfade with the background visuals and events follow them where it's easy (drips, gator, lightning).
+const AMB = { L: null, kind: null, level: 1, events: 0, waves: 0, preview: 0, buf: null, last: {} };
+const AMB_KIND = { 0: 'waves', 1: 'sewer', 2: 'city', 3: 'storm', 4: 'cosmic', 9: 'deep', 10: 'cave', 11: 'clock', 12: 'forest', 13: 'tomb' };
+function ambBuffer(c) { // 8 s seamless stereo brown noise
   const sr = c.sampleRate, n = Math.round(8 * sr), x = Math.round(0.5 * sr), b = c.createBuffer(2, n, sr);
   for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch), tmp = new Float32Array(n + x); let y = 0;
     for (let i = 0; i < n + x; i++) { y = (y + 0.02 * (Math.random() * 2 - 1)) / 1.02; tmp[i] = y * 3.5; }
-    for (let i = 0; i < n; i++) d[i] = tmp[i]; for (let i = 0; i < x; i++) { const k = i / x; d[i] = tmp[n + i] * (1 - k) + tmp[i] * k; } } // seamless loop
+    for (let i = 0; i < n; i++) d[i] = tmp[i]; for (let i = 0; i < x; i++) { const k = i / x; d[i] = tmp[n + i] * (1 - k) + tmp[i] * k; } }
   return b;
 }
-function ambStart() {
-  if (!A.ctx || AMB.src) return; const c = A.ctx, t = c.currentTime;
-  if (!AMB.buf) AMB.buf = ambBuffer(c);
-  AMB.src = c.createBufferSource(); AMB.src.buffer = AMB.buf; AMB.src.loop = true;
-  AMB.hp = c.createBiquadFilter(); AMB.hp.type = 'highpass'; AMB.hp.frequency.value = 150;
-  AMB.lp = c.createBiquadFilter(); AMB.lp.type = 'lowpass'; AMB.lp.Q.value = 0.3; AMB.lp.frequency.value = 300;
-  AMB.g = c.createGain(); AMB.g.gain.value = 0.0001; AMB.out = c.createGain(); AMB.out.gain.setValueAtTime(0, t); AMB.out.gain.linearRampToValueAtTime(AMB.level, t + 1.5);
-  AMB.src.connect(AMB.hp); AMB.hp.connect(AMB.lp); AMB.lp.connect(AMB.g); AMB.g.connect(AMB.out); AMB.out.connect(A.mus);
-  AMB.src.start(t, Math.random() * 7); AMB.next = t + 0.3;
+const aPan = (c, p, dest) => { if (c.createStereoPanner) { const s = c.createStereoPanner(); s.pan.value = Math.max(-1, Math.min(1, p)); s.connect(dest); return s; } return dest; };
+function aBed(L, o) { // looping brown-noise bed -> highpass -> lowpass/bandpass -> gain
+  const c = A.ctx, s = c.createBufferSource(); s.buffer = AMB.buf; s.loop = true;
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = o.hp || 60;
+  const f = c.createBiquadFilter(); f.type = o.type || 'lowpass'; f.frequency.value = o.f; f.Q.value = o.q || 0.5;
+  const g = c.createGain(); g.gain.value = o.g; s.connect(hp); hp.connect(f); f.connect(g); g.connect(o.dest || L.out);
+  s.start(c.currentTime, Math.random() * 7); L.srcs.push(s); return { f, g };
 }
-function ambStop() {
-  if (!AMB.src) return; const t = A.ctx.currentTime, o = AMB.out, s = AMB.src;
-  try { o.gain.cancelScheduledValues(t); o.gain.setValueAtTime(o.gain.value, t); o.gain.linearRampToValueAtTime(0, t + 1.2); s.stop(t + 1.3); } catch (e) { /* ignore */ }
-  AMB.src = null;
+function aPing(L, t, f0, f1, d, v, o) { // pitched one-shot (oscillator with exponential decay)
+  o = o || {}; const c = A.ctx, os = c.createOscillator(), g = c.createGain(); os.type = o.type || 'sine';
+  os.frequency.setValueAtTime(f0, t); if (f1 && f1 !== f0) os.frequency.exponentialRampToValueAtTime(f1, t + (o.glide || d));
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + (o.a || 0.004)); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  let n = os; if (o.lp) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; os.connect(fl); n = fl; }
+  n.connect(g); const dst = aPan(c, o.pan || 0, L.out); g.connect(dst); if (o.send) g.connect(o.send);
+  os.start(t); os.stop(t + d + 0.05); AMB.events++;
+}
+function aBurst(L, t, d, v, o) { // shaped brown-noise one-shot through a band/lowpass (wind gust, whoosh, rustle, steam)
+  const c = A.ctx, s = c.createBufferSource(); s.buffer = AMB.buf;
+  const f = c.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q || 0.8; f.frequency.setValueAtTime(o.f, t);
+  if (o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t + d * (o.mid || 0.5)); if (o.f2) f.frequency.exponentialRampToValueAtTime(o.f2, t + d);
+  const g = c.createGain(), a = o.a || 0.05; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  let dst = L.out; if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.setValueAtTime(o.pan || 0, t); if (o.pan1 != null) p.pan.linearRampToValueAtTime(o.pan1, t + d); p.connect(L.out); dst = p; }
+  s.connect(f); f.connect(g); g.connect(dst); if (o.send) g.connect(o.send);
+  if (o.flutter) { const lfo = c.createOscillator(), lg = c.createGain(), am = c.createGain(); lfo.type = 'square'; lfo.frequency.value = o.flutter; lg.gain.value = 0.5; am.gain.value = 0.5; lfo.connect(lg); lg.connect(am.gain); g.disconnect(); g.connect(am); am.connect(dst); lfo.start(t); lfo.stop(t + d + 0.05); }
+  s.start(t, Math.random() * 7); s.stop(t + d + 0.05); AMB.events++;
+}
+function aEcho(L, time, fb, lp) { // feedback delay send (sewer pipes, caves, factory hall)
+  const c = A.ctx, i = c.createGain(), dl = c.createDelay(2), f = c.createBiquadFilter(), g = c.createGain();
+  dl.delayTime.value = time; f.type = 'lowpass'; f.frequency.value = lp; g.gain.value = fb; i.connect(dl); dl.connect(f); f.connect(g); g.connect(dl); f.connect(L.out); return i;
+}
+function aOsc(L, type, f, v, dest) { const c = A.ctx, o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = f; g.gain.value = v; o.connect(g); g.connect(dest || L.out); o.start(); L.srcs.push(o); return { o, g }; }
+function aLfo(L, rate, depth, param) { const c = A.ctx, o = c.createOscillator(), g = c.createGain(); o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); L.srcs.push(o); }
+const PENTA = [1318.5, 1480, 1661.2, 1976, 2217.5, 2637];
+const AMB_DEF = {
+  waves: { lvl: 1.1, init(L) { L.w = aBed(L, { hp: 150, f: 300, q: 0.3, g: 0.0001 }); },
+    ev: { wave: [0, 0, (L, t) => { const pk = 0.6 + Math.random() * 0.4, r = 2.4 + Math.random() * 1.2, fall = 3.6 + Math.random() * 1.6, g = L.w.g.gain, f = L.w.f.frequency;
+      g.setTargetAtTime(pk, t, r / 2.6); f.setTargetAtTime(600 + 600 * pk, t, r / 2.6); g.setTargetAtTime(0.14, t + r, fall / 3); f.setTargetAtTime(300, t + r, fall / 3); AMB.waves++; AMB.events++;
+      return r + fall * (0.75 + Math.random() * 0.25); }] } },
+  sewer: { lvl: 1.35, init(L) { aBed(L, { hp: 60, f: 230, g: 0.3 }); L.echo = aEcho(L, 0.27, 0.4, 1800); },
+    drip(L, t, p) { const f = 900 + Math.random() * 700; aPing(L, t, f, f * 0.55, 0.08, 0.1, { pan: p, send: L.echo }); },
+    ev: { drip: [1.4, 3.2, (L, t) => AMB_DEF.sewer.drip(L, t, Math.random() * 1.6 - 0.8)], gator: [14, 24, (L, t) => AMB_DEF.sewer.gator(L, t)] },
+    gator(L, t) { const c = A.ctx, o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(), base = 52 + Math.random() * 12; o.type = 'sawtooth'; o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * 0.85, t + 2);
+      f.type = 'lowpass'; f.frequency.value = 380; f.Q.value = 2; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.4); g.gain.setTargetAtTime(0.0001, t + 1.2, 0.35);
+      const tr = c.createOscillator(), tg = c.createGain(), am = c.createGain(); tr.frequency.value = 7; tg.gain.value = 0.4; am.gain.value = 0.6; tr.connect(tg); tg.connect(am.gain);
+      o.connect(f); f.connect(am); am.connect(g); g.connect(L.out); g.connect(L.echo); o.start(t); tr.start(t); o.stop(t + 2.6); tr.stop(t + 2.6); AMB.events++; } },
+  city: { lvl: 1.6, init(L) { aBed(L, { hp: 120, f: 450, g: 0.28 }); const hf = A.ctx.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 320; hf.connect(L.out); aOsc(L, 'sawtooth', 110, 0.03, hf); aOsc(L, 'sawtooth', 165.4, 0.018, hf); },
+    ev: { car: [3.5, 8, (L, t) => { const d = 1.4 + Math.random() * 0.8, dir = Math.random() < 0.5 ? -1 : 1, v = 0.35 + Math.random() * 0.3;
+      aBurst(L, t, d, v, { f: 320, f1: 1100, f2: 300, q: 1.1, a: d * 0.45, pan: -0.85 * dir, pan1: 0.85 * dir }); aPing(L, t + d * 0.2, 430, 300, d * 0.75, 0.014, { a: d * 0.3, type: 'triangle', pan: 0 }); }] } },
+  storm: { lvl: 3, init(L) { L.wind = aBed(L, { type: 'bandpass', hp: 120, f: 420, q: 0.7, g: 0.16 }); },
+    ev: { gust: [4, 9, (L, t) => { const g = L.wind.g.gain, f = L.wind.f.frequency, pk = 0.45 + Math.random() * 0.4; g.setTargetAtTime(pk, t, 0.5); f.setTargetAtTime(650 + Math.random() * 250, t, 0.6); g.setTargetAtTime(0.16, t + 1.6, 0.8); f.setTargetAtTime(420, t + 1.6, 0.9); AMB.events++; }] } }, // thunder comes from the lightning visuals
+  cosmic: { lvl: 1, init(L) { const c = A.ctx, f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 650; f.Q.value = 0.8; f.connect(L.out); aLfo(L, 0.05, 250, f.frequency);
+      aOsc(L, 'triangle', 110, 0.07, f); aOsc(L, 'sine', 164.8, 0.05, f); aOsc(L, 'sine', 220.4, 0.035, f); aOsc(L, 'triangle', 329.9, 0.012, f); L.echo = aEcho(L, 0.42, 0.5, 4000); },
+    ev: { shimmer: [5, 11, (L, t) => { for (let i = 0; i < 4; i++) aPing(L, t + i * 0.13, PENTA[(Math.random() * 6) | 0], 0, 2.2, 0.022, { a: 0.05, pan: (i - 1.5) * 0.4, send: L.echo }); }] } },
+  deep: { lvl: 1.3, init(L) { const b = aBed(L, { hp: 50, f: 260, g: 0.32 }); aLfo(L, 0.07, 0.1, b.g.gain); L.echo = aEcho(L, 0.5, 0.35, 1200); },
+    bubbles(L, t, p) { const n = 3 + ((Math.random() * 5) | 0); let tt = t; for (let i = 0; i < n; i++) { const f = 350 + Math.random() * 380; aPing(L, tt, f, f * 2.2, 0.05, 0.045, { pan: p }); tt += 0.06 + Math.random() * 0.09; } },
+    ev: { bubbles: [1.6, 4, (L, t) => AMB_DEF.deep.bubbles(L, t, Math.random() * 1.4 - 0.7)], whale: [14, 24, (L, t) => { const c = A.ctx, o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(), b = 170 + Math.random() * 40;
+      o.type = 'triangle'; o.frequency.setValueAtTime(b, t); o.frequency.linearRampToValueAtTime(b * 1.4, t + 1.2); o.frequency.linearRampToValueAtTime(b * 0.8, t + 3); aLfo(L, 4, 3, o.frequency);
+      f.type = 'lowpass'; f.frequency.value = 700; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.8); g.gain.setValueAtTime(0.09, t + 2.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+      o.connect(f); f.connect(g); g.connect(aPan(c, Math.random() - 0.5, L.out)); g.connect(L.echo); o.start(t); o.stop(t + 3.3); AMB.events++; }] } },
+  cave: { lvl: 2.5, init(L) { aBed(L, { hp: 60, f: 200, g: 0.12 }); L.echo = aEcho(L, 0.31, 0.5, 2500); },
+    drip(L, t, p) { const f = 1100 + Math.random() * 800; aPing(L, t, f, f * 0.6, 0.07, 0.09, { pan: p, send: L.echo }); },
+    ev: { drip: [3, 6, (L, t) => AMB_DEF.cave.drip(L, t, Math.random() - 0.5)], chime: [3, 7, (L, t) => { const f = PENTA[(Math.random() * 6) | 0], p = Math.random() - 0.5;
+      aPing(L, t, f, 0, 1.8, 0.03, { type: 'triangle', pan: p, send: L.echo }); aPing(L, t, f * 2.76, 0, 0.9, 0.008, { pan: p, send: L.echo }); }] } },
+  clock: { lvl: 2.6, init(L) { aBed(L, { hp: 60, f: 220, g: 0.14 }); L.echo = aEcho(L, 0.18, 0.3, 2200); L.tk = 0; },
+    ev: { tick: [0, 0, (L, t) => { const tock = (L.tk++) & 1; aPing(L, t, tock ? 1500 : 2000, 0, 0.03, 0.035, { pan: tock ? 0.3 : -0.3 }); aPing(L, t, tock ? 420 : 560, 0, 0.05, 0.03, { type: 'triangle' });
+      const beat = 60 / (XM_BPM[Math.max(1, M.track)] || 125); return beat * 2; }, true],
+      steam: [7, 14, (L, t) => aBurst(L, t, 1.1, 0.07, { f: 1700, f1: 1250, q: 0.9, a: 0.18, pan: Math.random() - 0.5 })],
+      clank: [4, 9, (L, t) => { const f = 180 + Math.random() * 140, p = Math.random() - 0.5; [[1, 0.05], [2.76, 0.03], [5.4, 0.018], [8.93, 0.008]].forEach(([k, v]) => aPing(L, t, f * k, 0, 0.6 / Math.sqrt(k), v, { pan: p, send: L.echo })); }] } },
+  forest: { lvl: 2, init(L) { const w = aBed(L, { type: 'bandpass', hp: 120, f: 380, q: 0.8, g: 0.3 }); aLfo(L, 0.08, 0.15, w.g.gain); },
+    ev: { crickets: [0.9, 1.6, (L, t) => { const two = Math.random() < 0.4; for (let i = 0; i < 3; i++) aPing(L, t + i * 0.045, 4300, 0, 0.025, 0.01, { pan: -0.5 }); if (two) for (let i = 0; i < 3; i++) aPing(L, t + 0.3 + i * 0.05, 3900, 0, 0.025, 0.008, { pan: 0.55 }); }],
+      owl: [10, 18, (L, t) => { const p = Math.random() < 0.5 ? -0.6 : 0.6; aPing(L, t, 410, 385, 0.38, 0.07, { a: 0.06, lp: 900, pan: p }); aPing(L, t + 0.5, 385, 330, 0.6, 0.065, { a: 0.07, lp: 900, pan: p }); }],
+      rustle: [5, 11, (L, t) => aBurst(L, t, 0.8, 0.06, { f: 1300, f1: 900, q: 0.6, a: 0.2, pan: Math.random() - 0.5, flutter: 11 })] } },
+  tomb: { lvl: 3, init(L) { const c = A.ctx, f = c.createBiquadFilter(), sw = c.createGain(); f.type = 'lowpass'; f.frequency.value = 600; sw.gain.value = 0.7; f.connect(sw); sw.connect(L.out); aLfo(L, 0.06, 0.3, sw.gain);
+      for (const [fr, v] of [[146.8, 0.022], [174.6, 0.018], [220, 0.016], [293.7, 0.008]]) aOsc(L, 'sine', fr, v, f); aBed(L, { type: 'bandpass', hp: 150, f: 500, q: 1, g: 0.06, dest: sw }); },
+    ev: { bats: [6, 12, (L, t) => { const dir = Math.random() < 0.5 ? -1 : 1; aBurst(L, t, 0.7, 0.12, { f: 800, q: 2, a: 0.08, pan: -0.7 * dir, pan1: 0.7 * dir, flutter: 16 }); }],
+      creak: [8, 15, (L, t) => { const c = A.ctx, o = c.createOscillator(), am = c.createOscillator(), ag = c.createGain(), mix = c.createGain(), f = c.createBiquadFilter(), g = c.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(115, t + 0.9); am.type = 'square'; am.frequency.setValueAtTime(30, t); am.frequency.linearRampToValueAtTime(45, t + 0.9); ag.gain.value = 0.5; mix.gain.value = 0.5;
+        am.connect(ag); ag.connect(mix.gain); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 3; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.1, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+        o.connect(mix); mix.connect(f); f.connect(g); g.connect(aPan(c, Math.random() - 0.5, L.out)); o.start(t); am.start(t); o.stop(t + 1); am.stop(t + 1); AMB.events++; }] } }, // thunder comes from the lightning visuals
+};
+function ambStart(kind) {
+  const c = A.ctx, t = c.currentTime, def = AMB_DEF[kind]; if (!AMB.buf) AMB.buf = ambBuffer(c);
+  const L = { kind, out: c.createGain(), srcs: [], next: {} }; L.out.gain.setValueAtTime(0, t); L.out.gain.linearRampToValueAtTime(def.lvl, t + 1.5); L.out.connect(A.amb);
+  def.init(L); for (const k in def.ev) { const [a, b, , grid] = def.ev[k]; L.next[k] = grid ? 0 : t + (a || b ? a * 0.3 + Math.random() * b * 0.4 : 0.3); }
+  AMB.L = L; AMB.kind = kind;
+}
+function ambStop(fade) {
+  const L = AMB.L; if (!L) return; AMB.L = null; AMB.kind = null; const t = A.ctx.currentTime, f = fade || 1.2;
+  try { L.out.gain.cancelScheduledValues(t); L.out.gain.setValueAtTime(L.out.gain.value, t); L.out.gain.linearRampToValueAtTime(0, t + f); for (const s of L.srcs) s.stop(t + f + 0.1); } catch (e) { /* ignore */ }
+  setTimeout(() => { try { L.out.disconnect(); } catch (e) { /* ignore */ } }, (f + 0.5) * 1000);
 }
 function ambTick() {
-  if (!AMB.src) return; const now = A.ctx.currentTime, g = AMB.g.gain, f = AMB.lp.frequency;
-  while (AMB.next < now + 1) { const t = Math.max(AMB.next, now), pk = 0.6 + Math.random() * 0.4, r = 2.4 + Math.random() * 1.2, fall = 3.6 + Math.random() * 1.6;
-    g.setTargetAtTime(pk, t, r / 2.6); f.setTargetAtTime(600 + 600 * pk, t, r / 2.6);
-    g.setTargetAtTime(0.14, t + r, fall / 3); f.setTargetAtTime(300, t + r, fall / 3);
-    AMB.next = t + r + fall * (0.75 + Math.random() * 0.25); AMB.waves++; }
+  const L = AMB.L; if (!L) return; const now = A.ctx.currentTime, def = AMB_DEF[L.kind];
+  for (const k in def.ev) { const [a, b, fn, grid] = def.ev[k]; let guard = 0;
+    if (grid && L.next[k] === 0) { const per = 60 / (XM_BPM[Math.max(1, M.track)] || 125) * 2, t0 = XM.src ? XM.t0 : now; L.next[k] = t0 + Math.ceil((now + 0.05 - t0) / per) * per; } // ticks sit on the music's beat grid
+    while (L.next[k] < now + 0.6 && guard++ < 8) { const t = Math.max(L.next[k], now + 0.02), r = fn(L, t); L.next[k] = (typeof r === 'number' ? (grid ? L.next[k] : t) + r : t + a + Math.random() * (b - a)); }
+  }
 }
-function ambSync() { const on = !!(A.ctx && M.timer && M.track === 1 && state === 'play' && !paused); if (on && !AMB.src) ambStart(); else if (!on && AMB.src) ambStop(); ambTick(); }
+// events from the background visuals (drips landing, gator surfacing, ...): throttled so they never pile up
+function ambEv(kind, name, x) {
+  const L = AMB.L; if (!L || L.kind !== kind || !A.ctx) return; const now = A.ctx.currentTime, gap = { drip: 0.6, gator: 6, bubbles: 1.2 }[name] || 1;
+  if (now - (AMB.last[name] || 0) < gap) return; AMB.last[name] = now; const def = AMB_DEF[kind], p = x != null ? Math.max(-0.8, Math.min(0.8, (x / W) * 2 - 1)) : 0;
+  if (def[name]) { def[name](L, now + 0.01, p); if (def.ev[name]) L.next[name] = now + def.ev[name][1]; }
+}
+function ambSync() {
+  if (!A.ctx || !A.amb) return;
+  const prev = AMB.preview > performance.now(), live = state === 'play' && !paused;
+  const want = settings.sound && settings.vAmb > 0 && (live || prev) ? AMB_KIND[state === 'play' ? bgCur : 0] || (prev ? 'waves' : null) : null;
+  if (want !== AMB.kind) { ambStop(); if (want) ambStart(want); }
+  ambTick();
+}
 // the sequencer grid follows the new tempos
 for (let i = 0; i < TRACKS.length && i < XM_BPM.length; i++) TRACKS[i].bpm = XM_BPM[i];
 xmFetch(xmKey('loop', 0)).catch(() => {}); // start downloading the title loop right away (decoded after the first tap)
@@ -1118,7 +1217,7 @@ function layout() {
   L.sx = L.bx + bw + cell * 0.45; L.sw = cell * 3.35;
   buildSprites(); makeCaches();
 }
-function buildSprites() { sprites = makeSpriteSet(wallet.skin, Math.max(4, Math.round(L.cell * DPR))); }
+function buildSprites() { const s = Math.max(4, Math.round(L.cell * DPR)); sprites = makeSpriteSet(wallet.skin, s); if (settings.cb) cbSymbols(sprites, s); }
 function makeSpriteSet(skin, s) {
   const base = ['#3D8BFF', '#FFD23F', '#FF4FA3', '#2EE6A6', '#FF8A1F', 'RAINBOW', '#8d99a6', '#2a2140', '#ffffff'];
   const set = base.map((c, idx) => {
@@ -1610,7 +1709,7 @@ function bgSewer(t) {
     for (let i = W2.sb.length - 1; i >= 0; i--) {
       const b = W2.sb[i]; b.t += dt; b.x += 6 * dt;
       if (b.st === 'rise') { b.y -= b.v * dt; if (b.y <= wy + 2) { b.y = wy + 1; b.st = 'float'; b.t = 0; b.life = rand(0.8, 2.4); } }
-      else if (b.t > b.life) { W2.pops++; if (BG.rings.length < 16) BG.rings.push({ x: b.x, y: wy + 2, t: 0, s: 0.6 }); W2.sb.splice(i, 1); continue; }
+      else if (b.t > b.life) { W2.pops++; ambEv('deep', 'bubbles', b.x); if (BG.rings.length < 16) BG.rings.push({ x: b.x, y: wy + 2, t: 0, s: 0.6 }); W2.sb.splice(i, 1); continue; }
       const r = b.st === 'float' ? b.r * 1.3 : b.r;
       ctx.strokeStyle = 'rgba(180,230,140,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(b.x, b.y, r, b.st === 'float' ? Math.PI : 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = 'rgba(230,255,200,0.5)'; ctx.fillRect(b.x - r * 0.45, b.y - r * 0.55, 1.4, 1.4);
@@ -1624,7 +1723,7 @@ function bgSewer(t) {
   for (const d of BG.drips) {
     if (d.ph === 'wait') { d.w -= dt; if (d.w <= 0) { d.ph = 'grow'; d.r = 0; } continue; }
     if (d.ph === 'grow') { d.r += dt * 3 / d.gr; if (d.r >= 3) { d.ph = 'fall'; d.y = d.y0 + 3; d.vy = 30; } }
-    else { d.vy += 980 * dt; d.y += d.vy * dt; if (d.y >= wy) { d.ph = 'wait'; d.w = rand(0.3, 2.2); d.gr = rand(0.8, 2.4); if (BG.rings.length < 16) BG.rings.push({ x: d.x, y: wy + 2, t: 0, s: 1 }); for (let k = 0; k < 3 && BG.splash.length < 24; k++) BG.splash.push({ x: d.x, y: wy, vx: rand(-40, 40), vy: rand(-140, -70), t: 0 }); } }
+    else { d.vy += 980 * dt; d.y += d.vy * dt; if (d.y >= wy) { ambEv('sewer', 'drip', d.x); d.ph = 'wait'; d.w = rand(0.3, 2.2); d.gr = rand(0.8, 2.4); if (BG.rings.length < 16) BG.rings.push({ x: d.x, y: wy + 2, t: 0, s: 1 }); for (let k = 0; k < 3 && BG.splash.length < 24; k++) BG.splash.push({ x: d.x, y: wy, vx: rand(-40, 40), vy: rand(-140, -70), t: 0 }); } }
     ctx.fillStyle = 'rgba(170,230,140,0.85)';
     if (d.ph === 'grow') { ctx.beginPath(); ctx.arc(d.x, d.y0 + d.r, d.r, 0, 7); ctx.fill(); }
     else { ctx.beginPath(); ctx.ellipse(d.x, d.y, 2.2, 3.6, 0, 0, 7); ctx.fill(); }
@@ -1644,7 +1743,7 @@ function drawGator(dt, t, wy) {
     }
     if (gt.nextSink <= 0 && !gt.blink) { gt.state = 'sink'; gt.t = 0; gt.sinks++; BG.rings.push({ x: gt.x, y: wy + 2, t: 0, s: 1.6 }); }
   } else if (gt.state === 'sink') { gt.dy = Math.min(1, gt.t / 1.1) * 18; if (gt.t > 1.1) { gt.state = 'under'; gt.t = 0; gt.under = rand(2, 4.5); } }
-  else if (gt.state === 'under') { if (gt.t > gt.under) { gt.state = 'rise'; gt.t = 0; gt.x = colX() + rand(-10, 10); BG.rings.push({ x: gt.x, y: wy + 2, t: 0, s: 1.6 }); } }
+  else if (gt.state === 'under') { if (gt.t > gt.under) { gt.state = 'rise'; gt.t = 0; ambEv('sewer', 'gator', gt.x); gt.x = colX() + rand(-10, 10); BG.rings.push({ x: gt.x, y: wy + 2, t: 0, s: 1.6 }); } }
   else if (gt.state === 'rise') { gt.dy = 18 * (1 - Math.min(1, gt.t / 1.2)); if (gt.t > 1.2) { gt.state = 'up'; gt.t = 0; gt.dy = 0; gt.nextSink = rand(18, 30); gt.nextBlink = rand(0.6, 2); } }
   if (gt.state === 'under') return;
   let lid = 0;
@@ -2129,7 +2228,7 @@ function bgCaverns(t) {
   for (const d of BG.cdrips) {
     if (d.ph === 'wait') { d.w -= dt; if (d.w <= 0) { d.ph = 'grow'; d.r = 0; } continue; }
     if (d.ph === 'grow') { d.r += dt * 3 / d.gr; if (d.r >= 3) { d.ph = 'fall'; d.y = d.y0 + 3; d.vy = 20; } }
-    else { d.vy += 900 * dt; d.y += d.vy * dt; if (d.y >= py) { d.ph = 'wait'; d.w = rand(0.4, 2.5); d.gr = rand(1, 2.6); if (BG.cring.length < 14) BG.cring.push({ x: d.x, t: 0 }); for (let k = 0; k < 4 && BG.csplash.length < 24; k++) BG.csplash.push({ x: d.x, y: py, vx: rand(-40, 40), vy: rand(-150, -70) }); } }
+    else { d.vy += 900 * dt; d.y += d.vy * dt; if (d.y >= py) { ambEv('cave', 'drip', d.x); d.ph = 'wait'; d.w = rand(0.4, 2.5); d.gr = rand(1, 2.6); if (BG.cring.length < 14) BG.cring.push({ x: d.x, t: 0 }); for (let k = 0; k < 4 && BG.csplash.length < 24; k++) BG.csplash.push({ x: d.x, y: py, vx: rand(-40, 40), vy: rand(-150, -70) }); } }
     ctx.globalCompositeOperation = 'lighter'; glowAt('rgba(125,249,255,1)', d.x, d.ph === 'grow' ? d.y0 + d.r : d.y, 9, 0.6); ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = '#d9fbff'; ctx.beginPath(); if (d.ph === 'grow') ctx.arc(d.x, d.y0 + d.r, d.r, 0, 7); else ctx.ellipse(d.x, d.y, 2, 3.4, 0, 0, 7); ctx.fill();
   }
@@ -2353,10 +2452,10 @@ function setBG(i) { if (i === bgCur) return; bgPrev = bgCur; bgCur = i; bgFade =
 const P = [], MAXP = 700, FT = [], BURSTS = [], RINGS = [], TRAILS = [], TUMBLE = [];
 let shakeT = 0, shakeD = 1, shakeM = 0, flashA = 0, banner = null;
 function part(x, y, vx, vy, life, size, color, grav, type) {
-  if (P.length >= MAXP) return;
+  if (P.length >= (settings.fx === 'low' ? 160 : MAXP) || (settings.fx === 'low' && type !== 3 && type !== 4 && Math.random() < 0.6)) return;
   P.push({ x, y, vx, vy, life, max: life, size, color, grav, type: type || 0, rot: rand(0, 6), vr: rand(-10, 10) });
 }
-function shake(d, m) { const cur = shakeT > 0 ? shakeM * (shakeT / shakeD) : 0; if (m >= cur) { shakeT = d; shakeD = d; shakeM = m; } }
+function shake(d, m) { const sk = [0, 0.45, 1][settings.shake]; if (!sk) return; m *= sk; const cur = shakeT > 0 ? shakeM * (shakeT / shakeD) : 0; if (m >= cur) { shakeT = d; shakeD = d; shakeM = m; } }
 function floatText(s, x, y, color, size, d) { FT.push({ s, x, y, color, size, t: 0, d: d || 1.1 }); }
 function burst(x, y) {
   BURSTS.push({ x, y, t: 0, text: ['POW!', 'BAM!', 'WHAM!', 'BONK!', 'KAPOW!', 'THWACK!'][Math.random() * 6 | 0], rot: rand(-0.3, 0.3), r: Math.min(70, W * 0.16) });
@@ -2558,7 +2657,7 @@ function hardDrop() {
     const [sx, sy] = cellXY(p.x + Number(k), bottoms[k].y + 1);
     for (let i = 0; i < 7; i++) part(sx + rand(0, c), sy, rand(-260, 260), rand(-380, -60), rand(0.3, 0.6), 3, i % 2 ? '#fff6b0' : bottoms[k].col, 1200, 1);
   }
-  sfx.slam(); shake(0.18, Math.min(9, 3 + d * 0.4));
+  sfx.slam(); vib(12); shake(0.18, Math.min(9, 3 + d * 0.4));
   lockPiece(true);
 }
 function lockPiece(hard) {
@@ -2665,13 +2764,13 @@ function beginPop(pop) {
   if (g.boss && g.boss.hp > 0) hitBoss(Math.round(count * (1 + 0.5 * (g.chain - 1))));
   if (g.chain >= 2) {
     floatText('CHAIN x' + g.chain + '!', L.bx + c * 5, L.by + c * 6, g.chain >= 4 ? '#ff4fa3' : '#2bf0ff', Math.min(c * (1.1 + g.chain * 0.15), W * 0.13), 1.4);
-    shake(0.25 + g.chain * 0.05, 4 + g.chain * 2);
+    shake(0.25 + g.chain * 0.05, 4 + g.chain * 2); vib(20 + g.chain * 10);
     RINGS.push({ x: cx, y: cy, r: c * (4 + g.chain), t: 0, color: '#2bf0ff' });
   }
   if (maxG >= 8) {
     g.megas++;
     floatText('MEGA POP!', L.bx + c * 5, L.by + c * 8.5, '#ff2bd6', Math.min(c * 1.5, W * 0.12), 1.6);
-    shake(0.55, 14); flashA = 0.5; sfx.quad(); sfx.chaching();
+    shake(0.55, 14); flashA = 0.5; sfx.quad(); sfx.chaching(); vib([30, 40, 30]);
     RINGS.push({ x: cx, y: cy, r: c * 9, t: 0, color: '#ffe23d' });
   } else if (g.chain < 2) shake(0.12, 3);
   const nl = Math.floor(g.popped / LEVEL_POPS) + 1;
@@ -2888,7 +2987,7 @@ function gameOver() {
     TUMBLE.push({ x: sx + c / 2, y: sy + c / 2, vx: rand(-220, 220), vy: rand(-650, -150) - (ROWS - y) * 8, r: 0, vr: rand(-8, 8), c: spr(v), s: c });
     g.board[y][x] = 0;
   }
-  g.danger = false; pendFX = null; g.wipe = null; musicStop(); sfx.over(); shake(0.4, 8);
+  g.danger = false; pendFX = null; g.wipe = null; musicStop(); sfx.over(); shake(0.4, 8); vib(120);
   bankRun();
   overJoke = OVER_JOKES[Math.random() * OVER_JOKES.length | 0];
 }
@@ -2916,8 +3015,11 @@ const dbg = {
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
-  get amb() { return { on: !!AMB.src, waves: AMB.waves, level: AMB.level, g: AMB.g ? AMB.g.gain.value : 0, lp: AMB.lp ? AMB.lp.frequency.value : 0 }; },
-  ambLevel(v) { AMB.level = v; if (AMB.out) AMB.out.gain.value = v; },
+  get amb() { return { on: !!AMB.L, kind: AMB.kind, events: AMB.events, waves: AMB.waves, out: AMB.L ? AMB.L.out.gain.value : 0, bus: A.amb ? A.amb.gain.value : 0 }; },
+  ambLevel(v) { if (A.amb) A.amb.gain.value = v; },
+  get settings() { return JSON.parse(JSON.stringify(settings)); }, get opt() { return { open: opt.open, confirm: opt.confirm, from: opt.from }; },
+  get buses() { return A.ctx ? { mus: A.mus.gain.value, sfx: A.sfx.gain.value, amb: A.amb.gain.value } : null; },
+  setBG(i) { setBG(i); },
   get xm() { return { on: XM.on, gain: XM.gain, prime: XM.prime, dly: Object.assign({}, XM.dly), sd: XM.sd ? XM.sd.gain.value : 1, sr: A.ctx ? A.ctx.sampleRate : 0, track: XM.track, playing: !!XM.src, t0: XM.t0, plays: XM.plays, fans: XM.fans, danger: !!XM.dSrc, dangerOn: XM.dOn, loaded: Object.keys(XM.buf), failed: Object.keys(XM.failed), err: XM.lastErr, duck: XM.duck ? XM.duck.gain.value : 1, now: A.ctx ? A.ctx.currentTime : 0, pos: A.ctx && XM.src ? ((A.ctx.currentTime - XM.t0) % xmLoopLen(XM.track) + xmLoopLen(XM.track)) % xmLoopLen(XM.track) : -1 }; },
   xmGain(v) { XM.gain = v; if (XM.bus) XM.bus.gain.value = v; },
   xmEnable(v) { XM.on = !!v; if (!XM.on) xmStopAll(); },
@@ -2964,7 +3066,7 @@ function updateHolds(dt) {
 }
 function setPaused(p) {
   if (state !== 'play' || paused === p) return;
-  paused = p; if (!p) pmenu = false; for (const k in holds) delete holds[k]; g.soft = false; heldBtn.clear(); gest.clear();
+  paused = p; if (!p) { pmenu = false; opt.open = false; } for (const k in holds) delete holds[k]; g.soft = false; heldBtn.clear(); gest.clear();
   sfx.pause();
 }
 function toggleSound() {
@@ -2973,7 +3075,7 @@ function toggleSound() {
 }
 let DBG_STAGE = 0; try { DBG_STAGE = Math.max(0, Math.min(10, parseInt(new URLSearchParams(location.search).get('stage'), 10) || 0)); } catch (e) { /* ignore */ }
 function startGame() { newGame(); state = 'play'; paused = false; M.step = 0; if (DBG_STAGE > 1) dbg.setStage(DBG_STAGE - 1); }
-function toMenu() { state = 'title'; paused = false; setBG(5); M.stage = 0; confirmReset = false; P.length = 0; TUMBLE.length = 0; banner = null; }
+function toMenu() { opt.open = false; state = 'title'; paused = false; setBG(5); M.stage = 0; confirmReset = false; P.length = 0; TUMBLE.length = 0; banner = null; }
 function doAction(id) {
   switch (id) {
     case 'play': case 'again': case 'restart': startGame(); break;
@@ -2982,6 +3084,7 @@ function doAction(id) {
     case 'store': openStore(); break;
     case 'back': case 'menu': toMenu(); break;
     case 'resume': setPaused(false); break;
+    case 'options': openOptions(state === 'play' ? 'pause' : 'title'); break;
     case 'sort': sortKey = sortKey === 's' ? 'l' : sortKey === 'l' ? 'lv' : 's'; break;
     case 'reset': confirmReset = true; break;
     case 'resetNo': confirmReset = false; break;
@@ -2995,6 +3098,7 @@ function hitUI(x, y) {
 const CTRL = { c_left: 'left', c_right: 'right', c_down: 'down' };
 function pressButton(b, x, y, pid) {
   const id = b.id;
+  if (opt.open) { optPress(b, x); return; }
   pressAnim[id] = 0;
   if (id.startsWith('c_')) {
     heldBtn.set(pid, id);
@@ -3020,12 +3124,6 @@ function pressButton(b, x, y, pid) {
   }
   if (pending) return;
   sfx.punch(); burst(x, y);
-  if (id === 'sound' || id === 'music' || id === 'buttons') {
-    if (id === 'sound') { toggleSound(); if (settings.sound) sfx.punch(); }
-    else if (id === 'music') { settings.music = !settings.music; saveSettings(); }
-    else { settings.buttons = !settings.buttons; saveSettings(); layout(); }
-    return;
-  }
   if (id === 'ok') { submitEntry(); return; }
   pending = { id, t: 0.22 };
 }
@@ -3034,6 +3132,7 @@ function onDown(e) {
   audioUnlock();
   const x = e.clientX, y = e.clientY, b = hitUI(x, y);
   if (b) { pressButton(b, x, y, e.pointerId); return; }
+  if (opt.open) return;
   if (state === 'title') logoTap(y);
   if (state === 'play' && !paused) {
     const now = performance.now();
@@ -3042,6 +3141,7 @@ function onDown(e) {
 }
 function onMove(e) {
   const x = e.clientX, y = e.clientY;
+  if (opt.drag) { if (e.cancelable) e.preventDefault(); setSlider(opt.drag.id, x); return; }
   if (e.pointerType === 'mouse') { const b = hitUI(x, y); hoverId = b ? b.id : null; }
   const p = gest.get(e.pointerId);
   if (!p) return;
@@ -3059,6 +3159,7 @@ function onMove(e) {
   }
 }
 function onUp(e) {
+  if (opt.drag) { const sl = SLIDERS.find((s) => s[0] === opt.drag.id); opt.drag = null; saveSettings(); if (sl) sliderPreview(sl[1], true); }
   const hb = heldBtn.get(e.pointerId);
   if (hb) { heldBtn.delete(e.pointerId); if (CTRL[hb]) holdEnd(CTRL[hb]); }
   const p = gest.get(e.pointerId);
@@ -3092,7 +3193,8 @@ window.addEventListener('keydown', (e) => {
   const k = e.key;
   if (k.startsWith('Arrow') || k === ' ') e.preventDefault();
   if (k === 'm' || k === 'M') { toggleSound(); return; }
-  if (k === 'n' || k === 'N') { settings.music = !settings.music; saveSettings(); return; }
+  if (k === 'n' || k === 'N') { if (settings.vMusic > 0) { settings.vMusicLast = settings.vMusic; settings.vMusic = 0; } else settings.vMusic = settings.vMusicLast || 70; applyVolumes(); saveSettings(); return; }
+  if (opt.open) { if (k === 'Escape' || k === 'Backspace') closeOptions(); return; }
   if (state === 'title') { if (!e.repeat && !pending && (k === 'Enter' || k === ' ')) { sfx.punch(); burst(W / 2, H / 2); pending = { id: 'play', t: 0.22 }; } return; }
   if (state === 'scores' || state === 'howto') { if (k === 'Escape' || k === 'Enter' || k === 'Backspace') toMenu(); return; }
   if (state === 'over') { if (!e.repeat && k === 'Enter') startGame(); else if (k === 'Escape') toMenu(); return; }
@@ -3240,7 +3342,7 @@ function drawTitle() {
   by = Math.min(by, L.bot - (bh + gap) * 5 - 34); // leaves room for the footer + copyright lines
   logoBox.y0 = ly - size * 1.2; logoBox.y1 = ly + size * 1.6;
   const items = [['play', 'PLAY!', DEEP], ['store', 'STORE', OCEAN], ['scores', 'BEST SCORES', TEAL], ['howto', 'HOW TO PLAY', AQUA],
-    ['sound', 'SOUND: ' + (settings.sound ? 'ON' : 'OFF'), settings.sound ? OCEAN : ['#4a6572', '#2c3e50']]];
+    ['options', 'OPTIONS', OCEAN]];
   items.forEach(([id, label, col], i) => button(id, cx, by + i * (bh + gap) + bh / 2, bw * (i === 0 ? 1.08 : 1), bh * (i === 0 ? 1.12 : 1), label, col, { rot: Math.sin(T * 2.5 + i) * 0.025 }));
   txt('tap a button. go on. we dare you.', cx, L.bot - 24, 12, 'rgba(255,255,255,0.6)', null);
   fitTxt(COPYRIGHT, cx, L.bot - 8, 11, W * 0.92, 'rgba(255,255,255,0.78)', 'rgba(3,20,40,0.85)');
@@ -3372,7 +3474,7 @@ function drawBoard() {
   const p = g.piece;
   if (p && state === 'play') {
     const cells = ROT[p.t][p.r];
-    if (!g.res) {
+    if (!g.res && settings.ghost) {
       const gy = ghostY();
       ctx.globalAlpha = 0.25;
       cells.forEach(([cx, cy], i) => drawBlock(spr(p.cols[i]), bx + (p.x + cx) * c, by + (gy + cy - HID) * c, c));
@@ -3518,6 +3620,7 @@ function drawControls() {
   if (!settings.buttons || state !== 'play' || paused) return;
   const n = 5, aw = L.right - L.left, w = Math.min(aw / n - 10, 92), h = L.ctrlH - 6, y = L.bot - L.ctrlH / 2;
   const defs = [['c_left', 'left', TEAL], ['c_right', 'right', TEAL], ['c_hard', 'hard', OCEAN], ['c_down', 'down', AQUA], ['c_rot', 'rot', DEEP]];
+  if (settings.hand === 'left') defs.splice(0, 5, defs[4], defs[3], defs[2], defs[0], defs[1]); // rotate/drop under the left thumb, arrows keep their order
   defs.forEach(([id, ic, col], i) => button(id, L.left + aw * (i + 0.5) / n, y, w, h, '', col, { icon: ic, alpha: 0.9, glow: false }));
 }
 function drawBannerUI() {
@@ -3542,13 +3645,12 @@ function drawBannerUI() {
 }
 function drawPause() {
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
-  const pw = Math.min(W - 40, 340), bh = Math.min(54, H * 0.065), gap = bh * 0.3, ph = bh * 5 + gap * 4 + 172;
+  const pw = Math.min(W - 40, 340), bh = Math.min(54, H * 0.065), gap = bh * 0.3, ph = bh * 4 + gap * 3 + 172;
   const px = (W - pw) / 2, py = (H - ph) / 2;
   panel(px, py, pw, ph, STAGES[g.stage].c1);
   wobblyWord('PAUSED', W / 2, py + 44, Math.min(44, pw / 6), T, 0, COLORS, pw * 0.9);
   fitTxt('Go grab a snack. The blocks will wait.', W / 2, py + 88, 15, pw * 0.9, '#ffe23d', null);
-  const items = [['resume', 'RESUME', DEEP], ['restart', 'RESTART', TEAL], ['music', 'MUSIC: ' + (settings.music ? 'ON' : 'OFF'), AQUA],
-    ['buttons', 'BUTTONS: ' + (settings.buttons ? 'ON' : 'OFF'), OCEAN], ['menu', 'MAIN MENU', TEAL]];
+  const items = [['resume', 'RESUME', DEEP], ['restart', 'RESTART', TEAL], ['options', 'OPTIONS', AQUA], ['menu', 'MAIN MENU', OCEAN]];
   items.forEach(([id, l, col], i) => button(id, W / 2, py + 120 + i * (bh + gap) + bh / 2, pw * 0.8, bh, l, col));
   fitTxt(COPYRIGHT, W / 2, py + ph - 16, 11, pw * 0.9, 'rgba(255,255,255,0.75)', null);
 }
@@ -3828,16 +3930,123 @@ function drawBanked(cx, y, big) {
   txt('BANKED +' + money(b.amt), 0, 0, big ? 22 : 16, '#ffd23d', '#3a1a00', 'center', NFONT); ctx.restore();
   txt('WALLET ' + money(shown), cx, y + (big ? 26 : 20), big ? 15 : 13, '#5dff9a', '#062a12', 'center', NFONT);
 }
+// ---------------------------------------------------------------- options menu (title + pause)
+const opt = { open: false, from: null, confirm: false, drag: null, sl: {}, prevT: 0, lastPrev: 0, msg: null };
+function openOptions(from) { opt.open = true; opt.from = from; opt.confirm = false; opt.drag = null; }
+function closeOptions() { opt.open = false; opt.confirm = false; opt.drag = null; saveSettings(); }
+const SLIDERS = [['sl_vMusic', 'vMusic', 'MUSIC'], ['sl_vSfx', 'vSfx', 'BLOCKS / SFX'], ['sl_vAmb', 'vAmb', 'AMBIENT']];
+function setSlider(id, x) {
+  const g0 = opt.sl[id]; if (!g0) return; const key = SLIDERS.find((s) => s[0] === id)[1];
+  const v = Math.round(Math.max(0, Math.min(1, (x - g0.x0) / (g0.x1 - g0.x0))) * 20) * 5; // 5% steps
+  if (v === settings[key]) return; settings[key] = v; applyVolumes(); sliderPreview(key, false);
+}
+function sliderPreview(key, release) { // live preview of the bus being adjusted
+  const now = performance.now(); if (!release && now - opt.lastPrev < 160) return; opt.lastPrev = now;
+  if (key === 'vSfx') { if (release) sfx.pop(1, 4); else sfx.blip(); }
+  else if (key === 'vAmb') { AMB.preview = now + 4000; if (release && AMB.L) { const k = AMB.L.kind, d = AMB_DEF[k]; if (d.drip) ambEv(k, 'drip', W / 2); } }
+}
+function optToggle(id) {
+  if (id === 'o_vib') { if (!CAN_VIB) { opt.msg = { t: 2.5, text: 'Vibration is not supported in this browser (iPhone Safari)' }; return; } settings.vibrate = !settings.vibrate; vib(30); }
+  else if (id === 'o_shake') { settings.shake = (settings.shake + 2) % 3; shake(0.25, 8); }
+  else if (id === 'o_fx') settings.fx = settings.fx === 'full' ? 'low' : 'full';
+  else if (id === 'o_ghost') settings.ghost = !settings.ghost;
+  else if (id === 'o_cb') { settings.cb = !settings.cb; buildSprites(); }
+  else if (id === 'o_hand') settings.hand = settings.hand === 'right' ? 'left' : 'right';
+  else if (id === 'o_btns') { settings.buttons = !settings.buttons; layout(); }
+  else if (id === 'o_fps') settings.fps = !settings.fps;
+  saveSettings();
+}
+function resetProgress() {
+  scores = []; store.set('bb_scores_v2', scores);
+  const ed = wallet.edition, gr = wallet.grants; store.set('bb_wallet', {}); wallet = loadWallet(); wallet.edition = ed; wallet.grants = gr; if (ed === 'full' && gr.full) wallet.cash = START_CASH.full; saveWallet();
+  buildSprites(); opt.msg = { t: 2.5, text: 'Progress reset. Fresh start!' };
+}
+const OFFC = ['#4a6572', '#2c3e50'], DANGER = ['#ff6b6b', '#ff4050', '#c2185b'];
+function drawOptions() {
+  UI.length = 0; // modal: only the options are clickable
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
+  const pw = Math.min(W - 16, 420), ph = Math.min(L.bot - L.top - 4, 640), px = (W - pw) / 2, py = L.top + (L.bot - L.top - ph) / 2;
+  panel(px, py, pw, ph, '#00E5FF');
+  const head = Math.min(52, ph * 0.09);
+  wobblyWord('OPTIONS', W / 2, py + head * 0.62, Math.min(34, pw / 8, head * 0.75), T, 2, COLORS, pw * 0.8);
+  const foot = 22, rows = 9, rowH = Math.min(60, (ph - head - foot - 8) / rows), bh = Math.min(50, rowH * 0.84), pad = Math.max(10, pw * 0.04);
+  let y = py + head + rowH / 2;
+  // volume sliders
+  for (const [id, key, label] of SLIDERS) {
+    const lx = px + pad, x0 = px + pw * 0.36, x1 = px + pw - pad - pw * 0.15, v = settings[key], kx = x0 + (x1 - x0) * v / 100, kr = Math.min(15, rowH * 0.3);
+    fitTxt(label, lx, y, Math.min(17, rowH * 0.32), pw * 0.32 - pad, '#E0FFF7', '#03243a', 'left');
+    rr(x0, y - 6, x1 - x0, 12, 6); ctx.fillStyle = '#03202e'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#1DE9B6'; ctx.stroke();
+    if (v > 0) { const gr = ctx.createLinearGradient(x0, 0, x1, 0); gr.addColorStop(0, '#2979FF'); gr.addColorStop(0.5, '#00E5FF'); gr.addColorStop(1, '#1DE9B6'); rr(x0, y - 6, Math.max(12, kx - x0), 12, 6); ctx.fillStyle = gr; ctx.fill(); }
+    ctx.beginPath(); ctx.arc(kx, y, kr * (opt.drag && opt.drag.id === id ? 1.2 : 1), 0, 7); ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#03243a'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(kx, y, kr * 0.45, 0, 7); ctx.fillStyle = v > 0 ? '#1DE9B6' : '#ff4050'; ctx.fill();
+    txt(v > 0 ? v + '%' : 'OFF', px + pw - pad, y + 1, Math.min(16, rowH * 0.3), v > 0 ? '#7dffe0' : '#ffb3b3', '#03243a', 'right', NFONT);
+    opt.sl[id] = { x0, x1 }; UI.push({ id, x: x0 - kr - 6, y: y - rowH / 2, w: x1 - x0 + 2 * kr + 12, h: rowH });
+    y += rowH;
+  }
+  // toggles (2 columns)
+  const cw = (pw - pad * 3) / 2, c1 = px + pad + cw / 2, c2 = px + pw - pad - cw / 2, on = (b) => (b ? OCEAN : OFFC);
+  const items = [
+    ['o_vib', CAN_VIB ? 'VIBRATE: ' + (settings.vibrate ? 'ON' : 'OFF') : 'VIBRATE: N/A', CAN_VIB ? on(settings.vibrate) : OFFC],
+    ['o_shake', 'SHAKE: ' + ['OFF', 'LOW', 'FULL'][settings.shake], settings.shake ? TEAL : OFFC],
+    ['o_fx', 'PARTICLES: ' + settings.fx.toUpperCase(), settings.fx === 'full' ? AQUA : TEAL],
+    ['o_ghost', 'GHOST: ' + (settings.ghost ? 'ON' : 'OFF'), on(settings.ghost)],
+    ['o_cb', 'COLORBLIND: ' + (settings.cb ? 'ON' : 'OFF'), settings.cb ? DEEP : OFFC],
+    ['o_hand', settings.hand === 'right' ? 'RIGHT-HANDED' : 'LEFT-HANDED', AQUA],
+    ['o_btns', 'BUTTONS: ' + (settings.buttons ? 'ON' : 'OFF'), on(settings.buttons)],
+    ['o_fps', 'SHOW FPS: ' + (settings.fps ? 'ON' : 'OFF'), settings.fps ? TEAL : OFFC],
+  ];
+  items.forEach(([id, label, col], i) => { const cy = y + Math.floor(i / 2) * rowH; button(id, i % 2 ? c2 : c1, cy, cw, bh, label, col, { fs: Math.min(17, bh * 0.36) }); });
+  y += rowH * 4;
+  button('o_reset', c1, y, cw, bh, 'RESET PROGRESS', DANGER, { fs: Math.min(17, bh * 0.36) });
+  button('o_done', c2, y, cw, bh, 'DONE', DEEP);
+  if (!CAN_VIB) fitTxt('iPhone Safari has no vibration', W / 2, y + bh / 2 + 9, 10, pw * 0.9, 'rgba(255,255,255,0.55)', null);
+  fitTxt(COPYRIGHT, W / 2, py + ph - 11, 11, pw * 0.92, 'rgba(255,255,255,0.75)', null);
+  if (opt.msg) { opt.msg.t -= 1 / 60; if (opt.msg.t <= 0) opt.msg = null; else { const my = py + head + rowH * 3; rr(px + 12, my - 18, pw - 24, 36, 12); ctx.fillStyle = 'rgba(3,36,58,0.95)'; ctx.fill(); ctx.strokeStyle = '#ffe23d'; ctx.lineWidth = 2; ctx.stroke(); fitTxt(opt.msg.text, W / 2, my, 14, pw - 40, '#ffe23d', null); } }
+  if (opt.confirm) {
+    UI.length = 0; ctx.fillStyle = 'rgba(0,0,0,0.72)'; rr(px, py, pw, ph, 18); ctx.fill();
+    wobblyWord('RESET EVERYTHING?', W / 2, py + ph * 0.36, Math.min(32, pw / 10), T * 1.6, 0, ['#ff4050', '#ffe23d'], pw * 0.9);
+    fitTxt('Deletes cash, store items and best scores.', W / 2, py + ph * 0.36 + 40, 15, pw * 0.9, '#fff', null);
+    fitTxt('Your options stay. This cannot be undone.', W / 2, py + ph * 0.36 + 62, 13, pw * 0.9, '#ffb3b3', null);
+    button('o_resetYes', W / 2 - pw * 0.23, py + ph * 0.62, pw * 0.4, Math.max(48, bh), 'YES, RESET', DANGER);
+    button('o_resetNo', W / 2 + pw * 0.23, py + ph * 0.62, pw * 0.4, Math.max(48, bh), 'NO, KEEP IT', TEAL);
+  }
+}
+function optPress(b, x) { // returns true when handled
+  const id = b.id;
+  if (id.startsWith('sl_')) { opt.drag = { id }; setSlider(id, x); return true; }
+  if (!id.startsWith('o_')) return false;
+  pressAnim[id] = 0;
+  if (id === 'o_done') { sfx.blip(); closeOptions(); return true; }
+  if (id === 'o_reset') { sfx.danger(); opt.confirm = true; return true; }
+  if (id === 'o_resetNo') { sfx.blip(); opt.confirm = false; return true; }
+  if (id === 'o_resetYes') { opt.confirm = false; resetProgress(); sfx.punch(); return true; }
+  optToggle(id); sfx.blip(); return true;
+}
+// colorblind mode: a distinct white symbol on each of the 5 colors (circle, triangle, cross, diamond, star)
+function cbSymbols(set, s) {
+  for (let i = 0; i < 5; i++) { const o = document.createElement('canvas'); o.width = o.height = s; const x = o.getContext('2d'); x.drawImage(set[i], 0, 0, s, s);
+    const m = s / 2, r = s * 0.24; x.translate(m, m); x.beginPath();
+    if (i === 0) x.arc(0, 0, r, 0, 7);
+    else if (i === 1) { x.moveTo(0, -r * 1.1); x.lineTo(r * 1.05, r * 0.8); x.lineTo(-r * 1.05, r * 0.8); x.closePath(); }
+    else if (i === 2) { const w = r * 0.38; x.moveTo(-r, -r + w); x.lineTo(-r + w, -r); x.lineTo(0, -w); x.lineTo(r - w, -r); x.lineTo(r, -r + w); x.lineTo(w, 0); x.lineTo(r, r - w); x.lineTo(r - w, r); x.lineTo(0, w); x.lineTo(-r + w, r); x.lineTo(-r, r - w); x.lineTo(-w, 0); x.closePath(); }
+    else if (i === 3) { x.moveTo(0, -r * 1.15); x.lineTo(r * 1.15, 0); x.lineTo(0, r * 1.15); x.lineTo(-r * 1.15, 0); x.closePath(); }
+    else { for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr2 = k % 2 ? r * 0.5 : r * 1.15; x.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); } x.closePath(); }
+    x.fillStyle = 'rgba(255,255,255,0.92)'; x.fill(); x.lineWidth = Math.max(1, s * 0.06); x.strokeStyle = 'rgba(0,0,0,0.65)'; x.stroke(); set[i] = o; }
+  return set;
+}
+let fpsS = 60, fpsLast = 0;
+function drawFPS() { if (!settings.fps) return; txt(Math.round(fpsS) + ' FPS', L.left + 2, L.top + 8, 11, fpsS >= 55 ? '#7dffb0' : '#ffd180', '#03243a', 'left', NFONT); }
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
 function syncMusic() {
-  const want = A.ctx && settings.sound && settings.music && (state === 'title' || state === 'scores' || state === 'howto' || state === 'store' || (state === 'play' && !paused));
+  const want = A.ctx && settings.sound && settings.vMusic > 0 && (state === 'title' || state === 'scores' || state === 'howto' || state === 'store' || (state === 'play' && (!paused || opt.open)));
   if (want && !M.timer) musicStart(); else if (!want && M.timer) musicStop();
   if (state !== 'play') M.stage = 0;
   syncTrack(); updatePending(); try { ambSync(); } catch (e) { /* ambience is optional */ }
 }
 let TS = 1; // test hook: game-speed multiplier
 function frame(now) {
+  const rdt = (now - last) / 1000; if (rdt > 0 && rdt < 0.5) fpsS += (1 / rdt - fpsS) * 0.05;
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * TS; last = now; T += dt;
   try {
     for (const k in pressAnim) { pressAnim[k] += dt; if (pressAnim[k] > 0.3) delete pressAnim[k]; }
@@ -3883,7 +4092,8 @@ function frame(now) {
       else if (state === 'over') drawOver();
       else if (state === 'won') drawWin();
     }
-    drawBursts();
+    if (opt.open) drawOptions();
+    drawBursts(); drawFPS();
   } catch (err) { console.error(err); }
   requestAnimationFrame(frame);
 }
