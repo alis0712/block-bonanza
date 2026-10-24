@@ -171,7 +171,12 @@ function audioUnlock() {
     }
   } catch (e) { /* audio is optional */ }
 }
-const aok = () => A.ctx && settings.sound && A.ctx.state === 'running';
+let aokTry = 0;
+const aok = () => {
+  if (!A.ctx || !settings.sound) return false;
+  if (A.ctx.state !== 'running') { const n = Date.now(); if (n - aokTry > 500) { aokTry = n; try { const p = A.ctx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } } return false; }
+  return true;
+};
 const anow = () => A.ctx.currentTime;
 function tone(f, d, type, v, o) {
   if (!aok()) return;
@@ -186,7 +191,7 @@ function tone(f, d, type, v, o) {
   gn.gain.exponentialRampToValueAtTime(0.0001, t + d);
   let node = os;
   if (o.lp) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; fl.Q.value = o.q || 1; os.connect(fl); node = fl; }
-  node.connect(gn); gn.connect(o.dest || A.sfx);
+  node.connect(gn); gn.connect(o.dest || A.sfx); if (!o.dest && v >= 0.06) xmSfxDuck();
   os.start(t); os.stop(t + d + 0.03);
 }
 function noise(d, v, type, freq, o) {
@@ -197,7 +202,7 @@ function noise(d, v, type, freq, o) {
   const fl = c.createBiquadFilter(); fl.type = type || 'lowpass'; fl.frequency.value = freq || 1000; fl.Q.value = o.q || 0.8;
   const gn = c.createGain();
   gn.gain.setValueAtTime(v, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  s.connect(fl); fl.connect(gn); gn.connect(o.dest || A.sfx);
+  s.connect(fl); fl.connect(gn); gn.connect(o.dest || A.sfx); if (!o.dest && v >= 0.1) xmSfxDuck();
   if (d > 0.45) s.loop = true;
   s.start(t, Math.random() * 0.5); s.stop(t + d + 0.02);
 }
@@ -805,8 +810,8 @@ function fanfare(E, ti, t) {
 // across the whole file so the loop window is click-free whatever the codec priming). Lazy-loaded per stage, next stage
 // preloaded, played on the same bar grid as the sequencer (M), danger layer + comeback fanfare are matching buffers.
 // If a file can't load the old procedural engine (makeMusic) plays that track instead.
-const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 7;
-const XM = { on: true, gain: 3.5, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
+const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 9, XM_MARK = 0.25;
+const XM = { on: true, gain: 2.2, sd: null, sdT: 0, prime: null, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
 const xmKey = (kind, i) => kind + '-' + String(i).padStart(2, '0');
 const xmLoopLen = (i) => XM_BARS * 240 / XM_BPM[i];
 function xmFetch(key) {
@@ -824,22 +829,29 @@ function xmDecode(key) {
   if (XM.dec[key]) return XM.dec[key];
   if (!A.ctx) return xmFetch(key).then(() => null);
   XM.dec[key] = xmFetch(key).then((ab) => new Promise((res, rej) => A.ctx.decodeAudioData(ab.slice(0), res, rej))).then((b) => {
-    const expect = key.startsWith('fanfare') ? 0 : (key.startsWith('loop') ? xmLoopLen(+key.slice(-2)) : XM_DBARS * 240 / XM_BPM[+key.slice(-2)]) + 2 * XM_PAD;
-    XM.dly[key] = expect && b.duration - expect > 0.02 ? 1105 / 44100 : 0; // undo MP3 encoder priming if the decoder kept it
+    XM.dly[key] = xmFindMark(b); // where the decoder really put t = 0 (MP3 encoder priming differs per browser)
     XM.buf[key] = b; delete XM.dec[key]; xmEvict(); return b;
   }).catch((e) => { XM.failed[key] = true; XM.lastErr = String(e && e.message || e); delete XM.dec[key]; return null; });
   return XM.dec[key];
 }
+// Every file starts with a 0.5 s pre-roll that is never played and holds one click at exactly 0.25 s. Its position in the
+// decoded buffer tells us the decoder's start offset, so loops sit sample-accurately on the bar grid in every browser.
+function xmFindMark(b) {
+  const d = b.getChannelData(0), sr = b.sampleRate, n = Math.min(d.length, Math.round(0.42 * sr)); let mi = 0, mv = 0;
+  for (let i = 0; i < n; i++) { const v = d[i] < 0 ? -d[i] : d[i]; if (v > mv) { mv = v; mi = i; } }
+  if (mv < 0.08) return XM.prime != null ? XM.prime : 0; // no marker found: fall back to the last measured offset
+  const off = Math.max(-0.05, Math.min(0.1, mi / sr - XM_MARK)); XM.prime = off; return off;
+}
 function xmEvict() { // keep memory bounded on phones: title, current, next (+ their danger/fanfare) only
   const keep = new Set(), cur = Math.max(0, XM.track), nx = Math.min(10, cur + 1);
-  for (const i of [0, cur, nx, Math.max(0, XM.want)]) { keep.add(xmKey('loop', i)); keep.add(xmKey('danger', i)); keep.add(xmKey('fanfare', i)); }
+  for (const i of cur === 0 ? [0, 1] : [cur, nx, Math.max(0, XM.want)]) { keep.add(xmKey('loop', i)); keep.add(xmKey('danger', i)); keep.add(xmKey('fanfare', i)); }
   for (const k in XM.buf) if (!keep.has(k)) delete XM.buf[k];
 }
 function xmPrefetch(i) { if (i < 0 || i > 10) return; xmDecode(xmKey('loop', i)); if (i > 0) { xmDecode(xmKey('danger', i)); xmDecode(xmKey('fanfare', i)); } }
 function xmGraph() {
   if (XM.bus || !A.ctx) return;
   const c = A.ctx; XM.bus = c.createGain(); XM.bus.gain.value = XM.gain; XM.bus.connect(A.mus);
-  XM.duck = c.createGain(); XM.duck.connect(XM.bus);
+  XM.sd = c.createGain(); XM.sd.connect(XM.bus); XM.duck = c.createGain(); XM.duck.connect(XM.sd);
 }
 const xmUsable = (i) => XM.on && !XM.failed[xmKey('loop', i)];
 // start track i so that loop position 0 (start of drop A) lands exactly on `when` (a bar line of M's grid)
@@ -855,6 +867,11 @@ function xmPlay(i, when) {
   s.connect(g); g.connect(XM.duck); xmStopLoop(when); s.start(when, XM_PAD + d);
   XM.src = s; XM.srcG = g; XM.t0 = when; XM.plays++;
   if (XM.dOn) { xmDangerStop(when, true); xmDanger(true, when); }
+}
+// sound effects duck the streamed music for a moment (-3.5 dB, ~150 ms) so pops, locks and cheers cut through
+function xmSfxDuck() {
+  if (!XM.sd || !XM.src) return; const t = A.ctx.currentTime; if (t - XM.sdT < 0.05) return; XM.sdT = t;
+  const gn = XM.sd.gain; gn.cancelScheduledValues(t); gn.setValueAtTime(gn.value, t); gn.linearRampToValueAtTime(0.67, t + 0.01); gn.setTargetAtTime(1, t + 0.12, 0.1);
 }
 function xmStopLoop(when, fade) {
   const s = XM.src, g = XM.srcG; if (!s) return; XM.src = null; XM.srcG = null;
@@ -878,7 +895,7 @@ function xmDangerStop(t, instant) { const s = XM.dSrc, g = XM.dG; if (!s) return
 function xmFanfare(i, t, alone) {
   if (!A.ctx) return 0; xmGraph(); const key = xmKey('fanfare', Math.max(1, i)), b = XM.buf[key]; if (!b) { xmDecode(key); return 0; }
   const s = A.ctx.createBufferSource(), g = A.ctx.createGain(), beat = 60 / XM_BPM[Math.max(1, i)];
-  s.buffer = b; g.gain.value = alone ? 1 : 0.95; s.connect(g); g.connect(XM.bus); s.start(t, XM.dly[key] || 0); XM.fans++;
+  s.buffer = b; g.gain.value = alone ? 1 : 0.95; s.connect(g); g.connect(XM.bus); s.start(t, XM_PAD + (XM.dly[key] || 0)); XM.fans++;
   XM.dOn = false; xmDangerStop(t, true);
   if (!alone) { const dg = XM.duck.gain; dg.cancelScheduledValues(t); dg.setTargetAtTime(0.3, t, 0.03); dg.setTargetAtTime(1, t + beat * 3, 0.6); }
   return t + beat;
@@ -894,7 +911,10 @@ const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
 function musicTick() {
   if (!A.ctx || A.ctx.state !== 'running' || !M.E) return;
   const now = A.ctx.currentTime;
-  if (M.next < now - 0.2) M.next = now + 0.05;
+  if (M.next < now - 0.2) { // the scheduler fell behind (tab stall, context resumed): re-anchor
+    if (XM.src && XM.track === M.track && !M.pending) { const sd = stepDur(M.track), k = Math.ceil((now + 0.05 - XM.t0) / sd); M.next = XM.t0 + k * sd; M.step = k; } // stay on the loop's own grid
+    else M.next = now + 0.05;
+  }
   let guard = 0;
   while (M.next < now + 0.15 && guard++ < 64) {
     if (M.pending && M.next >= M.pending.at - 0.001) {
@@ -2863,7 +2883,7 @@ const dbg = {
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
-  get xm() { return { on: XM.on, track: XM.track, playing: !!XM.src, t0: XM.t0, plays: XM.plays, fans: XM.fans, danger: !!XM.dSrc, dangerOn: XM.dOn, loaded: Object.keys(XM.buf), failed: Object.keys(XM.failed), err: XM.lastErr, duck: XM.duck ? XM.duck.gain.value : 1, now: A.ctx ? A.ctx.currentTime : 0, pos: A.ctx && XM.src ? ((A.ctx.currentTime - XM.t0) % xmLoopLen(XM.track) + xmLoopLen(XM.track)) % xmLoopLen(XM.track) : -1 }; },
+  get xm() { return { on: XM.on, gain: XM.gain, prime: XM.prime, dly: Object.assign({}, XM.dly), sd: XM.sd ? XM.sd.gain.value : 1, sr: A.ctx ? A.ctx.sampleRate : 0, track: XM.track, playing: !!XM.src, t0: XM.t0, plays: XM.plays, fans: XM.fans, danger: !!XM.dSrc, dangerOn: XM.dOn, loaded: Object.keys(XM.buf), failed: Object.keys(XM.failed), err: XM.lastErr, duck: XM.duck ? XM.duck.gain.value : 1, now: A.ctx ? A.ctx.currentTime : 0, pos: A.ctx && XM.src ? ((A.ctx.currentTime - XM.t0) % xmLoopLen(XM.track) + xmLoopLen(XM.track)) % xmLoopLen(XM.track) : -1 }; },
   xmGain(v) { XM.gain = v; if (XM.bus) XM.bus.gain.value = v; },
   xmEnable(v) { XM.on = !!v; if (!XM.on) xmStopAll(); },
   renderPreview,
