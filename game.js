@@ -810,7 +810,7 @@ function fanfare(E, ti, t) {
 // across the whole file so the loop window is click-free whatever the codec priming). Lazy-loaded per stage, next stage
 // preloaded, played on the same bar grid as the sequencer (M), danger layer + comeback fanfare are matching buffers.
 // If a file can't load the old procedural engine (makeMusic) plays that track instead.
-const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 9, XM_MARK = 0.25;
+const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 10, XM_MARK = 0.25;
 const XM = { on: true, gain: 2.2, sd: null, sdT: 0, prime: null, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
 const xmKey = (kind, i) => kind + '-' + String(i).padStart(2, '0');
 const xmLoopLen = (i) => XM_BARS * 240 / XM_BPM[i];
@@ -901,6 +901,39 @@ function xmFanfare(i, t, alone) {
   return t + beat;
 }
 function xmStopAll() { if (!A.ctx || !XM.bus) return; const t = A.ctx.currentTime; xmStopLoop(t, 0.12); xmDangerStop(t, true); XM.dOn = false; XM.want = -1; XM.duck.gain.cancelScheduledValues(t); XM.duck.gain.setValueAtTime(1, t); }
+// stage 1 ocean ambience: its own gentle layer under the music. Low-passed brown noise (no hiss) shaped into slow,
+// irregular swells: each wave rises ~3 s (filter opens 300 -> ~1.2 kHz) and recedes over ~4-5 s.
+const AMB = { src: null, lp: null, g: null, out: null, next: 0, waves: 0, level: 1.1 };
+function ambBuffer(c) {
+  const sr = c.sampleRate, n = Math.round(8 * sr), x = Math.round(0.5 * sr), b = c.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch), tmp = new Float32Array(n + x); let y = 0;
+    for (let i = 0; i < n + x; i++) { y = (y + 0.02 * (Math.random() * 2 - 1)) / 1.02; tmp[i] = y * 3.5; }
+    for (let i = 0; i < n; i++) d[i] = tmp[i]; for (let i = 0; i < x; i++) { const k = i / x; d[i] = tmp[n + i] * (1 - k) + tmp[i] * k; } } // seamless loop
+  return b;
+}
+function ambStart() {
+  if (!A.ctx || AMB.src) return; const c = A.ctx, t = c.currentTime;
+  if (!AMB.buf) AMB.buf = ambBuffer(c);
+  AMB.src = c.createBufferSource(); AMB.src.buffer = AMB.buf; AMB.src.loop = true;
+  AMB.hp = c.createBiquadFilter(); AMB.hp.type = 'highpass'; AMB.hp.frequency.value = 150;
+  AMB.lp = c.createBiquadFilter(); AMB.lp.type = 'lowpass'; AMB.lp.Q.value = 0.3; AMB.lp.frequency.value = 300;
+  AMB.g = c.createGain(); AMB.g.gain.value = 0.0001; AMB.out = c.createGain(); AMB.out.gain.setValueAtTime(0, t); AMB.out.gain.linearRampToValueAtTime(AMB.level, t + 1.5);
+  AMB.src.connect(AMB.hp); AMB.hp.connect(AMB.lp); AMB.lp.connect(AMB.g); AMB.g.connect(AMB.out); AMB.out.connect(A.mus);
+  AMB.src.start(t, Math.random() * 7); AMB.next = t + 0.3;
+}
+function ambStop() {
+  if (!AMB.src) return; const t = A.ctx.currentTime, o = AMB.out, s = AMB.src;
+  try { o.gain.cancelScheduledValues(t); o.gain.setValueAtTime(o.gain.value, t); o.gain.linearRampToValueAtTime(0, t + 1.2); s.stop(t + 1.3); } catch (e) { /* ignore */ }
+  AMB.src = null;
+}
+function ambTick() {
+  if (!AMB.src) return; const now = A.ctx.currentTime, g = AMB.g.gain, f = AMB.lp.frequency;
+  while (AMB.next < now + 1) { const t = Math.max(AMB.next, now), pk = 0.6 + Math.random() * 0.4, r = 2.4 + Math.random() * 1.2, fall = 3.6 + Math.random() * 1.6;
+    g.setTargetAtTime(pk, t, r / 2.6); f.setTargetAtTime(600 + 600 * pk, t, r / 2.6);
+    g.setTargetAtTime(0.14, t + r, fall / 3); f.setTargetAtTime(300, t + r, fall / 3);
+    AMB.next = t + r + fall * (0.75 + Math.random() * 0.25); AMB.waves++; }
+}
+function ambSync() { const on = !!(A.ctx && M.timer && M.track === 1 && state === 'play' && !paused); if (on && !AMB.src) ambStart(); else if (!on && AMB.src) ambStop(); ambTick(); }
 // the sequencer grid follows the new tempos
 for (let i = 0; i < TRACKS.length && i < XM_BPM.length; i++) TRACKS[i].bpm = XM_BPM[i];
 xmFetch(xmKey('loop', 0)).catch(() => {}); // start downloading the title loop right away (decoded after the first tap)
@@ -2883,6 +2916,8 @@ const dbg = {
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
+  get amb() { return { on: !!AMB.src, waves: AMB.waves, level: AMB.level, g: AMB.g ? AMB.g.gain.value : 0, lp: AMB.lp ? AMB.lp.frequency.value : 0 }; },
+  ambLevel(v) { AMB.level = v; if (AMB.out) AMB.out.gain.value = v; },
   get xm() { return { on: XM.on, gain: XM.gain, prime: XM.prime, dly: Object.assign({}, XM.dly), sd: XM.sd ? XM.sd.gain.value : 1, sr: A.ctx ? A.ctx.sampleRate : 0, track: XM.track, playing: !!XM.src, t0: XM.t0, plays: XM.plays, fans: XM.fans, danger: !!XM.dSrc, dangerOn: XM.dOn, loaded: Object.keys(XM.buf), failed: Object.keys(XM.failed), err: XM.lastErr, duck: XM.duck ? XM.duck.gain.value : 1, now: A.ctx ? A.ctx.currentTime : 0, pos: A.ctx && XM.src ? ((A.ctx.currentTime - XM.t0) % xmLoopLen(XM.track) + xmLoopLen(XM.track)) % xmLoopLen(XM.track) : -1 }; },
   xmGain(v) { XM.gain = v; if (XM.bus) XM.bus.gain.value = v; },
   xmEnable(v) { XM.on = !!v; if (!XM.on) xmStopAll(); },
@@ -3799,7 +3834,7 @@ function syncMusic() {
   const want = A.ctx && settings.sound && settings.music && (state === 'title' || state === 'scores' || state === 'howto' || state === 'store' || (state === 'play' && !paused));
   if (want && !M.timer) musicStart(); else if (!want && M.timer) musicStop();
   if (state !== 'play') M.stage = 0;
-  syncTrack(); updatePending();
+  syncTrack(); updatePending(); try { ambSync(); } catch (e) { /* ambience is optional */ }
 }
 let TS = 1; // test hook: game-speed multiplier
 function frame(now) {
