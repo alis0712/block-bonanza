@@ -1,6 +1,10 @@
-/* BLOCK BONANZA - web edition. Single-file canvas game, no dependencies. */
+/* BLOCK BONANZA - web edition. Single-file canvas game, no dependencies.
+ * Copyright (c) 2026 goneRogue Entertainment. All rights reserved.
+ * Proprietary and confidential: no permission is granted to copy, modify or redistribute this code,
+ * its music or its artwork. See LICENSE. */
 'use strict';
 (function () {
+const COPYRIGHT = '\u00a9 2026 goneRogue Entertainment. All rights reserved.';
 // ---------------------------------------------------------------- setup
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -3178,12 +3182,13 @@ function drawTitle() {
   ctx.restore();
   const bw = Math.min(W * 0.72, 320), bh = Math.min(58, H * 0.07), gap = bh * 0.32;
   let by = Math.max(ly + size * 2.0 + bh * 0.9 + 30, (H - (bh * 4 + gap * 3)) / 2 + size * 0.9);
-  by = Math.min(by, L.bot - (bh + gap) * 5 - 16);
+  by = Math.min(by, L.bot - (bh + gap) * 5 - 34); // leaves room for the footer + copyright lines
   logoBox.y0 = ly - size * 1.2; logoBox.y1 = ly + size * 1.6;
   const items = [['play', 'PLAY!', DEEP], ['store', 'STORE', OCEAN], ['scores', 'BEST SCORES', TEAL], ['howto', 'HOW TO PLAY', AQUA],
     ['sound', 'SOUND: ' + (settings.sound ? 'ON' : 'OFF'), settings.sound ? OCEAN : ['#4a6572', '#2c3e50']]];
   items.forEach(([id, label, col], i) => button(id, cx, by + i * (bh + gap) + bh / 2, bw * (i === 0 ? 1.08 : 1), bh * (i === 0 ? 1.12 : 1), label, col, { rot: Math.sin(T * 2.5 + i) * 0.025 }));
-  txt('tap a button. go on. we dare you.', cx, L.bot - 8, 12, 'rgba(255,255,255,0.6)', null);
+  txt('tap a button. go on. we dare you.', cx, L.bot - 24, 12, 'rgba(255,255,255,0.6)', null);
+  fitTxt(COPYRIGHT, cx, L.bot - 8, 11, W * 0.92, 'rgba(255,255,255,0.78)', 'rgba(3,20,40,0.85)');
   { // wallet + edition badge, centered between the tagline and PLAY
     const ph = 28; ctx.font = font(ph * 0.55, NFONT); const pw0 = ctx.measureText(money(wallet.cash)).width + ph * 1.5, tot = pw0 + 8 + 46;
     const wy = Math.max(ly + size * 2.0 + 26, by - bh * 0.06 - ph / 2 - 8);
@@ -3246,7 +3251,8 @@ function drawHowto() {
     fitTxt(b, px + pw * 0.36, y, fs, pw * 0.6, '#fff', null, 'left');
   });
   const bh = Math.min(52, H * 0.065);
-  button('back', W / 2, py + ph - bh * 0.8 - 8, Math.min(220, pw * 0.6), bh, 'GOT IT!', DEEP);
+  button('back', W / 2, py + ph - bh * 0.8 - 14, Math.min(220, pw * 0.6), bh, 'GOT IT!', DEEP);
+  fitTxt(COPYRIGHT, W / 2, py + ph - 10, 10, pw * 0.92, 'rgba(255,255,255,0.7)', null);
 }
 function drawPreview(q, cx, cy, cs, alpha) {
   if (!q) return;
@@ -3481,7 +3487,7 @@ function drawBannerUI() {
 }
 function drawPause() {
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
-  const pw = Math.min(W - 40, 340), bh = Math.min(54, H * 0.065), gap = bh * 0.3, ph = bh * 5 + gap * 4 + 150;
+  const pw = Math.min(W - 40, 340), bh = Math.min(54, H * 0.065), gap = bh * 0.3, ph = bh * 5 + gap * 4 + 172;
   const px = (W - pw) / 2, py = (H - ph) / 2;
   panel(px, py, pw, ph, STAGES[g.stage].c1);
   wobblyWord('PAUSED', W / 2, py + 44, Math.min(44, pw / 6), T, 0, COLORS, pw * 0.9);
@@ -3489,6 +3495,7 @@ function drawPause() {
   const items = [['resume', 'RESUME', DEEP], ['restart', 'RESTART', TEAL], ['music', 'MUSIC: ' + (settings.music ? 'ON' : 'OFF'), AQUA],
     ['buttons', 'BUTTONS: ' + (settings.buttons ? 'ON' : 'OFF'), OCEAN], ['menu', 'MAIN MENU', TEAL]];
   items.forEach(([id, l, col], i) => button(id, W / 2, py + 120 + i * (bh + gap) + bh / 2, pw * 0.8, bh, l, col));
+  fitTxt(COPYRIGHT, W / 2, py + ph - 16, 11, pw * 0.9, 'rgba(255,255,255,0.75)', null);
 }
 function drawEntry() {
   ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, W, H);

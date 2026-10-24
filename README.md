@@ -60,13 +60,11 @@ title screen and in the **STORE** (title menu). Everything is bought with in-gam
 - Code hooks for real IAP and ads later: `isFullEdition()`, `grantFullEditionBonus()`, `setEdition()`, `IAP.purchaseFullEdition()`, `maybeShowAd()`.
 
 ## Music
-Every track is generated live in Web Audio, with no audio files: a punchy kick with a sub tail and sidechain pumping, detuned
-supersaw leads and pads, a 303-style acid bass, FM arpeggios, metallic hats and rides, laser zaps, risers and white-noise
-uplifters, glitch stutter and bitcrush fills every 8/16 bars, ping-pong delay and convolution reverb, all through a
-compressor and limiter. Tracks are arranged in sections (intro, build, drop, breakdown) so they keep changing.
-Title: cyber anthem 128 BPM, Tropical Tides: synthwave techno 120, Sewer Lair: trance techno 126, Neo Metropolis: breakbeat 130,
-Storm Planet: industrial 136, Event Horizon: hard glitch 145, Deep Sea Abyss: sonar dub techno 122, Crystal Caverns: bell-tone trance 132,
-Clockwork Factory: tick-tock industrial 138, Haunted Forest: dark techno with a ghostly choir 126, Vampire's Tomb: spooky techno 140 with a church organ, choir and procedural evil laughs. A new stage drops in on the next bar after a noise uplifter.
+A vaporwave / future-funk soundtrack (original material, synthesized offline: no samples): a chopped disco-funk loop,
+swung 16ths, slap funk bass with ghost notes, congas and tambourine, sidechain pump and a few stuttered vocal chops.
+Each stage has its own seamless loop (`music/loop-NN.b64`, base64 MP3, ~0.8 MB) loaded when the stage starts, with the
+next stage preloaded. A matching danger layer fades in when the stack gets high, and a comeback / victory fanfare hits on
+the beat. Stage changes land on the next bar. If a file can't load, the old live Web Audio synth plays instead.
 
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
@@ -80,3 +78,10 @@ Tap anywhere once to turn sound on (the title screen shows SOUND ON / TAP FOR SO
 check the ring/silent switch and the volume buttons.
 
 `icons.tar.b64` holds the app icons (base64 tar); a small GitHub Action unpacks them into the PNGs at the root.
+
+## Copyright
+© 2026 goneRogue Entertainment. All rights reserved.
+
+BLOCK BONANZA, including its code, music, artwork and name, is proprietary software of goneRogue Entertainment.
+This repository is public only so the game can be hosted on GitHub Pages. No license is granted to copy, modify,
+redistribute or reuse any part of it. See [LICENSE](LICENSE).
