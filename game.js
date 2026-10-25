@@ -1282,7 +1282,7 @@ function musicTick() {
   let guard = 0;
   while (M.next < now + 0.15 && guard++ < 64) {
     if (M.pending && M.next >= M.pending.at - 0.001) {
-      M.track = M.pending.track; M.step = M.pending.bar * 16; M.E.setTrack(M.track, M.next); M.pending = null;
+      M.track = M.pending.track; M.step = M.pending.bar * 16; M.E.setTrack(M.track, M.next); M.pending = null; M.lastSwitch = M.next;
       if (xmUsable(M.track)) xmPlay(M.track, M.next); else { xmStopLoop(M.next); smp(M.E, M.E.crash, M.next, 0.5, M.E.perc); }
     }
     if (!xmUsable(M.track)) musicStep(M.E, M.track, M.step, M.next);
@@ -1323,12 +1323,13 @@ function requestTrack(ti, startBar, minLead, lift) {
 }
 // stage changes: noise uplifter rises into the next bar line, then the new stage track drops in with the banner
 let pendBanner = null;
-function stageBanner(i) {
+function stageBanner(i, queued) {
   const show = () => showBanner('STAGE ' + (i + 1), STAGES[i].name, STAGES[i].c1, TWISTS[i]);
-  if (M.timer && aok()) { const at = requestTrack(i + 1, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
+  if (queued) show(); // v17: the music hand-off already landed on this bar line
+  else if (M.timer && aok()) { const at = requestTrack(i + 1, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 function syncTrack() {
-  if (!M.timer || M.pending || pendBanner) return;
+  if (!M.timer || M.pending || pendBanner || (g && g.handoff)) return;
   const want = desiredTrack();
   if (want !== M.track) requestTrack(want, want === 0 || state === 'play' && g.popped === 0 ? 0 : DROP_BAR, 0.15, false);
 }
@@ -3326,10 +3327,22 @@ function miniWin() {
   floatText('+' + money(MB.bonus) + ' BONUS!', L.bx + L.cell * 5, L.by + L.cell * 5.2, '#ffd23d', L.cell * 0.95, 2);
   if (aok() && M.timer && ensureEngine()) { const t = nextBeatTime(); if (!xmFanfare(MB.track, t, false)) fanfare(M.E, MB.track, t); }
 }
+// v17: the boss theme crossfades into the next stage's track on its next bar line, and the next stage
+// (backdrop, twist, banner) begins at that same moment
 function miniNext() {
   const ep = effPop(), ns = Math.max(g.stage + 1, Math.min(LAST_STAGE, Math.floor(ep / STAGE_POPS)));
+  if (M.timer && aok() && M.E) { g.handoff = { ns, at: requestTrack(ns + 1, DROP_BAR, 1.2, true), t: g.time }; return; }
+  finishHandoff(ns, false);
+}
+function finishHandoff(ns, queued) {
+  const ep = effPop(); g.handoff = null;
   g.level = Math.max(g.level, Math.floor(ep / LEVEL_POPS) + 1); g.boss = null; g.bats = []; g.wave = null; g.murk = null;
-  enterStage(ns); setTimeout(sfx.level, 350);
+  enterStage(ns, queued); setTimeout(sfx.level, 350);
+  g.handoffs = (g.handoffs || 0) + 1; g.lastHandoff = { ns, at: queued ? M.lastSwitch : -1, now: A.ctx ? anow() : 0, track: M.track };
+}
+function updateHandoff() {
+  const h = g.handoff; if (!h || state !== 'play') return;
+  if (!M.timer || !A.ctx || anow() >= h.at - 0.005) finishHandoff(h.ns, !!(M.timer && A.ctx));
 }
 function miniTwist(dt) {
   const b = g.boss; if (b.hp <= 0) return;
@@ -3602,10 +3615,10 @@ function beginPop(pop) {
     else if (g.stage < BOSS) { showBanner('LEVEL ' + nl, gravInterval() <= gravFloor() + 0.001 ? 'KEEP IT UP!' : 'FASTER! FASTER!', STAGES[g.stage].c2); setTimeout(sfx.level, 350); }
   }
 }
-function enterStage(ns) {
+function enterStage(ns, queued) {
   g.stage = ns; M.stage = ns; setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
   g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 } : null;
-  stageBanner(ns);
+  stageBanner(ns, queued);
 }
 // v14: the vampire laughs (sound + background + portrait). Throttled: at most once every 7 s, never during an OUCH
 function bossLaugh(why) {
@@ -3800,7 +3813,8 @@ function updateGame(dt) {
   if (g.boss) { const b = g.boss; b.hit = Math.max(0, b.hit - dt); b.laugh = Math.max(0, b.laugh - dt); b.ouch = Math.max(0, b.ouch - dt); b.barShake = Math.max(0, b.barShake - dt * 1.2); b.disp += (b.hp - b.disp) * Math.min(1, dt * 4); }
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
-  if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > 3 && !g.res && state === 'play') miniNext();
+  if (g.handoff) updateHandoff();
+  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > 3 && !g.res && state === 'play') miniNext();
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
   updateTwists(dt);
@@ -3851,7 +3865,7 @@ const dbg = {
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
   miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
-  get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
+  get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
     for (let y = 0; y < ROWS; y++) g.board[y].fill(0);
     rows.forEach((s, i) => { const y = ROWS - rows.length + i; [...s].forEach((ch, x) => { g.board[y][x] = LETTERS[ch] || 0; }); });
@@ -4181,7 +4195,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v16';
+const VERSION = 'v17';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
