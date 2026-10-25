@@ -163,7 +163,9 @@ function audioUnlock() {
       A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.mus.connect(A.master); A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
       const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
       lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
-      comp.connect(lim); lim.connect(c.destination);
+      const clip = c.createWaveShaper(), cn = 2048, cv2 = new Float32Array(cn); // v14: last-ditch soft clip (transparent below 0.85) so stacked boss cries can never overshoot 0 dBFS
+      for (let i = 0; i < cn; i++) { const x = i / (cn - 1) * 2 - 1, ax = Math.abs(x); cv2[i] = Math.sign(x) * (ax <= 0.85 ? ax : 0.85 + 0.13 * Math.tanh((ax - 0.85) / 0.13)); }
+      clip.curve = cv2; comp.connect(lim); lim.connect(clip); clip.connect(c.destination);
       const len = c.sampleRate | 0, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       A.noise = buf;
@@ -299,17 +301,15 @@ const sfx = {
   gears() { if (!aok()) return; const t = anow(); for (let i = 0; i < 10; i++) { noise(0.025, 0.22, 'bandpass', 1800 + (i % 2) * 600, { when: t + i * 0.13, q: 4 }); tone(i % 2 ? 210 : 160, 0.05, 'square', 0.04, { when: t + i * 0.13, lp: 900 }); } tone(70, 1.2, 'sawtooth', 0.06, { lp: 260, when: t, to: 110 }); },
   clunk() { tone(90, 0.25, 'square', 0.16, { lp: 600, to: 55 }); noise(0.18, 0.3, 'bandpass', 900, { q: 2 }); noise(0.5, 0.08, 'highpass', 4000); }, // conveyor shifts + steam hiss
   whoosh() { if (!aok()) return; const c = A.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g2 = c.createGain(); s.buffer = A.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + 0.8); f.frequency.exponentialRampToValueAtTime(250, t + 1.8); g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.22, t + 0.6); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); s.connect(f); f.connect(g2); g2.connect(A.sfx); s.start(t); s.stop(t + 2); tone(220, 1.6, 'sine', 0.035, { when: t + 0.2, to: 180 }); }, // ghostly fog
-  laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // evil vampire laugh (through the music reverb when available)
+  laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
+  mwaha() { if (!aok()) return false; vampLaugh2(A.ctx, anow() + 0.02, A.sfx, 104 + rand(-5, 5), 1.0, A.noise); return true; }, // v14 formant "MWAH-HA-HA-HA" on the SFX bus
+  ouch(q) { if (!aok()) return false; vampOuch(A.ctx, anow() + 0.01, A.sfx, q, 1.0, A.noise); tone(900 + q * 300, 0.07, 'square', 0.04, { to: 500 }); return true; }, // v14 cartoony OUCH! (q = 1..3, sillier each time)
   bats() { if (!aok()) return; const t = anow(); for (let i = 0; i < 7; i++) tone(rand(3200, 5600), 0.06, 'sine', 0.05, { when: t + i * 0.07, to: rand(1800, 2600) }); noise(0.6, 0.12, 'bandpass', 900, { q: 3 }); }, // screeching bat swarm + wing flutter
   web() { noise(0.15, 0.25, 'bandpass', 600, { q: 3 }); tone(140, 0.12, 'sine', 0.12, { to: 90 }); },
   hurt() { if (!aok()) return; const c = A.ctx, t = anow(), o = c.createOscillator(), f = c.createBiquadFilter(), g2 = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(85, t + 0.28); f.type = 'bandpass'; f.frequency.value = 650; f.Q.value = 3; g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.3, t + 0.02); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(f); f.connect(g2); g2.connect(A.sfx); o.start(t); o.stop(t + 0.32); }, // vampire grunt when hit
-  defeat() { // vampire's last cry: long falling "nooo" (ooh formant) + bats bursting out + big thud
-    if (!aok()) return; const c = A.ctx, t = anow() + 0.02, o = c.createOscillator(), mix = c.createGain(), amp = c.createGain();
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(240, t); o.frequency.exponentialRampToValueAtTime(70, t + 1.6);
-    const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 6; lg.gain.value = 60; lfo.connect(lg); lg.connect(o.detune);
-    for (const [f, gv] of VOWELS.ooh) { const bp = c.createBiquadFilter(), bg = c.createGain(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 6; bg.gain.value = gv * 2.4; mix.connect(bp); bp.connect(bg); bg.connect(amp); }
-    amp.gain.setValueAtTime(0.0001, t); amp.gain.exponentialRampToValueAtTime(0.5, t + 0.08); amp.gain.setValueAtTime(0.45, t + 1.1); amp.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
-    o.connect(mix); amp.connect(M.E ? M.E.fx : A.sfx); amp.connect(A.sfx); o.start(t); lfo.start(t); o.stop(t + 1.75); lfo.stop(t + 1.75);
+  defeat() { // vampire's last cry: "NOOOO... AAARGH!" + bats bursting out + big thud
+    if (!aok()) return; const c = A.ctx, t = anow() + 0.02;
+    vampDefeatCry(c, t, A.sfx, 0.55, A.noise); // v14: big "NOOOOOO... AAARGH!" dying cry (formant voice)
     sfx.bats(); tone(60, 0.9, 'sine', 0.5, { when: t + 0.1, to: 28 }); noise(0.8, 0.3, 'lowpass', 500, { when: t + 0.1 });
   },
 };
@@ -660,6 +660,90 @@ function choir(E, notes, t, d, v, vowel, dest) {
   const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 5.2; lg.gain.value = 14; lfo.connect(lg); lfo.start(t); lfo.stop(t + d + 0.6);
   for (const m of notes) for (let k = 0; k < 2; k++) { const os = c.createOscillator(); os.type = 'sawtooth'; os.frequency.value = mf(m); os.detune.value = k ? 9 : -9; lg.connect(os.detune); os.connect(mix); os.start(t); os.stop(t + d + 0.6); }
 }
+// ---- v14 boss voices: a small formant "vocal" synth (original, no samples). A glottal buzz (two detuned saws +
+// a sub) and breath noise go through four band-pass formants whose frequencies glide between vowels, so it can say
+// "MWAH-HA-HA-HA", "OUCH!" and "NOOOO-AARGH". Each voice is described as keyframes [time, value] on the pitch,
+// vowel, loudness and breath, plus short "ch" consonant bursts.
+const VF = {
+  a: [[730, 1], [1090, 0.5], [2440, 0.28], [3400, 0.1]], o: [[540, 1], [840, 0.45], [2410, 0.16], [3300, 0.06]],
+  u: [[320, 1], [800, 0.32], [2240, 0.1], [3300, 0.04]], e: [[530, 1], [1840, 0.5], [2480, 0.28], [3500, 0.1]],
+  i: [[290, 1], [2250, 0.42], [3010, 0.25], [3700, 0.1]], m: [[260, 1], [1000, 0.07], [2300, 0.03], [3300, 0.01]],
+  n: [[290, 1], [1500, 0.08], [2500, 0.04], [3300, 0.01]], r: [[480, 1], [1300, 0.5], [1650, 0.35], [3200, 0.08]],
+};
+const VQ = [7, 9, 13, 16];
+function kfp(p, t, arr, exp) { // keyframes -> AudioParam
+  p.setValueAtTime(arr[0][1], t + arr[0][0]);
+  for (let i = 1; i < arr.length; i++) { const [dt, v] = arr[i]; if (exp && v > 0 && arr[i - 1][1] > 0) p.exponentialRampToValueAtTime(v, t + dt); else p.linearRampToValueAtTime(v, t + dt); }
+}
+function formantVoice(c, t, dest, o, noiseBuf) {
+  const end = t + o.dur + 0.05, fs = o.fs || 1, mk = (type) => { const x = c.createOscillator(); x.type = type; return x; };
+  const s1 = mk('sawtooth'), s2 = mk('sawtooth'), sub = mk('sine'), src = c.createGain(), amp = c.createGain(), out = c.createGain(), lp = c.createBiquadFilter();
+  for (const [x, k] of [[s1, 1], [s2, 1.004], [sub, 0.5]]) kfp(x.frequency, t, o.f0.map(([d, f]) => [d, f * k]), true);
+  s2.detune.value = 8; src.gain.value = 0.5; out.gain.value = o.v;
+  const sg = c.createGain(); sg.gain.value = 0.55; s1.connect(src); s2.connect(sg); sg.connect(src);
+  const vib = mk('sine'), vg = c.createGain(); vib.frequency.value = o.vib ? o.vib[0] : 5.5; vib.connect(vg); vg.connect(s1.detune); vg.connect(s2.detune);
+  kfp(vg.gain, t, o.vibD || [[0, o.vib ? o.vib[1] : 20]]);
+  const wob = mk('sine'), wg = c.createGain(); wob.frequency.value = 1.7; wg.gain.value = 9; wob.connect(wg); wg.connect(s1.detune); // slow drift (less robotic)
+  let nz = null; const br = c.createGain();
+  if (noiseBuf) { nz = c.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true; const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 400; nz.connect(hp); hp.connect(br); br.connect(src); kfp(br.gain, t, o.br || [[0, 0.05]]); }
+  // the formant bank: each band glides through the vowel keyframes
+  for (let k = 0; k < 4; k++) {
+    const bp = c.createBiquadFilter(), bg = c.createGain(); bp.type = 'bandpass'; bp.Q.value = VQ[k];
+    kfp(bp.frequency, t, o.vow.map(([d, v]) => [d, VF[v][k][0] * fs])); kfp(bg.gain, t, o.vow.map(([d, v]) => [d, VF[v][k][1] * 3.2]));
+    src.connect(bp); bp.connect(bg); bg.connect(amp);
+  }
+  const sgain = c.createGain(); sgain.gain.value = o.sub || 0.12; sub.connect(sgain); sgain.connect(amp); // chest
+  kfp(amp.gain, t, o.amp);
+  lp.type = 'lowpass'; lp.frequency.value = o.lp || 5200; lp.Q.value = 0.5; amp.connect(lp); lp.connect(out); out.connect(dest);
+  if (o.echo) { const d = c.createDelay(1), fb = c.createGain(), el = c.createBiquadFilter(), es = c.createGain(); d.delayTime.value = o.echo[0]; fb.gain.value = o.echo[1]; el.type = 'lowpass'; el.frequency.value = 1800; es.gain.value = o.echo[2]; out.connect(es); es.connect(d); d.connect(el); el.connect(fb); fb.connect(d); el.connect(dest); }
+  for (const [d0, dd, lv, f] of o.ch || []) { // "ch" / "h" consonant bursts
+    if (!noiseBuf) break; const n = c.createBufferSource(), nf = c.createBiquadFilter(), ng = c.createGain(); n.buffer = noiseBuf; nf.type = 'bandpass'; nf.frequency.value = f || 3800; nf.Q.value = 1.4;
+    ng.gain.setValueAtTime(0.0001, t + d0); ng.gain.exponentialRampToValueAtTime(lv * o.v, t + d0 + 0.012); ng.gain.exponentialRampToValueAtTime(0.0001, t + d0 + dd);
+    n.connect(nf); nf.connect(ng); ng.connect(dest); n.start(t + d0, Math.random() * 0.4); n.stop(t + d0 + dd + 0.02);
+  }
+  for (const x of [s1, s2, sub, vib, wob]) { x.start(t); x.stop(end); }
+  if (nz) { nz.start(t, Math.random() * 0.5); nz.stop(end); }
+  return o.dur;
+}
+// "MWAH-HA-HA-HA-HAAA": syllable onsets/lengths are shared with the background vampire's jaw animation
+const LAUGH_SYL = [[0, 0.42, 1.0], [0.52, 0.17, 1.24], [0.73, 0.17, 1.19], [0.94, 0.17, 1.12], [1.15, 0.19, 1.05], [1.4, 0.62, 0.95]], LAUGH_DUR = 2.15;
+function laughSpec(base, v) {
+  base = base || 108; const f0 = [], vow = [], amp = [[0, 0]], br = [[0, 0]], ch = [];
+  LAUGH_SYL.forEach(([o, d, p], i) => {
+    const f = base * p;
+    f0.push([o, f * 1.1], [o + d * 0.3, f * 1.04], [o + d, f * (i === 5 ? 0.62 : 0.84)]);
+    if (i === 0) { vow.push([0, 'm'], [0.06, 'm'], [0.11, 'u'], [0.19, 'a'], [d, 'a']); amp.push([0.02, 0.55], [0.07, 0.45], [0.16, 1], [d * 0.75, 0.85], [d, 0]); }
+    else { vow.push([o, 'a'], [o + d, i === 5 ? 'o' : 'a']); ch.push([o - 0.035, 0.07, 0.35, 1500]); amp.push([o, 0], [o + 0.03, 1], [o + d * (i === 5 ? 0.5 : 0.55), i === 5 ? 0.85 : 0.75], [o + d, 0]); }
+    br.push([o, 0.25], [o + 0.04, 0.04], [o + d, 0.02]);
+  });
+  return { dur: LAUGH_DUR, f0, vow, amp, br, ch, v: v || 0.5, vib: [6.2, 0], vibD: [[0, 12], [1.4, 18], [2.0, 70]], echo: [0.21, 0.32, 0.28], sub: 0.18, fs: 0.92 };
+}
+// cartoony "OUCH!" at each quarter of the boss's health: q = 1 (75%), 2 (50%), 3 (25%), each sillier + higher
+function ouchSpec(q, v) {
+  const fs = 1.1 + q * 0.06;
+  if (q === 1) return { dur: 0.5, fs, v: v || 0.55, vib: [7, 25],
+    f0: [[0, 190], [0.07, 290], [0.3, 165], [0.42, 150]], vow: [[0, 'a'], [0.1, 'a'], [0.3, 'u'], [0.42, 'u']],
+    amp: [[0, 0], [0.02, 1], [0.24, 0.8], [0.33, 0], [0.5, 0]], br: [[0, 0.3], [0.04, 0.03]], ch: [[0.31, 0.13, 0.55, 3600]] };
+  if (q === 2) return { dur: 0.82, fs, v: v || 0.55, vib: [8, 35],
+    f0: [[0, 240], [0.05, 340], [0.17, 230], [0.27, 280], [0.36, 420], [0.6, 210], [0.72, 190]], vow: [[0, 'a'], [0.08, 'a'], [0.17, 'u'], [0.26, 'a'], [0.38, 'a'], [0.58, 'u'], [0.72, 'u']],
+    amp: [[0, 0], [0.02, 0.9], [0.15, 0.6], [0.19, 0], [0.27, 0], [0.3, 1], [0.54, 0.85], [0.62, 0], [0.82, 0]], br: [[0, 0.3], [0.04, 0.03], [0.27, 0.3], [0.31, 0.03]], ch: [[0.6, 0.15, 0.6, 3700]] };
+  return { dur: 1.25, fs, v: v || 0.55, vib: [9, 45], // "OW-OW-OUCHIEEE!"
+    f0: [[0, 300], [0.05, 390], [0.15, 300], [0.19, 340], [0.24, 450], [0.34, 330], [0.4, 380], [0.48, 560], [0.6, 470], [0.7, 300], [0.86, 520], [1.1, 680], [1.2, 640]],
+    vow: [[0, 'a'], [0.07, 'a'], [0.15, 'u'], [0.19, 'a'], [0.27, 'a'], [0.34, 'u'], [0.4, 'a'], [0.55, 'a'], [0.7, 'u'], [0.86, 'i'], [1.2, 'i']],
+    amp: [[0, 0], [0.02, 0.85], [0.13, 0.5], [0.16, 0], [0.19, 0], [0.21, 0.9], [0.31, 0.5], [0.34, 0], [0.4, 0], [0.42, 1], [0.64, 0.85], [0.71, 0], [0.86, 0], [0.88, 0.8], [1.12, 0.6], [1.22, 0]],
+    br: [[0, 0.3], [0.04, 0.03], [0.19, 0.3], [0.22, 0.03], [0.4, 0.3], [0.43, 0.03]], ch: [[0.71, 0.14, 0.6, 3800]] };
+}
+// the vampire's last cry: "NOOOOOOO..." sliding down with a growing wobble, then a strangled "AAARGH!" and a gasp
+function defeatSpec(v) {
+  return { dur: 3.4, v: v || 0.55, fs: 0.95, vib: [5.5, 0], vibD: [[0, 20], [1.0, 40], [2.0, 120], [2.2, 30], [3.0, 60]], echo: [0.27, 0.38, 0.35], sub: 0.2,
+    f0: [[0, 250], [0.15, 270], [0.5, 290], [1.4, 180], [2.05, 85], [2.15, 380], [2.3, 430], [2.8, 200], [3.05, 120]],
+    vow: [[0, 'n'], [0.12, 'n'], [0.22, 'o'], [1.2, 'o'], [2.0, 'u'], [2.12, 'a'], [2.6, 'a'], [2.85, 'r'], [3.05, 'r']],
+    amp: [[0, 0], [0.05, 0.6], [0.2, 1], [1.5, 0.9], [2.0, 0.35], [2.1, 0.1], [2.16, 1], [2.7, 0.9], [3.0, 0.2], [3.1, 0], [3.4, 0]],
+    br: [[0, 0.05], [2.1, 0.08], [2.2, 0.35], [2.9, 0.25], [3.05, 0.1]], ch: [[3.12, 0.28, 0.35, 1400]] };
+}
+function vampLaugh2(c, t, dest, base, v, nb) { return formantVoice(c, t, dest, laughSpec(base, v), nb); }
+function vampOuch(c, t, dest, q, v, nb) { return formantVoice(c, t, dest, ouchSpec(q, v), nb); }
+function vampDefeatCry(c, t, dest, v, nb) { return formantVoice(c, t, dest, defeatSpec(v), nb); }
 // procedural evil vampire laugh: "MWAH-HA-HA-HA-HA" - a deep voice (saw + sub) through vowel formants,
 // per-syllable pitch + amplitude envelopes, breathy 'h' noise at each syllable, wobbly vibrato
 function vampLaugh(c, t, dest, base, v, noiseBuf) {
@@ -1153,7 +1237,7 @@ function updateDanger(dt) {
   if (g.danger) { g.dangerT += dt; if (!M.danger && M.timer) setDanger(true); }
   if (g.res) return; // judge only a settled board
   const h = stackHeight();
-  if (!g.danger && h >= DANGER_IN) { g.danger = true; g.dangerT = 0; g.dangerCount++; setDanger(true); sfx.danger(); }
+  if (!g.danger && h >= DANGER_IN) { g.danger = true; g.dangerT = 0; g.dangerCount++; setDanger(true); sfx.danger(); if (g.boss) setTimeout(() => bossLaugh('danger'), 700); }
   else if (g.danger && h <= DANGER_OUT) {
     g.danger = false;
     if (g.dangerT >= DANGER_MIN) comeback(); else setDanger(false);
@@ -2177,7 +2261,7 @@ function initBG2() {
   BG.wisps = []; for (let i = 0; i < 9; i++) BG.wisps.push({ x: Math.random() * W, y: rand(0.45, 0.95) * H, p: rand(0, 6), v: rand(6, 16) });
   BG.hbat = { t: rand(2, 5), x: 0, y: 0, on: false };
   // vampire's tomb
-  BG.spiders = [[0.05, 0.2], [0.27, 0.11], [0.5, 0.15], [cx / W, 0.08], [0.95, 0.24]].map(([x, l], i) => ({ x: x * W, len: l * H, p: i * 1.9, s: 0.8 + hash(i * 5) * 0.5 }));
+  initTombSpiders(H * 0.84); // v14: dangling, tarantula, scurriers, corner-web and jumping spiders
   BG.tbats = []; for (let i = 0; i < 7; i++) BG.tbats.push({ x: Math.random() * W, y: rand(0.06, 0.4) * H, v: rand(40, 110) * (i % 2 ? 1 : -1), p: rand(0, 6), s: rand(0.6, 1.2) });
   BG.tomb = BG.tomb || { flashes: 0, thunders: 0 }; BG.tomb.next = BG.lt[13] + rand(2, 4); BG.tomb.bolt = null; BG.tomb.age = 9;
 }
@@ -2413,14 +2497,183 @@ function bgHaunted(t) {
   ctx.globalCompositeOperation = 'source-over';
 }
 // ---- 10. VAMPIRE'S TOMB (final boss)
-function bgTomb(t) {
-  const dt = bgDt(13, t), gy = H * 0.84, S = BG.tomb, mx = W * 0.5, mw = Math.min(W * 0.36, 170);
-  ctx.drawImage(lay('tomb', W, H, (x) => {
-    x.fillStyle = lgx(x, 0, gy, [[0, '#0c0108'], [0.5, '#3a0718'], [1, '#5a1020']]); x.fillRect(0, 0, W, H);
-    const bx = W * 0.25, by = H * 0.14, br = Math.min(W, H) * 0.13; // blood moon
-    x.fillStyle = rgx(x, bx, by, br, br * 3.2, [[0, 'rgba(255,60,60,0.4)'], [1, 'rgba(255,60,60,0)']]); x.fillRect(0, 0, W, gy);
-    x.fillStyle = rgx(x, bx - br * 0.3, by - br * 0.3, 2, br * 1.2, [[0, '#ffb39a'], [1, '#c22a2a']]); x.beginPath(); x.arc(bx, by, br, 0, 7); x.fill();
-    x.fillStyle = 'rgba(90,0,10,0.3)'; for (let i = 0; i < 6; i++) { x.beginPath(); x.arc(bx + (hash(i * 4) - 0.5) * br * 1.2, by + (hash(i * 9) - 0.5) * br * 1.2, br * (0.08 + hash(i * 2) * 0.12), 0, 7); x.fill(); }
+// ---- v14: Count Blockula looming in the tomb's sky. He laughs (head back, jaw flapping in time with the
+// "MWAH-HA-HA-HA" syllables, shoulders shaking, claws up, cape flapping, eyes blazing), flinches and turns red on
+// every OUCH, and fades away when defeated. Off the boss stage (store preview) he laughs silently now and then.
+function vampAnim(dt) {
+  const V = BG.vamp || (BG.vamp = { lt: -1, next: 6, gone: 0, ouch: 0, q: 0, hit: 0 }), b = g.boss && g.stage === BOSS ? g.boss : null;
+  if (b) {
+    V.lt = b.laugh > 0 ? LAUGH_DUR - b.laugh : -1; V.ouch = b.ouch || 0; V.q = b.ouchQ || 0; V.hit = b.hit || 0;
+    V.gone = b.hp <= 0 ? Math.min(1, V.gone + dt * 0.7) : 0;
+  } else {
+    V.gone = g.won && g.stage === BOSS ? 1 : 0; V.ouch = 0; V.hit = 0;
+    V.next -= dt; if (V.lt >= 0) { V.lt += dt; if (V.lt > LAUGH_DUR) V.lt = -1; } else if (V.next <= 0) { V.lt = 0; V.next = rand(10, 15); }
+  }
+  return V;
+}
+// drawn into a small low-res offscreen canvas at ~30 Hz, then blitted (it's a soft background figure behind the board glass, keeps the frame rate)
+function glowX(X, col, x, y, r, a) { X.globalAlpha = a; X.drawImage(glowSpr(col), x - r, y - r, r * 2, r * 2); X.globalAlpha = 1; }
+function drawBgVampire(t, dt) {
+  const V = vampAnim(dt); if (V.gone >= 1) return null;
+  const s = Math.min(W * 0.16, H * 0.085), ox = 2.95 * s, oy = 1.35 * s, vw = 5.9 * s, vh = 6.4 * s, k = 1;
+  let C = BG.vcv; if (!C || C.s !== s) { C = BG.vcv = document.createElement('canvas'); C.width = Math.ceil(vw * k); C.height = Math.ceil(vh * k); C.s = s; C.x = C.getContext('2d'); C.t = -1; }
+  if (t - C.t >= (V.lt >= 0 || V.ouch > 0 || V.hit > 0 || V.gone > 0 ? 1 / 30 : 1 / 15) || t < C.t) { C.t = t; const X = C.x; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, C.width, C.height); X.setTransform(k, 0, 0, k, 0, 0); paintBgVampire(X, t, V, s, ox, oy); }
+  const x0 = L.bx + L.cell * COLS / 2 - ox, y0 = H * 0.25 - oy; ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
+}
+function paintBgVampire(X, t, V, s, cx, cy) {
+  const lt = V.lt, lk = lt < 0 ? 0 : Math.min(1, lt / 0.15, (LAUGH_DUR - lt) / 0.3); // laugh envelope
+  let jaw = 0; if (lt >= 0) for (const [o, d] of LAUGH_SYL) if (lt >= o && lt < o + d) jaw = Math.sin(Math.PI * (lt - o) / d);
+  const ok = V.ouch > 0 ? Math.min(1, V.ouch / 0.9) : 0, hurt = Math.max(ok, V.hit > 0 ? V.hit / 0.9 * 0.5 : 0);
+  const shakeY = lk * jaw * s * 0.07, flinch = ok * Math.sin(t * 48) * s * 0.12;
+  X.save(); X.globalAlpha = 1 - V.gone; X.translate(cx + flinch, cy + V.gone * s * 0.8); const sc = 1 - V.gone * 0.3; X.scale(sc, sc);
+  X.globalCompositeOperation = 'lighter'; glowX(X, hurt > 0.3 ? 'rgba(255,40,40,1)' : 'rgba(255,30,70,1)', 0, s * 1.5, s * 2.75, 0.16 + lk * 0.14 + hurt * 0.3); X.globalCompositeOperation = 'source-over';
+  // cape (flutters harder while he laughs), fading into the mist behind the mausoleum
+  const fl = s * (0.06 + lk * 0.16 + ok * 0.1), cg = X.createLinearGradient(0, s * 0.5, 0, s * 4.6);
+  cg.addColorStop(0, '#14000b'); cg.addColorStop(0.55, 'rgba(20,0,11,0.92)'); cg.addColorStop(1, 'rgba(20,0,11,0)');
+  X.fillStyle = cg; X.beginPath(); X.moveTo(-s * 0.55, s * 0.62 + shakeY);
+  X.quadraticCurveTo(-s * 1.9, s * 0.9 + shakeY, -s * 2.7 + Math.sin(t * 5.3) * fl, s * 4.4);
+  for (let k = 1; k <= 8; k++) { const u = -2.7 + k * 5.4 / 8; X.lineTo(s * u + Math.sin(t * 6 + k) * fl * 0.5, s * (4.4 + (k % 2 ? 0.25 : 0)) + Math.sin(t * 7.1 + k * 1.7) * fl); }
+  X.quadraticCurveTo(s * 1.9, s * 0.9 + shakeY, s * 0.55, s * 0.62 + shakeY); X.fill();
+  const lg = X.createLinearGradient(0, s * 0.8, 0, s * 4.2); lg.addColorStop(0, hurt > 0.3 ? '#d01030' : '#8a0a24'); lg.addColorStop(1, 'rgba(138,10,36,0)');
+  X.fillStyle = lg; X.beginPath(); X.moveTo(-s * 0.5, s * 0.75 + shakeY); X.quadraticCurveTo(-s * 1.5, s * 1.1 + shakeY, -s * 2.1 + Math.sin(t * 5.7) * fl, s * 4.1); X.lineTo(s * 2.1 + Math.sin(t * 5.1 + 1) * fl, s * 4.1); X.quadraticCurveTo(s * 1.5, s * 1.1 + shakeY, s * 0.5, s * 0.75 + shakeY); X.fill();
+  // shoulders + suit, white shirt V and a blood-red gem
+  X.translate(0, shakeY);
+  X.fillStyle = '#0c0008'; X.beginPath(); X.moveTo(-s * 1.45, s * 1.6); X.quadraticCurveTo(-s * 1.4, s * 0.72, -s * 0.4, s * 0.6); X.lineTo(s * 0.4, s * 0.6); X.quadraticCurveTo(s * 1.4, s * 0.72, s * 1.45, s * 1.6); X.lineTo(s * 1.2, s * 3.6); X.lineTo(-s * 1.2, s * 3.6); X.fill();
+  X.fillStyle = '#e8e4f2'; X.beginPath(); X.moveTo(-s * 0.3, s * 0.62); X.lineTo(0, s * 1.55); X.lineTo(s * 0.3, s * 0.62); X.fill();
+  X.fillStyle = '#ff1a40'; X.beginPath(); X.arc(0, s * 0.86, s * 0.07, 0, 7); X.fill();
+  // high collar behind the head
+  X.fillStyle = '#1a0010'; X.beginPath(); X.moveTo(-s * 0.45, s * 0.62); X.lineTo(-s * 1.05, -s * 0.35); X.lineTo(-s * 0.72, s * 0.15); X.lineTo(0, s * 0.55); X.lineTo(s * 0.72, s * 0.15); X.lineTo(s * 1.05, -s * 0.35); X.lineTo(s * 0.45, s * 0.62); X.fill();
+  X.fillStyle = '#9a0f2a'; X.beginPath(); X.moveTo(-s * 0.42, s * 0.6); X.lineTo(-s * 0.9, -s * 0.2); X.lineTo(-s * 0.6, s * 0.2); X.lineTo(0, s * 0.5); X.lineTo(s * 0.6, s * 0.2); X.lineTo(s * 0.9, -s * 0.2); X.lineTo(s * 0.42, s * 0.6); X.fill();
+  // claws raised while laughing (and thrown up on an ouch)
+  const up = Math.max(lk, ok);
+  if (up > 0.05) for (const sd of [-1, 1]) {
+    const hx = sd * s * (1.55 + 0.15 * up), hy = s * (1.25 - 0.85 * up) + (lk ? Math.sin(t * 22 + sd) * s * 0.05 : 0);
+    X.strokeStyle = '#0c0008'; X.lineWidth = s * 0.34; X.lineCap = 'round'; X.beginPath(); X.moveTo(sd * s * 1.2, s * 1.3); X.lineTo(hx, hy + s * 0.2); X.stroke();
+    X.fillStyle = hurt > 0.3 ? '#ffb0bc' : '#d9d4ea'; X.beginPath(); X.ellipse(hx, hy, s * 0.17, s * 0.2, 0, 0, 7); X.fill();
+    X.strokeStyle = X.fillStyle; X.lineWidth = s * 0.05;
+    for (let k = 0; k < 4; k++) { const a = -Math.PI / 2 + (k - 1.5) * 0.38 * sd; X.beginPath(); X.moveTo(hx, hy); X.lineTo(hx + Math.cos(a) * s * 0.36, hy + Math.sin(a) * s * 0.36); X.stroke(); }
+    X.lineCap = 'butt';
+  }
+  // head: tilts back while laughing, jerks on an ouch
+  X.save(); X.translate(0, s * 0.5); X.rotate(-0.2 * lk + Math.sin(t * 30) * 0.03 * lk + ok * 0.18 * Math.sin(t * 40)); X.translate(0, -s * 0.5 - lk * s * 0.1);
+  const face = hurt > 0.3 ? '#ffb3bd' : '#d9d4ea';
+  X.fillStyle = face;
+  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.38, -s * 0.1); X.lineTo(sd * s * 0.64, -s * 0.46); X.lineTo(sd * s * 0.42, s * 0.12); X.fill(); }
+  X.beginPath(); X.ellipse(0, 0, s * 0.42, s * 0.56, 0, 0, 7); X.fill();
+  X.fillStyle = 'rgba(80,40,90,0.25)'; X.beginPath(); X.ellipse(s * 0.12, s * 0.06, s * 0.28, s * 0.46, 0, 0, 7); X.fill(); // cheek shade
+  X.fillStyle = '#0a0006'; X.beginPath(); X.moveTo(-s * 0.44, -s * 0.1); X.quadraticCurveTo(-s * 0.46, -s * 0.64, 0, -s * 0.64); X.quadraticCurveTo(s * 0.46, -s * 0.64, s * 0.44, -s * 0.1); X.lineTo(s * 0.3, -s * 0.36); X.lineTo(0, -s * 0.16); X.lineTo(-s * 0.3, -s * 0.36); X.closePath(); X.fill(); // widow's peak
+  X.strokeStyle = '#0a0006'; X.lineWidth = Math.max(1.5, s * 0.07); X.lineCap = 'round';
+  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.06, -s * (ok ? 0.2 : 0.12)); X.lineTo(sd * s * 0.3, -s * (ok ? 0.12 : lk ? 0.28 : 0.2)); X.stroke(); }
+  for (const sd of [-1, 1]) {
+    const ex = sd * s * 0.17, ey = -s * 0.03;
+    if (ok > 0) { X.beginPath(); X.moveTo(ex - s * 0.08, ey - s * 0.06); X.lineTo(ex + s * 0.06 * sd, ey); X.lineTo(ex - s * 0.08, ey + s * 0.06); if (sd > 0) { X.moveTo(ex + s * 0.08, ey - s * 0.06); X.lineTo(ex - s * 0.06, ey); X.lineTo(ex + s * 0.08, ey + s * 0.06); } X.stroke(); continue; } // squeezed > < eyes
+    X.globalCompositeOperation = 'lighter'; glowX(X, 'rgba(255,30,60,1)', ex, ey, s * (0.22 + lk * 0.2), 0.55 + lk * 0.45); X.globalCompositeOperation = 'source-over';
+    const bl = !lk && (t % 4.1) < 0.12;
+    X.fillStyle = lk ? '#ff5a70' : '#ff1a40'; X.beginPath(); X.ellipse(ex, ey, s * 0.085, bl ? s * 0.01 : s * (lk ? 0.05 : 0.06), 0, 0, 7); X.fill();
+  }
+  X.lineCap = 'butt';
+  if (ok > 0) { // "OUCH!" mouth: wobbly open O
+    X.fillStyle = '#3a0010'; X.beginPath(); X.ellipse(0, s * 0.3, s * (0.1 + 0.03 * Math.sin(t * 35)), s * 0.16, 0, 0, 7); X.fill();
+  } else if (lk > 0) { // laughing: jaw drops on each "HA", fangs + tongue
+    const mh = s * (0.08 + 0.2 * jaw * lk + 0.05 * lk);
+    X.fillStyle = '#2a000c'; X.beginPath(); X.moveTo(-s * 0.24, s * 0.2); X.quadraticCurveTo(0, s * 0.14, s * 0.24, s * 0.2); X.quadraticCurveTo(s * 0.2, s * 0.22 + mh * 1.6, 0, s * 0.22 + mh * 1.7); X.quadraticCurveTo(-s * 0.2, s * 0.22 + mh * 1.6, -s * 0.24, s * 0.2); X.fill();
+    X.fillStyle = '#c0203a'; X.beginPath(); X.ellipse(0, s * 0.2 + mh * 1.35, s * 0.11, mh * 0.35, 0, 0, 7); X.fill();
+    X.fillStyle = '#ffffff'; for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.15, s * 0.18); X.lineTo(sd * s * 0.1, s * 0.34); X.lineTo(sd * s * 0.05, s * 0.17); X.fill(); }
+  } else { // smug smirk with fangs
+    X.strokeStyle = '#3a0010'; X.lineWidth = Math.max(1.2, s * 0.05); X.beginPath(); X.moveTo(-s * 0.18, s * 0.24); X.quadraticCurveTo(0, s * 0.32, s * 0.2, s * 0.2); X.stroke();
+    X.fillStyle = '#ffffff'; for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.1, s * 0.25); X.lineTo(sd * s * 0.07, s * 0.36); X.lineTo(sd * s * 0.04, s * 0.26); X.fill(); }
+  }
+  X.restore(); X.restore(); X.globalAlpha = 1;
+}
+// ---- v14: spooky spiders of different kinds for the tomb (all behind the board)
+function initTombSpiders(gy) {
+  const low = settings.fx === 'low', cx = colX();
+  const dang = low ? [[0.05, 0.3, 0], [0.5, 0.3, 1], [0.95, 0.26, 2]] : [[0.05, 0.3, 0], [0.27, 0.4, 3], [0.5, 0.24, 1], [cx / W, 0.62, 2], [0.95, 0.26, 0], [0.7, 0.46, 3]];
+  // kinds: 0 = plain black, 1 = black widow (red hourglass), 2 = fuzzy brown, 3 = daddy long-legs
+  const sc = Math.max(1, Math.min(W, H) / 280); // bigger on big phones so they read through the board glass
+  BG.spiders = dang.map(([x, l, k], i) => ({ x: x * W, len: l * H, p: i * 1.9, s: (0.85 + hash(i * 5) * 0.5) * sc, k, sp: 0.25 + hash(i * 3) * 0.25 }));
+  BG.tar = { x: W * 0.5 - Math.min(W * 0.36, 170) * 0.4, dir: 1, walk: 0, pause: 1.5, raise: 0 }; // tarantula on the mausoleum wall
+  BG.scurry = []; for (let i = 0; i < (low ? 3 : 7); i++) BG.scurry.push({ x: Math.random() * W, y: gy + 8 + hash(i * 7) * 26, v: 0, t: rand(0, 1.5), dir: Math.random() < 0.5 ? -1 : 1, ph: rand(0, 6) });
+  BG.jumper = { x: W * 0.15, y: gy + 22, dir: 1, t: 0, next: 1, hop: null };
+  BG.corner = { tw: 0, next: 2 };
+  BG.spStats = { hops: 0, dashes: 0, lunges: 0 };
+}
+function spLegs(x, y, s, n, len, wig, lw, col, spread) { // 4 legs per side from (x, y)
+  ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.beginPath(); // one path for all 8 legs
+  for (const sd of [-1, 1]) for (let k = 0; k < n; k++) {
+    const a = (k - (n - 1) / 2) * (spread || 0.5) + (k % 2 ? wig : -wig) * sd;
+    const kx = x + sd * Math.cos(a) * len * 0.6 * s, ky = y + Math.sin(a) * len * 0.6 * s - len * 0.35 * s;
+    ctx.moveTo(x, y); ctx.quadraticCurveTo(kx, ky, x + sd * Math.cos(a) * len * s, y + Math.sin(a) * len * s + len * 0.25 * s);
+  }
+  ctx.stroke(); ctx.lineCap = 'butt';
+}
+function spHalo(x, y, r, a) { if (settings.fx !== 'low') glowAt('rgba(255,70,110,1)', x, y, r, a); } // soft red rim light so the black spiders read on the dark tomb
+function drawTombSpiders(t, dt, gy) {
+  const st = BG.spStats || (BG.spStats = { hops: 0, dashes: 0, lunges: 0 }), mx = W * 0.5, mw = Math.min(W * 0.36, 170);
+  // 1. dangling spiders slowly lowering and climbing their silk, bobbing and wiggling
+  for (const sp of BG.spiders) {
+    const y = sp.len * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * sp.sp + sp.p))) + Math.sin(t * 2.2 + sp.p) * 3, s = sp.s, wig = Math.sin(t * 9 + sp.p) * 0.25;
+    ctx.strokeStyle = 'rgba(235,235,245,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sp.x, 0); ctx.lineTo(sp.x, y); ctx.stroke(); spHalo(sp.x, y + 6 * s, 18 * s, 0.4);
+    if (sp.k === 3) { spLegs(sp.x, y + 4 * s, s, 4, 22, wig, 0.9, '#2a1a14', 0.55); ctx.fillStyle = '#3a2418'; ctx.beginPath(); ctx.ellipse(sp.x, y + 4 * s, 3 * s, 3.4 * s, 0, 0, 7); ctx.fill(); continue; }
+    const col = sp.k === 2 ? '#3a2214' : '#0a0508';
+    spLegs(sp.x, y + 4 * s, s, 4, 13, wig, (sp.k === 2 ? 2.2 : 1.6) * s, col, 0.45);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(sp.x, y + 8 * s, 6 * s, 7 * s, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(sp.x, y + 1 * s, 4 * s, 0, 7); ctx.fill();
+    if (sp.k === 2) { ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28; ctx.moveTo(sp.x + Math.cos(a) * 5.5 * s, y + 8 * s + Math.sin(a) * 6.5 * s); ctx.lineTo(sp.x + Math.cos(a) * 7.5 * s, y + 8 * s + Math.sin(a) * 8.5 * s); } ctx.stroke(); }
+    if (sp.k === 1) { ctx.fillStyle = '#e8102e'; ctx.beginPath(); ctx.moveTo(sp.x - 2.4 * s, y + 6 * s); ctx.lineTo(sp.x + 2.4 * s, y + 6 * s); ctx.lineTo(sp.x, y + 8.5 * s); ctx.lineTo(sp.x + 2.4 * s, y + 11 * s); ctx.lineTo(sp.x - 2.4 * s, y + 11 * s); ctx.lineTo(sp.x, y + 8.5 * s); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(sp.x - 2 * s, y + 5.5 * s, 1.4 * s, 2.2 * s, -0.4, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#ff3355'; ctx.fillRect(sp.x - 2.4 * s, y, 1.6 * s, 1.6 * s); ctx.fillRect(sp.x + 0.8 * s, y, 1.6 * s, 1.6 * s);
+  }
+  // 2. glowing-eyed spider waiting in the top-left cobweb (twitches, sometimes lunges)
+  const C = BG.corner, R = Math.min(W, H) * 0.22, wx = R * 0.42, wy = R * 0.5; C.next -= dt;
+  if (C.next <= 0) { C.tw = 0.5; C.next = rand(2.5, 6); st.lunges++; } C.tw = Math.max(0, C.tw - dt);
+  const lu = Math.sin(Math.min(1, (0.5 - C.tw) / 0.5) * Math.PI) * (C.tw > 0 ? 1 : 0), sx = wx + lu * 5, sy = wy + lu * 5, cs = Math.max(1.1, R / 70);
+  spHalo(sx, sy, 20 * cs, 0.3); spLegs(sx, sy, cs, 4, 14, Math.sin(t * 30) * 0.12 * (C.tw > 0 ? 1 : 0.15), 2 * cs, '#120810', 0.55);
+  ctx.fillStyle = '#120810'; ctx.beginPath(); ctx.ellipse(sx - 4 * cs, sy - 4 * cs, 8 * cs, 7 * cs, 0.8, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(sx + 2 * cs, sy + 2 * cs, 4.6 * cs, 0, 7); ctx.fill();
+  const eg = 0.6 + 0.4 * Math.sin(t * 3.1);
+  ctx.globalCompositeOperation = 'lighter'; glowAt('rgba(120,255,120,1)', sx + 3.5 * cs, sy + 3.5 * cs, 9 * cs, 0.35 * eg); ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(170,255,140,' + (0.7 + 0.3 * eg) + ')';
+  for (const [ex, ey, er] of [[1.2, 3.4, 1.1], [3.4, 1.2, 1.1], [3.0, 4.2, 0.7], [4.2, 3.0, 0.7], [0.4, 4.6, 0.5], [4.6, 0.4, 0.5], [4.4, 4.6, 0.5], [2.2, 2.2, 0.5]]) { ctx.beginPath(); ctx.arc(sx + ex * cs, sy + ey * cs, er * cs, 0, 7); ctx.fill(); }
+  // 3. big hairy tarantula creeping along the mausoleum wall, pausing to rear up
+  const T2 = BG.tar, ty = gy - H * 0.12, ts = Math.max(1.2, Math.min(W, H) / 240);
+  if (T2.pause > 0) { T2.pause -= dt; T2.raise = Math.min(1, T2.raise + dt * 3); } else {
+    T2.raise = Math.max(0, T2.raise - dt * 3); T2.walk += dt; T2.x += T2.dir * 14 * ts * dt;
+    if (T2.x > mx + mw * 0.4) { T2.x = mx + mw * 0.4; T2.dir = -1; T2.pause = rand(1.5, 3); } else if (T2.x < mx - mw * 0.4) { T2.x = mx - mw * 0.4; T2.dir = 1; T2.pause = rand(1.5, 3); } else if (Math.random() < dt * 0.15) T2.pause = rand(1, 2.5);
+  }
+  spHalo(T2.x - 4 * ts * T2.dir, ty, 26 * ts, 0.3); ctx.save(); ctx.translate(T2.x, ty); ctx.scale(T2.dir * ts, ts);
+  const kn = []; ctx.strokeStyle = '#2b1a12'; ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.beginPath();
+  for (const sd of [-1, 1]) for (let k = 0; k < 4; k++) { // walking gait: alternating legs, front pair rears up when paused
+    const ph = T2.walk * 9 + k * Math.PI / 2 + (sd > 0 ? Math.PI : 0), lift = T2.pause > 0 ? 0 : Math.max(0, Math.sin(ph)) * 3, rear = k === 3 ? T2.raise * 8 : 0;
+    const bx0 = -6 + k * 4, kx = bx0 + (k - 1.5) * 7, ky = sd * 9 - 6 - lift - rear, fx = bx0 + (k - 1.5) * 11 + Math.cos(ph) * 2, fy = sd * 13 - lift * 0.3 - rear * 1.6;
+    ctx.moveTo(bx0, 0); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy); kn.push(kx, ky);
+  }
+  ctx.stroke(); ctx.fillStyle = '#c07030'; for (let i = 0; i < kn.length; i += 2) ctx.fillRect(kn[i] - 1.2, kn[i + 1] - 0.8, 2.4, 1.6); // orange knee bands
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = '#24150e'; ctx.beginPath(); ctx.ellipse(-11, 0, 10, 8, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(4, 0, 7, 6, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#4a2e1c'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 18; k++) { const a = k / 18 * 6.28; ctx.moveTo(-11 + Math.cos(a) * 9, Math.sin(a) * 7); ctx.lineTo(-11 + Math.cos(a) * 12, Math.sin(a) * 10); } ctx.stroke(); // hairs
+  ctx.fillStyle = '#ff3355'; ctx.fillRect(8, -2.5, 2, 2); ctx.fillRect(8, 0.8, 2, 2);
+  ctx.restore();
+  // 4. tiny spiders scurrying along the ground in quick dashes
+  for (const q of BG.scurry) {
+    q.t -= dt; if (q.t <= 0) { if (q.v) { q.v = 0; q.t = rand(0.6, 2.2); } else { q.v = rand(70, 140); q.t = rand(0.25, 0.7); if (Math.random() < 0.4) q.dir = -q.dir; st.dashes++; } }
+    q.x += q.dir * q.v * dt; if (q.x < -8) q.x = W + 8; if (q.x > W + 8) q.x = -8;
+    const qs = Math.max(1, Math.min(W, H) / 300);
+    spLegs(q.x, q.y, 0.5 * qs, 4, 9, q.v ? Math.sin(t * 40 + q.ph) * 0.4 : 0, 1.1 * qs, '#0a0508', 0.5);
+    ctx.fillStyle = '#0a0508'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 2.8 * qs, 2.2 * qs, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ff3355'; ctx.fillRect(q.x + q.dir * 1.6 * qs - 0.6, q.y - 1, 1.2, 1.2);
+  }
+  // 5. fuzzy jumping spider hopping across the graveyard (big shiny front eyes)
+  const J = BG.jumper, js = Math.max(1.3, Math.min(W, H) / 250); J.t += dt;
+  if (!J.hop && J.t > J.next) { const d = rand(28, 60) * js; J.hop = { x0: J.x, x1: J.x + J.dir * d, h: rand(18, 34) * js, t: 0, d: 0.45 }; st.hops++; }
+  let jy = J.y, jx = J.x, squash = 0;
+  if (J.hop) { const hp = J.hop; hp.t += dt; const k = Math.min(1, hp.t / hp.d); jx = J.x = hp.x0 + (hp.x1 - hp.x0) * k; jy = J.y - Math.sin(k * Math.PI) * hp.h; if (k >= 1) { J.hop = null; J.t = 0; J.next = rand(0.9, 2.4); J.land = 0.15; if (J.x > W - 20 || J.x < 20 || Math.random() < 0.2) J.dir = J.x > W - 20 ? -1 : J.x < 20 ? 1 : -J.dir; } }
+  if (J.land > 0) { J.land -= dt; squash = J.land / 0.15; }
+  spHalo(jx, jy, 18 * js, 0.3); ctx.save(); ctx.translate(jx, jy); ctx.scale(J.dir * js, js * (1 - squash * 0.25));
+  spLegs(0, 0, 0.8, 4, 11, J.hop ? 0.5 : Math.sin(t * 6) * 0.08, 2.2, '#1c1410', 0.5);
+  ctx.fillStyle = '#1c1410'; ctx.beginPath(); ctx.ellipse(-6, 0, 6.5, 5.2, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(3, -1, 5.5, 5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#f2e6c8'; ctx.fillRect(-10, -1, 8, 1.6); ctx.fillStyle = '#ff9a3c'; ctx.fillRect(-9, 1.5, 6, 1.2); // markings
+  for (const ey of [-2.6, 0.6]) { ctx.fillStyle = '#05030a'; ctx.beginPath(); ctx.arc(7, ey, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(7.6, ey - 0.8, 0.8, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+function paintT2(x) { // mausoleum, fence, cobwebs (static)
+  const gy = H * 0.84, mx = W * 0.5, mw = Math.min(W * 0.36, 170);
     // mausoleum
     const top = gy - H * 0.32;
     x.fillStyle = '#1a0c14'; x.fillRect(mx - mw * 0.55, gy - 10, mw * 1.1, 10); x.fillRect(mx - mw * 0.5, gy - 18, mw, 8);
@@ -2437,7 +2690,20 @@ function bgTomb(t) {
     x.fillRect(0, gy - 20, mx - mw * 0.6, 2.5); x.fillRect(mx + mw * 0.6, gy - 20, W, 2.5);
     // corner cobwebs
     for (const [ox, sx] of [[0, 1], [W, -1]]) { x.strokeStyle = 'rgba(220,220,235,0.35)'; x.lineWidth = 1; const R = Math.min(W, H) * 0.22; x.beginPath(); for (let k = 0; k <= 6; k++) { const a = k / 6 * Math.PI / 2; x.moveTo(ox, 0); x.lineTo(ox + sx * Math.cos(a) * R, Math.sin(a) * R); } for (const f of [0.3, 0.55, 0.8]) { for (let k = 0; k <= 6; k++) { const a = k / 6 * Math.PI / 2, a0 = (k - 1) / 6 * Math.PI / 2, px = ox + sx * Math.cos(a) * R * f, py = Math.sin(a) * R * f; if (!k) x.moveTo(px, py); else x.quadraticCurveTo(ox + sx * Math.cos((a + a0) / 2) * R * f * 0.85, Math.sin((a + a0) / 2) * R * f * 0.85, px, py); } } x.stroke(); }
+}
+function bgTomb(t) {
+  const dt = bgDt(13, t), gy = H * 0.84, S = BG.tomb, mx = W * 0.5, mw = Math.min(W * 0.36, 170);
+  ctx.drawImage(lay('tombsky', W, H, (x) => {
+    x.fillStyle = lgx(x, 0, gy, [[0, '#0c0108'], [0.5, '#3a0718'], [1, '#5a1020']]); x.fillRect(0, 0, W, H);
+    const bx = W * 0.25, by = H * 0.14, br = Math.min(W, H) * 0.13; // blood moon
+    x.fillStyle = rgx(x, bx, by, br, br * 3.2, [[0, 'rgba(255,60,60,0.4)'], [1, 'rgba(255,60,60,0)']]); x.fillRect(0, 0, W, gy);
+    x.fillStyle = rgx(x, bx - br * 0.3, by - br * 0.3, 2, br * 1.2, [[0, '#ffb39a'], [1, '#c22a2a']]); x.beginPath(); x.arc(bx, by, br, 0, 7); x.fill();
+    x.fillStyle = 'rgba(90,0,10,0.3)'; for (let i = 0; i < 6; i++) { x.beginPath(); x.arc(bx + (hash(i * 4) - 0.5) * br * 1.2, by + (hash(i * 9) - 0.5) * br * 1.2, br * (0.08 + hash(i * 2) * 0.12), 0, 7); x.fill(); }
+    paintT2(x);
   }), 0, 0, W, H);
+  const vb = drawBgVampire(t, dt); // v14: Count Blockula looming (and laughing) behind the mausoleum
+  const t2 = lay('tomb2', W, H, paintT2); // mausoleum etc. are baked into 'tombsky' too; only the strip overlapping the vampire is re-blitted on top of him
+  if (vb) { const sc = t2.width / W, y0 = gy - H * 0.37, x0 = Math.max(0, vb[0]), x1 = Math.min(W, vb[0] + vb[2]), y1 = Math.min(H, vb[1] + vb[3]); if (y1 > y0 && x1 > x0) ctx.drawImage(t2, x0 * sc, y0 * sc, (x1 - x0) * sc, (y1 - y0) * sc, x0, y0, x1 - x0, y1 - y0); }
   // drifting storm clouds
   const cl = lay('tcloud', W * 2, H * 0.28, (x) => { for (let i = 0; i < 34; i++) { const cx2 = hash(i * 2.7) * W * 2, cy2 = hash(i * 6.1) * H * 0.2, r = 24 + hash(i * 3.9) * 50; x.fillStyle = rgx(x, cx2, cy2, 2, r, [[0, 'rgba(20,0,10,0.6)'], [1, 'rgba(20,0,10,0)']]); x.fillRect(cx2 - r, cy2 - r, r * 2, r * 2); } });
   const co = (t * 25) % (W * 2); ctx.drawImage(cl, co - W * 2, 0, W * 2, H * 0.28); ctx.drawImage(cl, co, 0, W * 2, H * 0.28);
@@ -2470,15 +2736,7 @@ function bgTomb(t) {
     b.x += b.v * dt; if (b.v > 0 && b.x > W + 30) { b.x = -30; b.y = rand(0.06, 0.45) * H; } if (b.v < 0 && b.x < -30) { b.x = W + 30; b.y = rand(0.06, 0.45) * H; }
     const fl = 0.5 + 0.5 * Math.sin(t * 15 + b.p); ctx.save(); ctx.translate(b.x, b.y + Math.sin(t * 3 + b.p) * 8); ctx.scale(Math.sign(b.v), 1); batPath(ctx, 11 * b.s, fl); ctx.fillStyle = '#070206'; ctx.fill(); ctx.restore();
   }
-  // spiders dangling on silk threads, bobbing and wiggling their legs
-  for (const sp of BG.spiders) {
-    const y = sp.len * (0.75 + 0.25 * Math.sin(t * 0.9 + sp.p)), s = sp.s, wig = Math.sin(t * 9 + sp.p) * 0.25;
-    ctx.strokeStyle = 'rgba(230,230,240,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sp.x, 0); ctx.lineTo(sp.x, y); ctx.stroke();
-    ctx.strokeStyle = '#0a0508'; ctx.lineWidth = 1.6 * s;
-    for (const side of [-1, 1]) for (let k = 0; k < 4; k++) { const a = (k - 1.5) * 0.45 + (k % 2 ? wig : -wig); ctx.beginPath(); ctx.moveTo(sp.x, y + 4 * s); ctx.quadraticCurveTo(sp.x + side * 9 * s, y + (a * 12 - 6) * s, sp.x + side * 13 * s, y + (a * 14 + 6) * s); ctx.stroke(); }
-    ctx.fillStyle = '#0a0508'; ctx.beginPath(); ctx.ellipse(sp.x, y + 7 * s, 6 * s, 7 * s, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(sp.x, y + 1 * s, 4 * s, 0, 7); ctx.fill();
-    ctx.fillStyle = '#ff3355'; ctx.fillRect(sp.x - 2.4 * s, y, 1.6 * s, 1.6 * s); ctx.fillRect(sp.x + 0.8 * s, y, 1.6 * s, 1.6 * s);
-  }
+  drawTombSpiders(t, dt, gy); // v14: several kinds of spiders
   // low crimson ground mist
   const mist = lay('tmist', W * 2, H * 0.2, (x) => { for (let i = 0; i < 22; i++) { const fx = hash(i * 2.2) * W * 2, fy = H * 0.1 + (hash(i * 4.4) - 0.5) * H * 0.08, r = 30 + hash(i * 6.6) * 50; x.fillStyle = rgx(x, fx, fy, 2, r, [[0, 'rgba(160,40,70,0.3)'], [1, 'rgba(160,40,70,0)']]); x.fillRect(fx - r, fy - r, r * 2, r * 2); } });
   const mo = (t * 18) % (W * 2); ctx.drawImage(mist, mo - W * 2, gy - H * 0.1, W * 2, H * 0.2); ctx.drawImage(mist, mo, gy - H * 0.1, W * 2, H * 0.2);
@@ -2520,7 +2778,7 @@ function drawBG(t) {
 function setBG(i) { if (i === bgCur) return; bgPrev = bgCur; bgCur = i; bgFade = 1; }
 // ---------------------------------------------------------------- effects
 const P = [], MAXP = 700, FT = [], BURSTS = [], RINGS = [], TRAILS = [], TUMBLE = [];
-let shakeT = 0, shakeD = 1, shakeM = 0, flashA = 0, banner = null;
+let shakeT = 0, shakeD = 1, shakeM = 0, flashA = 0, hurtA = 0, banner = null;
 function part(x, y, vx, vy, life, size, color, grav, type) {
   if (P.length >= (settings.fx === 'low' ? 160 : MAXP) || (settings.fx === 'low' && type !== 3 && type !== 4 && Math.random() < 0.6)) return;
   P.push({ x, y, vx, vy, life, max: life, size, color, grav, type: type || 0, rot: rand(0, 6), vr: rand(-10, 10) });
@@ -2552,6 +2810,7 @@ function updateFX(dt) {
   for (const b of TUMBLE) { b.vy += 1500 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt; }
   if (shakeT > 0) shakeT = Math.max(0, shakeT - dt);
   if (flashA > 0) flashA = Math.max(0, flashA - dt * 2.5);
+  if (hurtA > 0) hurtA = Math.max(0, hurtA - dt * 1.6);
   if (bgFade > 0) bgFade = Math.max(0, bgFade - dt);
   if (banner) { banner.t += dt; if (banner.t >= banner.d) banner = null; }
 }
@@ -2853,14 +3112,27 @@ function beginPop(pop) {
 }
 function enterStage(ns) {
   g.stage = ns; M.stage = ns; setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
-  g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0 } : null;
+  g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 } : null;
   stageBanner(ns);
+}
+// v14: the vampire laughs (sound + background + portrait). Throttled: at most once every 7 s, never during an OUCH
+function bossLaugh(why) {
+  const b = g.boss; if (!b || b.hp <= 0 || state !== 'play' || g.stage !== BOSS) return false;
+  if (g.time - b.lastLaugh < 7 || b.ouch > 0) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
+  b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laugh = LAUGH_DUR; b.laughs++; b.why[why] = (b.why[why] || 0) + 1;
+  sfx.mwaha(); return true;
 }
 function hitBoss(d) {
   const b = g.boss; b.hp = Math.max(0, b.hp - d); b.dmg += d; b.hit = 0.45;
   const c = L.cell; floatText('-' + d, L.bx + c * (2 + Math.random() * 6), L.by + c * 1.6, '#ff4d6a', c * 0.75, 0.9);
-  if (b.hp <= 0) { b.laugh = 0; b.warn = null; g.bats = []; sfx.defeat(); shake(0.6, 14); flashA = 0.6; showBanner('VAMPIRE DEFEATED!', 'THE NIGHT IS SAVED!', '#ffd23d'); }
-  else { sfx.hurt(); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => sfx.laugh(80, 0.5), 500); } }
+  // v14: every quarter of his health (75 / 50 / 25%) fires once: a goofier OUCH! each time + flinch, red flash, shaking bar
+  let q = 0; for (const [k, th] of [[1, 0.75], [2, 0.5], [3, 0.25]]) if (!b.qd[k] && b.hp <= b.max * th) { b.qd[k] = true; b.ouches.push(k); q = k; }
+  if (b.hp <= 0) { b.laugh = 0; b.warn = null; g.bats = []; b.cries++; sfx.defeat(); shake(0.6, 14); flashA = 0.6; hurtA = 0.5; showBanner('VAMPIRE DEFEATED!', 'THE NIGHT IS SAVED!', '#ffd23d'); }
+  else if (q) {
+    b.ouch = 0.9; b.ouchQ = q; b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; sfx.ouch(q); shake(0.25, 5 + q * 2); hurtA = 0.22 + q * 0.06; vib(40 + q * 20);
+    floatText(['OUCH!', 'OUCH!!', 'OW-OW-OUCHIE!!!'][q - 1], L.bx + c * 5, L.by + c * 3.2, '#ff4d6a', c * (q === 3 ? 0.95 : 1.25), 1.4);
+  }
+  else { sfx.hurt(); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => bossLaugh('furious'), 1200); } }
 }
 const at2 = (k) => g.board[(k / COLS) | 0][k % COLS];
 const clampX = (x) => Math.max(L.bx + L.cell * 2, Math.min(L.bx + L.cell * 8, x));
@@ -2949,7 +3221,8 @@ function updateTwists(dt) {
   }
   if (g.stage === BOSS && g.boss && g.boss.hp > 0) { // vampire summons bats that drop spider webs; gentle step-up below 35% hp
     const b = g.boss, per = b.hp < b.max * 0.35 ? 18 : 22;
-    if (g.twistT > per - 2 && !b.warn) { b.warn = { t: 0 }; b.laugh = 1.7; sfx.laugh(); }
+    if (g.twistT > per - 2 && !b.warn) { b.warn = { t: 0 }; bossLaugh('bats'); }
+    if (g.time >= b.nextLaugh) bossLaugh('idle'); // v14: he laughs every ~10-15 s (throttled)
     if (b.warn) b.warn.t += dt;
     if (g.twistT > per) { g.twistT = 0; b.warn = null; batAttack(); }
   }
@@ -3027,7 +3300,7 @@ function updateGame(dt) {
   g.disp = gap > 0 ? Math.min(g.score, g.disp + Math.max(60, gap * 7) * dt) : g.score;
   if (g.wipe) { g.wipe.t += dt; if (g.wipe.t >= 0.5 && !g.res) applyWipe(); }
   updateDanger(dt);
-  if (g.boss) { const b = g.boss; b.hit = Math.max(0, b.hit - dt); b.laugh = Math.max(0, b.laugh - dt); b.disp += (b.hp - b.disp) * Math.min(1, dt * 4); }
+  if (g.boss) { const b = g.boss; b.hit = Math.max(0, b.hit - dt); b.laugh = Math.max(0, b.laugh - dt); b.ouch = Math.max(0, b.ouch - dt); b.barShake = Math.max(0, b.barShake - dt * 1.2); b.disp += (b.hp - b.disp) * Math.min(1, dt * 4); }
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
@@ -3075,6 +3348,7 @@ const best = () => Math.max(scores.length ? scores[0].s : 0, g.score);
 const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L: LAVA, W: WEB,
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
+  voices: { laugh: vampLaugh2, ouch: vampOuch, defeat: vampDefeatCry }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
     for (let y = 0; y < ROWS; y++) g.board[y].fill(0);
     rows.forEach((s, i) => { const y = ROWS - rows.length + i; [...s].forEach((ch, x) => { g.board[y][x] = LETTERS[ch] || 0; }); });
@@ -3083,6 +3357,7 @@ const dbg = {
   },
   setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
+  bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; } return bossLaugh(w || 'test'); },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
   get amb() { return { on: !!AMB.L, kind: AMB.kind, events: AMB.events, waves: AMB.waves, out: AMB.L ? AMB.L.out.gain.value : 0, bus: A.amb ? A.amb.gain.value : 0 }; },
@@ -3400,7 +3675,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v13';
+const VERSION = 'v14';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
@@ -3790,12 +4065,13 @@ function drawFogCloud(bx, by, c) {
   ctx.restore();
 }
 function drawBossBar(bx, by, c, bw) {
-  const b = g.boss, h = Math.max(14, c * 0.62), sh = b.hit > 0 ? Math.sin(T * 60) * b.hit * 6 : 0, x = bx + c * 0.25 + sh, y = by + c * 0.18, w = bw - c * 0.5;
+  const b = g.boss, h = Math.max(14, c * 0.62), sh = (b.hit > 0 ? Math.sin(T * 60) * b.hit * 6 : 0) + (b.barShake > 0 ? Math.sin(T * 75) * b.barShake * c * 0.35 : 0), x = bx + c * 0.25 + sh, y = by + c * 0.18 + (b.barShake > 0 ? Math.sin(T * 53) * b.barShake * c * 0.12 : 0), w = bw - c * 0.5;
   rr(x, y, w, h, h / 2); ctx.fillStyle = 'rgba(10,0,5,0.96)'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = b.hp < b.max * 0.35 ? (Math.sin(T * 10) > 0 ? '#ff3355' : '#ffd23d') : '#ff3355'; ctx.stroke();
   const ip = h + 2, iw = w - ip - 3, kd = Math.max(0, b.disp / b.max), kh = Math.max(0, b.hp / b.max);
   rr(x + ip, y + 3, iw, h - 6, (h - 6) / 2); ctx.fillStyle = 'rgba(255,60,90,0.10)'; ctx.fill();
   if (kd > kh) { rr(x + ip, y + 3, Math.max(4, iw * kd), h - 6, (h - 6) / 2); ctx.fillStyle = '#ffffff'; ctx.fill(); } // white damage trail
   if (kh > 0) { rr(x + ip, y + 3, Math.max(4, iw * kh), h - 6, (h - 6) / 2); const gr = ctx.createLinearGradient(x + ip, 0, x + ip + Math.max(4, iw * kh), 0); gr.addColorStop(0, '#c0102f'); gr.addColorStop(0.7, '#ff2a4f'); gr.addColorStop(1, '#ff8fa0'); ctx.fillStyle = gr; ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; for (const k of [0.25, 0.5, 0.75]) ctx.fillRect(x + ip + iw * k - 1, y + 3, 2, h - 6); // quarter marks (OUCH!)
   ctx.save(); ctx.translate(x + h / 2 + 1, y + h / 2); batPath(ctx, h * 0.42, 0.5 + 0.5 * Math.sin(T * 12)); ctx.fillStyle = '#ff3355'; ctx.fill(); ctx.restore();
   fitTxt('COUNT BLOCKULA', x + ip + iw / 2, y + h / 2 + 1, h * 0.62, iw * 0.92, '#ffffff', '#3a0010', 'center', NFONT);
   if (b.warn) { const a = 0.6 + 0.4 * Math.sin(T * 16); ctx.globalAlpha = a; txt('BATS INCOMING!', bx + bw / 2, y + h + c * 0.65, c * 0.6, '#ff6b81', '#2a0010'); ctx.globalAlpha = 1; }
@@ -4320,6 +4596,7 @@ function frame(now) {
       drawBoard(); drawDanger(); drawSide(); drawBatsInFlight(); drawFX();
       ctx.restore();
       if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA + ')'; ctx.fillRect(0, 0, W, H); }
+      if (hurtA > 0) { ctx.fillStyle = 'rgba(255,20,50,' + hurtA + ')'; ctx.fillRect(0, 0, W, H); } // v14 OUCH! red flash
       drawHUD(); drawControls(); drawBannerUI();
       if (state === 'play' && paused) { if (pmenu) drawPUMenu(); else drawPause(); }
       else if (state === 'entry') { drawEntry(); drawFX(); }
@@ -4340,7 +4617,8 @@ window.__bb = {
   get bg() { return { cur: bgCur, fade: bgFade, draws: BG.draws.slice(), layers: Object.keys(BG.L), gator: BG.gator ? { state: BG.gator.state, blinks: BG.gator.blinks, doubles: BG.gator.doubles, sinks: BG.gator.sinks } : null, storm: BG.storm ? { flashes: BG.storm.flashes, thunders: BG.storm.thunders } : null, hole: BG.hole ? { eaten: BG.hole.eaten } : null, surf: BG.surf ? { n: BG.surf.list.length, rides: BG.surf.rides, wipes: BG.surf.wipes, crashes: BG.surf.crashes, states: BG.surf.list.map((q) => q.st), xs: BG.surf.list.map((q) => Math.round(q.x)) } : null, ambCrashes: AMB.crashes || 0, water: BG.water ? { tbub: BG.water.tb.length, splashes: BG.water.splashes, sbub: BG.water.sb.length, pops: BG.water.pops, cur: BG.water.cur.length } : null, particles: { dust: BG.dust.length, fall: BG.fall.length, cars: BG.cars.length } }; },
   get wallet() { return JSON.parse(JSON.stringify(wallet)); }, get edition() { return wallet.edition; }, get shop() { return { tab: shop.tab, modal: shop.modal, msg: shop.msg ? shop.msg.text : null, thumbs: Object.keys(shop.thumbs).length }; }, get pmenu() { return pmenu; }, get stats() { return g.stats ? Object.assign({}, g.stats) : null; }, get queue() { return g.queue ? g.queue.map((q) => q.t) : []; }, get bank() { return g.bank ? { amt: g.bank.amt, from: g.bank.from } : null; }, get ads() { return Object.assign({}, BB_ADS); },
   isFullEdition, get level() { return g.level; }, get time() { return g.time; },
-  get boss() { return g.boss ? { hp: g.boss.hp, max: g.boss.max, attacks: g.boss.attacks, dmg: g.boss.dmg } : null; }, get won() { return !!g.won; }, get fog() { return g.fog ? Object.assign({}, g.fog) : null; },
+  get boss() { return g.boss ? { hp: g.boss.hp, max: g.boss.max, attacks: g.boss.attacks, dmg: g.boss.dmg, ouches: g.boss.ouches.slice(), laughs: g.boss.laughs, why: Object.assign({}, g.boss.why), laughing: g.boss.laugh > 0, ouch: g.boss.ouch, cries: g.boss.cries } : null; },
+  get tomb() { return { vamp: BG.vamp ? Object.assign({}, BG.vamp) : null, spiders: BG.spiders ? BG.spiders.length : 0, scurry: BG.scurry ? BG.scurry.length : 0, kinds: BG.spiders ? BG.spiders.map((x) => x.k) : [], tar: BG.tar ? { x: BG.tar.x, dir: BG.tar.dir } : null, jumper: BG.jumper ? { x: BG.jumper.x } : null, stats: BG.spStats ? Object.assign({}, BG.spStats) : null }; }, get won() { return !!g.won; }, get fog() { return g.fog ? Object.assign({}, g.fog) : null; },
   get conv() { return { n: g.convN || 0, dir: g.convDir || 1, warn: !!g.convWarn }; }, get grav() { return gravInterval(); }, get bats() { return g.bats ? g.bats.length : 0; },
   get start() { return { armed: ST.armed, out: ST.out, playing: !!ST.src, plays: ST.plays, taps: ST.taps, critters: ST.critters.length, decoded: !!ST.buf, version: VERSION }; },
   get layout() { return Object.assign({ W, H }, L); }, get buttons() { return UI.map((b) => Object.assign({}, b)); },
