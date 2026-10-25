@@ -6,6 +6,13 @@ A silly, splashy falling-block puzzler built for phones. Pure HTML5 canvas + Web
 
 On iPhone: open the link in Safari, tap **Share → Add to Home Screen** to launch it fullscreen like an app.
 
+## Start screen
+The game opens on a wacky vaporwave sunset start screen: a striped retro sun over a neon grid, palm silhouettes, a
+marble bust in shades, spinning 3D blocks and googly-eyed bouncing blocks under a squash-and-stretch logo.
+The first tap turns sound on and starts the start-screen theme, **SUNSET BOING** (an original 112 BPM future-funk loop,
+`music/start-00.b64`). The second tap slides into the main menu while the theme crossfades into the menu music.
+With sound off, one tap goes straight to the menu. `?stage=N` links skip the start screen.
+
 ## Controls
 - **Tap**: rotate
 - **Swipe left/right**: move (keep dragging to slide cell by cell)
@@ -66,6 +73,9 @@ Each stage has its own seamless loop (`music/loop-NN.b64`, base64 MP3, ~0.8 MB) 
 next stage preloaded. A matching danger layer fades in when the stack gets high, and a comeback / victory fanfare hits on
 the beat. Stage changes land on the next bar. If a file can't load, the old live Web Audio synth plays instead.
 
+On stage 1, Tropical Tides, a few surfers paddle out, catch waves, carve and sometimes wipe out in the background,
+with a soft wave crash each time someone catches a wave.
+
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
 Developer shortcut: `?stage=N` (1–10) starts a new game at that stage, e.g. https://alis0712.github.io/block-bonanza/?stage=10
@@ -74,7 +84,7 @@ Also: ghost piece, lock delay, SRS wall kicks, particles and screen shake, anima
 track per stage, top-10 best scores with initials, wallet and store items (all saved on the device).
 
 ## Sound on iPhone
-Tap anywhere once to turn sound on (the title screen shows SOUND ON / TAP FOR SOUND). If it's still silent,
+Tap the start screen once to turn sound on. If it's still silent,
 check the ring/silent switch and the volume buttons.
 
 `icons.tar.b64` holds the app icons (base64 tar); a small GitHub Action unpacks them into the PNGs at the root.
