@@ -89,12 +89,17 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
 };
+const SET_DEF = { vMusic: 70, vSfx: 70, vAmb: 70 }; // slider defaults (the v12 mix lives in the bus gains, BUS below)
 const settings = (() => { const st = store.get('bb_settings', {}), o = Object.assign({ sound: true, buttons: true, vMusic: 70, vSfx: 70, vAmb: 70, vibrate: true, shake: 2, fx: 'full', ghost: true, cb: false, hand: 'right', fps: false }, st);
   if (st.music === false && st.vMusic == null) o.vMusic = 0; // the old MUSIC: OFF toggle becomes a 0% music slider
+  if ((st.sv || 1) < 2) { // v12 rebalanced mix: untouched old defaults (70/70/70) move to the new defaults; deliberate changes are kept
+    if ((st.vMusic == null && st.music !== false) || +st.vMusic === 70) o.vMusic = SET_DEF.vMusic; if (st.vSfx == null || +st.vSfx === 70) o.vSfx = SET_DEF.vSfx; if (st.vAmb == null || +st.vAmb === 70) o.vAmb = SET_DEF.vAmb; }
+  if (st.sv !== 2) { o.sv = 2; try { store.set('bb_settings', o); } catch (e) { /* ignore */ } }
   delete o.music; ['vMusic', 'vSfx', 'vAmb'].forEach((k) => { o[k] = Math.max(0, Math.min(100, Math.round(+o[k] || 0))); }); return o; })();
 const volK = (v) => (v <= 0 ? 0 : Math.pow(v / 70, 1.6)); // slider % -> gain (70% = the original mix, 100% = +5 dB)
 function applyVolumes() { if (!A.ctx) return; const t = A.ctx.currentTime, set = (n, v) => { if (n) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(v, t, 0.03); } };
-  set(A.mus, 0.42 * volK(settings.vMusic)); set(A.sfx, 0.9 * volK(settings.vSfx)); set(A.amb, 0.42 * volK(settings.vAmb)); }
+  set(A.mus, BUS.mus * volK(settings.vMusic)); set(A.sfx, BUS.sfx * volK(settings.vSfx)); set(A.amb, BUS.amb * volK(settings.vAmb)); }
+const BUS = { mus: 0.21, sfx: 1.6, amb: 0.84 }; // v12 mix: music -6 dB, SFX +5 dB, ambient +6 dB vs v11 (0.42 / 0.9 / 0.42)
 const CAN_VIB = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 function vib(p) { if (settings.vibrate && CAN_VIB) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } }
 const saveSettings = () => store.set('bb_settings', settings);
@@ -153,11 +158,11 @@ function audioUnlock() {
       const comp = c.createDynamicsCompressor();
       comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
       A.master = c.createGain(); A.master.gain.value = settings.sound ? 0.8 : 0;
-      A.mus = c.createGain(); A.mus.gain.value = 0.42;
-      A.sfx = c.createGain(); A.sfx.gain.value = 0.9;
-      A.amb = c.createGain(); A.amb.gain.value = 0.42; A.mus.connect(A.master); A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
+      A.mus = c.createGain(); A.mus.gain.value = BUS.mus;
+      A.sfx = c.createGain(); A.sfx.gain.value = BUS.sfx;
+      A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.mus.connect(A.master); A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
       const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
-      lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+      lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
       comp.connect(lim); lim.connect(c.destination);
       const len = c.sampleRate | 0, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -876,10 +881,10 @@ function xmPlay(i, when) {
   XM.src = s; XM.srcG = g; XM.t0 = when; XM.plays++;
   if (XM.dOn) { xmDangerStop(when, true); xmDanger(true, when); }
 }
-// sound effects duck the streamed music for a moment (-3.5 dB, ~150 ms) so pops, locks and cheers cut through
+// sound effects duck the streamed music for a moment (-8 dB, ~300 ms) so pops, locks and cheers cut through
 function xmSfxDuck() {
   if (!XM.sd || !XM.src) return; const t = A.ctx.currentTime; if (t - XM.sdT < 0.05) return; XM.sdT = t;
-  const gn = XM.sd.gain; gn.cancelScheduledValues(t); gn.setValueAtTime(gn.value, t); gn.linearRampToValueAtTime(0.67, t + 0.01); gn.setTargetAtTime(1, t + 0.12, 0.1);
+  const gn = XM.sd.gain; gn.cancelScheduledValues(t); gn.setValueAtTime(gn.value, t); gn.linearRampToValueAtTime(0.4, t + 0.01); gn.setTargetAtTime(1, t + 0.2, 0.15);
 }
 function xmStopLoop(when, fade) {
   const s = XM.src, g = XM.srcG; if (!s) return; XM.src = null; XM.srcG = null;
@@ -900,10 +905,11 @@ function xmDanger(on, at) {
 function xmDangerStop(t, instant) { const s = XM.dSrc, g = XM.dG; if (!s) return; XM.dSrc = null; XM.dG = null; const f = instant ? 0.03 : 0.6;
   try { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, f / 3); s.stop(t + f + 0.3); } catch (e) { /* ignore */ } }
 // comeback / victory fanfare on time t; returns the impact time (one beat later) or 0 if not available
+// fanfares are achievements: +6 dB (gain 2) to sit above the quieter v12 music
 function xmFanfare(i, t, alone) {
   if (!A.ctx) return 0; xmGraph(); const key = xmKey('fanfare', Math.max(1, i)), b = XM.buf[key]; if (!b) { xmDecode(key); return 0; }
   const s = A.ctx.createBufferSource(), g = A.ctx.createGain(), beat = 60 / XM_BPM[Math.max(1, i)];
-  s.buffer = b; g.gain.value = alone ? 1 : 0.95; s.connect(g); g.connect(XM.bus); s.start(t, XM_PAD + (XM.dly[key] || 0)); XM.fans++;
+  s.buffer = b; g.gain.value = alone ? 2 : 1.9; s.connect(g); g.connect(XM.bus); s.start(t, XM_PAD + (XM.dly[key] || 0)); XM.fans++;
   XM.dOn = false; xmDangerStop(t, true);
   if (!alone) { const dg = XM.duck.gain; dg.cancelScheduledValues(t); dg.setTargetAtTime(0.3, t, 0.03); dg.setTargetAtTime(1, t + beat * 3, 0.6); }
   return t + beat;
