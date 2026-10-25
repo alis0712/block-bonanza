@@ -302,7 +302,7 @@ const sfx = {
   clunk() { tone(90, 0.25, 'square', 0.16, { lp: 600, to: 55 }); noise(0.18, 0.3, 'bandpass', 900, { q: 2 }); noise(0.5, 0.08, 'highpass', 4000); }, // conveyor shifts + steam hiss
   whoosh() { if (!aok()) return; const c = A.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g2 = c.createGain(); s.buffer = A.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + 0.8); f.frequency.exponentialRampToValueAtTime(250, t + 1.8); g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.22, t + 0.6); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); s.connect(f); f.connect(g2); g2.connect(A.sfx); s.start(t); s.stop(t + 2); tone(220, 1.6, 'sine', 0.035, { when: t + 0.2, to: 180 }); }, // ghostly fog
   laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
-  mwaha() { if (!aok()) return false; vampLaugh2(A.ctx, anow() + 0.02, A.sfx, 104 + rand(-5, 5), 1.0, A.noise); return true; }, // v14 formant "MWAH-HA-HA-HA" on the SFX bus
+  mwaha(kind) { if (!aok()) return false; vampLaugh3(A.ctx, anow() + 0.02, A.sfx, kind || 'cackle', 104 + rand(-5, 5), LAUGH_V[kind || 'cackle'], A.noise); return true; }, // v15 theatrical laughs on the SFX bus
   ouch(q) { if (!aok()) return false; vampOuch(A.ctx, anow() + 0.01, A.sfx, q, 1.0, A.noise); tone(900 + q * 300, 0.07, 'square', 0.04, { to: 500 }); return true; }, // v14 cartoony OUCH! (q = 1..3, sillier each time)
   bats() { if (!aok()) return; const t = anow(); for (let i = 0; i < 7; i++) tone(rand(3200, 5600), 0.06, 'sine', 0.05, { when: t + i * 0.07, to: rand(1800, 2600) }); noise(0.6, 0.12, 'bandpass', 900, { q: 3 }); }, // screeching bat swarm + wing flutter
   web() { noise(0.15, 0.25, 'bandpass', 600, { q: 3 }); tone(140, 0.12, 'sine', 0.12, { to: 90 }); },
@@ -680,7 +680,7 @@ function formantVoice(c, t, dest, o, noiseBuf) {
   const s1 = mk('sawtooth'), s2 = mk('sawtooth'), sub = mk('sine'), src = c.createGain(), amp = c.createGain(), out = c.createGain(), lp = c.createBiquadFilter();
   for (const [x, k] of [[s1, 1], [s2, 1.004], [sub, 0.5]]) kfp(x.frequency, t, o.f0.map(([d, f]) => [d, f * k]), true);
   s2.detune.value = 8; src.gain.value = 0.5; out.gain.value = o.v;
-  const sg = c.createGain(); sg.gain.value = 0.55; s1.connect(src); s2.connect(sg); sg.connect(src);
+  const sg = c.createGain(); sg.gain.value = 0.55; const vg0 = c.createGain(); kfp(vg0.gain, t, o.voi || [[0, 1]]); s1.connect(vg0); s2.connect(sg); sg.connect(vg0); vg0.connect(src); // voicing (0 = whispered wheeze)
   const vib = mk('sine'), vg = c.createGain(); vib.frequency.value = o.vib ? o.vib[0] : 5.5; vib.connect(vg); vg.connect(s1.detune); vg.connect(s2.detune);
   kfp(vg.gain, t, o.vibD || [[0, o.vib ? o.vib[1] : 20]]);
   const wob = mk('sine'), wg = c.createGain(); wob.frequency.value = 1.7; wg.gain.value = 9; wob.connect(wg); wg.connect(s1.detune); // slow drift (less robotic)
@@ -692,16 +692,18 @@ function formantVoice(c, t, dest, o, noiseBuf) {
     kfp(bp.frequency, t, o.vow.map(([d, v]) => [d, VF[v][k][0] * fs])); kfp(bg.gain, t, o.vow.map(([d, v]) => [d, VF[v][k][1] * 3.2]));
     src.connect(bp); bp.connect(bg); bg.connect(amp);
   }
-  const sgain = c.createGain(); sgain.gain.value = o.sub || 0.12; sub.connect(sgain); sgain.connect(amp); // chest
+  const sgain = c.createGain(), sv = c.createGain(); sgain.gain.value = o.sub || 0.12; kfp(sv.gain, t, o.voi || [[0, 1]]); sub.connect(sgain); sgain.connect(sv); sv.connect(amp); // chest
   kfp(amp.gain, t, o.amp);
-  lp.type = 'lowpass'; lp.frequency.value = o.lp || 5200; lp.Q.value = 0.5; amp.connect(lp); lp.connect(out); out.connect(dest);
+  let rz = null; const rg = c.createGain(); rg.gain.value = 1; amp.connect(rg);
+  if (o.rasp) { rz = mk('triangle'); rz.frequency.value = o.raspHz || 46; const rd = c.createGain(); kfp(rd.gain, t, o.rasp.map(([d, v]) => [d, v * 0.55])); rz.connect(rd); rd.connect(rg.gain); } // raspy growl (fast AM)
+  lp.type = 'lowpass'; lp.frequency.value = o.lp || 5200; lp.Q.value = 0.5; rg.connect(lp); lp.connect(out); out.connect(dest);
   if (o.echo) { const d = c.createDelay(1), fb = c.createGain(), el = c.createBiquadFilter(), es = c.createGain(); d.delayTime.value = o.echo[0]; fb.gain.value = o.echo[1]; el.type = 'lowpass'; el.frequency.value = 1800; es.gain.value = o.echo[2]; out.connect(es); es.connect(d); d.connect(el); el.connect(fb); fb.connect(d); el.connect(dest); }
   for (const [d0, dd, lv, f] of o.ch || []) { // "ch" / "h" consonant bursts
     if (!noiseBuf) break; const n = c.createBufferSource(), nf = c.createBiquadFilter(), ng = c.createGain(); n.buffer = noiseBuf; nf.type = 'bandpass'; nf.frequency.value = f || 3800; nf.Q.value = 1.4;
     ng.gain.setValueAtTime(0.0001, t + d0); ng.gain.exponentialRampToValueAtTime(lv * o.v, t + d0 + 0.012); ng.gain.exponentialRampToValueAtTime(0.0001, t + d0 + dd);
     n.connect(nf); nf.connect(ng); ng.connect(dest); n.start(t + d0, Math.random() * 0.4); n.stop(t + d0 + dd + 0.02);
   }
-  for (const x of [s1, s2, sub, vib, wob]) { x.start(t); x.stop(end); }
+  for (const x of [s1, s2, sub, vib, wob].concat(rz ? [rz] : [])) { x.start(t); x.stop(end); }
   if (nz) { nz.start(t, Math.random() * 0.5); nz.stop(end); }
   return o.dur;
 }
@@ -718,6 +720,55 @@ function laughSpec(base, v) {
   });
   return { dur: LAUGH_DUR, f0, vow, amp, br, ch, v: v || 0.5, vib: [6.2, 0], vibD: [[0, 12], [1.4, 18], [2.0, 70]], echo: [0.21, 0.32, 0.28], sub: 0.18, fs: 0.92 };
 }
+// v15: three theatrical laughs built from syllable tables (shared with the background vampire's jaw):
+//   [onset, length, pitch start, pitch peak, pitch end, loudness, vowels, h-burst, rasp, breath, voicing, vibrato cents]
+// smug  = closed-mouth "mm-hm-hm" chuckle, "heh-heh", contented "hehhh" sigh (idle)
+// cackle = quiet rising "heh-heh-heh-heh" build-up, a sharp gasp, a swooping "MWAH", accelerating then slowing "HA"s with
+//          a wandering pitch contour, a huge raspy "HAAAAA" swoop down, a delighted wheeze and a sigh (bat swarms, top-outs)
+// gloat = low "hoo-hoo-hoo", descending "HA-HA-HAAAA", a pleased "mmmm" hum (after HE'S FURIOUS!)
+const LAUGHS = {
+  smug: { dur: 1.8, syl: [
+    [0, 0.16, 0.95, 1.0, 0.9, 0.42, 'm', 0, 0.1, 0.05, 1, 10], [0.22, 0.12, 1.0, 1.06, 0.92, 0.5, 'm', 0.12, 0.12, 0.05, 1, 10], [0.4, 0.12, 1.02, 1.1, 0.93, 0.55, 'm', 0.12, 0.15, 0.05, 1, 12],
+    [0.6, 0.14, 1.1, 1.2, 1.0, 0.78, 'e', 0.3, 0.25, 0.08, 1, 14], [0.82, 0.17, 1.16, 1.28, 0.98, 0.88, 'ea', 0.32, 0.3, 0.08, 1, 18],
+    [1.1, 0.6, 1.05, 1.1, 0.78, 0.42, 'eu', 0.4, 0.05, 0.75, 0.35, 30]] },
+  cackle: { dur: 5.0, syl: [
+    [0, 0.11, 0.85, 0.9, 0.8, 0.34, 'e', 0.2, 0.1, 0.1, 1, 8], [0.2, 0.11, 0.92, 0.98, 0.86, 0.44, 'e', 0.22, 0.12, 0.1, 1, 8], [0.38, 0.11, 1.0, 1.06, 0.93, 0.54, 'e', 0.25, 0.15, 0.1, 1, 10], [0.54, 0.11, 1.08, 1.16, 1.0, 0.64, 'e', 0.28, 0.2, 0.1, 1, 12],
+    [0.7, 0.24, 1.3, 1.4, 1.5, 0.32, 'i', 0, 0, 1, 0.05, 0],                                     // sharp gasp (inhale)
+    [1.0, 0.5, 1.0, 1.58, 1.25, 1.0, 'mua', 0, 0.45, 0.15, 1, 30],                               // "MWAH" with a big swoop up
+    [1.58, 0.2, 1.62, 1.72, 1.32, 0.95, 'a', 0.4, 0.4, 0.2, 1, 25], [1.82, 0.17, 1.52, 1.62, 1.28, 0.9, 'a', 0.38, 0.4, 0.2, 1, 25],
+    [2.02, 0.15, 1.72, 1.84, 1.42, 1.0, 'a', 0.4, 0.45, 0.2, 1, 30], [2.2, 0.14, 1.48, 1.58, 1.25, 0.86, 'a', 0.36, 0.4, 0.2, 1, 25],
+    [2.37, 0.14, 1.66, 1.78, 1.36, 0.96, 'a', 0.4, 0.45, 0.2, 1, 30], [2.55, 0.16, 1.44, 1.52, 1.2, 0.86, 'a', 0.36, 0.4, 0.22, 1, 30],
+    [2.77, 0.19, 1.56, 1.66, 1.26, 0.9, 'ao', 0.38, 0.45, 0.22, 1, 35], [3.03, 0.23, 1.36, 1.44, 1.1, 0.82, 'a', 0.36, 0.45, 0.25, 1, 40],
+    [3.33, 0.74, 1.6, 1.9, 0.72, 1.0, 'ao', 0.45, 0.6, 0.25, 1, 85],                              // the huge raspy "HAAAAA" swooping down
+    [4.12, 0.34, 1.6, 1.7, 1.5, 0.42, 'i', 0, 0, 1, 0.08, 0],                                     // delighted wheeze
+    [4.5, 0.46, 0.85, 0.9, 0.6, 0.34, 'au', 0.2, 0.1, 0.6, 0.45, 25]] },                          // ...and a sigh
+  gloat: { dur: 2.8, syl: [
+    [0, 0.2, 0.8, 0.88, 0.74, 0.7, 'o', 0.25, 0.25, 0.1, 1, 15], [0.28, 0.18, 0.84, 0.92, 0.76, 0.75, 'o', 0.25, 0.25, 0.1, 1, 15], [0.52, 0.18, 0.88, 0.96, 0.78, 0.8, 'ou', 0.25, 0.3, 0.1, 1, 18],
+    [0.82, 0.2, 1.36, 1.46, 1.2, 1.0, 'a', 0.4, 0.4, 0.15, 1, 25], [1.1, 0.2, 1.24, 1.32, 1.08, 0.95, 'a', 0.38, 0.4, 0.15, 1, 25],
+    [1.38, 0.62, 1.18, 1.3, 0.68, 1.0, 'ao', 0.4, 0.5, 0.2, 1, 70],
+    [2.1, 0.55, 0.85, 0.95, 0.8, 0.5, 'm', 0, 0.05, 0.05, 1, 30]] },
+};
+function laughSpec2(kind, base, v) {
+  const L = LAUGHS[kind] || LAUGHS.cackle; base = base || 104;
+  const f0 = [[0, base * L.syl[0][2]]], vow = [], amp = [[0, 0]], br = [[0, 0.05]], ch = [], voi = [[0, 1]], rasp = [[0, 0]], vibD = [[0, 10]];
+  for (const [o, d, p0, pk, p1, a, vs, h, r, b, vo, vb] of L.syl) {
+    f0.push([o, base * p0], [o + d * 0.28, base * pk], [o + d, base * p1]);
+    const n = vs.length, sp = n > 2 ? Math.min(d, 0.16) : d * 0.7; for (let k = 0; k < n; k++) vow.push([o + (n === 1 ? 0 : k / (n - 1)) * sp, vs[k]]); vow.push([o + d, vs[n - 1]]);
+    amp.push([o, 0], [o + Math.min(0.03, d * 0.2), a], [o + d * (d > 0.4 ? 0.7 : 0.58), a * 0.85], [o + d, 0]);
+    br.push([o, b + h * 0.6], [o + 0.04, b], [o + d, b]); voi.push([o, vo], [o + d, vo]); rasp.push([o, r], [o + d, r * 0.8]); vibD.push([o, vb], [o + d, vb]);
+    if (h > 0) ch.push([Math.max(0, o - 0.03), 0.06, h, 1500]);
+  }
+  vow.sort((x, y) => x[0] - y[0]);
+  return { dur: L.dur, f0, vow, amp, br, ch, voi, rasp, raspHz: 46, v: v || 0.5, vib: [6.4, 0], vibD, echo: [0.21, 0.3, 0.26], sub: 0.18, fs: 0.92 };
+}
+// jaw openness for the background vampire at time lt into laugh `kind` (closed "m"s, half-open "e"/"i", wide "a"/"o")
+function laughJaw(kind, lt) {
+  const L = LAUGHS[kind] || LAUGHS.cackle;
+  for (const [o, d, , , , a, vs] of L.syl) if (lt >= o && lt < o + d) { const n = vs.length, sp = n > 2 ? Math.min(d, 0.16) : d * 0.7, c = vs[n > 1 ? Math.min(n - 1, Math.round((lt - o) / sp * (n - 1))) : 0]; return Math.sin(Math.PI * (lt - o) / d) * Math.min(1, a * 1.1) * (c === 'm' ? 0.12 : c === 'e' || c === 'i' ? 0.55 : 1); }
+  return 0;
+}
+const LAUGH_V = { smug: 1.35, cackle: 1.0, gloat: 1.15 }; // matched loudness
+function vampLaugh3(c, t, dest, kind, base, v, nb) { return formantVoice(c, t, dest, laughSpec2(kind, base, v), nb); }
 // cartoony "OUCH!" at each quarter of the boss's health: q = 1 (75%), 2 (50%), 3 (25%), each sillier + higher
 function ouchSpec(q, v) {
   const fs = 1.1 + q * 0.06;
@@ -2501,13 +2552,13 @@ function bgHaunted(t) {
 // "MWAH-HA-HA-HA" syllables, shoulders shaking, claws up, cape flapping, eyes blazing), flinches and turns red on
 // every OUCH, and fades away when defeated. Off the boss stage (store preview) he laughs silently now and then.
 function vampAnim(dt) {
-  const V = BG.vamp || (BG.vamp = { lt: -1, next: 6, gone: 0, ouch: 0, q: 0, hit: 0 }), b = g.boss && g.stage === BOSS ? g.boss : null;
+  const V = BG.vamp || (BG.vamp = { lt: -1, next: 6, gone: 0, ouch: 0, q: 0, hit: 0, lv: 'smug', ld: LAUGHS.smug.dur }), b = g.boss && g.stage === BOSS ? g.boss : null;
   if (b) {
-    V.lt = b.laugh > 0 ? LAUGH_DUR - b.laugh : -1; V.ouch = b.ouch || 0; V.q = b.ouchQ || 0; V.hit = b.hit || 0;
+    V.lv = b.lv || 'cackle'; V.ld = LAUGHS[V.lv].dur; V.lt = b.laugh > 0 ? V.ld - b.laugh : -1; V.ouch = b.ouch || 0; V.q = b.ouchQ || 0; V.hit = b.hit || 0;
     V.gone = b.hp <= 0 ? Math.min(1, V.gone + dt * 0.7) : 0;
   } else {
     V.gone = g.won && g.stage === BOSS ? 1 : 0; V.ouch = 0; V.hit = 0;
-    V.next -= dt; if (V.lt >= 0) { V.lt += dt; if (V.lt > LAUGH_DUR) V.lt = -1; } else if (V.next <= 0) { V.lt = 0; V.next = rand(10, 15); }
+    V.next -= dt; if (V.lt >= 0) { V.lt += dt; if (V.lt > V.ld) V.lt = -1; } else if (V.next <= 0) { V.lv = Math.random() < 0.5 ? 'smug' : 'gloat'; V.ld = LAUGHS[V.lv].dur; V.lt = 0; V.next = rand(10, 15); }
   }
   return V;
 }
@@ -2521,8 +2572,8 @@ function drawBgVampire(t, dt) {
   const x0 = L.bx + L.cell * COLS / 2 - ox, y0 = H * 0.25 - oy; ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
 }
 function paintBgVampire(X, t, V, s, cx, cy) {
-  const lt = V.lt, lk = lt < 0 ? 0 : Math.min(1, lt / 0.15, (LAUGH_DUR - lt) / 0.3); // laugh envelope
-  let jaw = 0; if (lt >= 0) for (const [o, d] of LAUGH_SYL) if (lt >= o && lt < o + d) jaw = Math.sin(Math.PI * (lt - o) / d);
+  const lt = V.lt, lk = lt < 0 ? 0 : Math.min(1, lt / 0.15, (V.ld - lt) / 0.3); // laugh envelope
+  const jaw = lt >= 0 ? laughJaw(V.lv, lt) : 0; // v15: jaw follows each syllable of the chosen laugh
   const ok = V.ouch > 0 ? Math.min(1, V.ouch / 0.9) : 0, hurt = Math.max(ok, V.hit > 0 ? V.hit / 0.9 * 0.5 : 0);
   const shakeY = lk * jaw * s * 0.07, flinch = ok * Math.sin(t * 48) * s * 0.12;
   X.save(); X.globalAlpha = 1 - V.gone; X.translate(cx + flinch, cy + V.gone * s * 0.8); const sc = 1 - V.gone * 0.3; X.scale(sc, sc);
@@ -3119,8 +3170,10 @@ function enterStage(ns) {
 function bossLaugh(why) {
   const b = g.boss; if (!b || b.hp <= 0 || state !== 'play' || g.stage !== BOSS) return false;
   if (g.time - b.lastLaugh < 7 || b.ouch > 0) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
-  b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laugh = LAUGH_DUR; b.laughs++; b.why[why] = (b.why[why] || 0) + 1;
-  sfx.mwaha(); return true;
+  // v15: pick the laugh for the moment (smug chuckle when idle, the full cackle for bat swarms / top-outs, a gloat after HE'S FURIOUS!), never the same idle one twice in a row
+  let kind = why === 'bats' || why === 'danger' || why === 'test' ? 'cackle' : why === 'furious' ? 'gloat' : (b.lv === 'smug' ? (Math.random() < 0.5 ? 'gloat' : 'cackle') : 'smug');
+  b.lv = kind; b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laugh = LAUGHS[kind].dur; b.laughs++; b.why[why] = (b.why[why] || 0) + 1; b.kinds = b.kinds || {}; b.kinds[kind] = (b.kinds[kind] || 0) + 1;
+  sfx.mwaha(kind); return true;
 }
 function hitBoss(d) {
   const b = g.boss; b.hp = Math.max(0, b.hp - d); b.dmg += d; b.hit = 0.45;
@@ -3348,7 +3401,7 @@ const best = () => Math.max(scores.length ? scores[0].s : 0, g.score);
 const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L: LAVA, W: WEB,
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
-  voices: { laugh: vampLaugh2, ouch: vampOuch, defeat: vampDefeatCry }, // offline rendering of the boss voices (preview export)
+  voices: { laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry }, laughs: LAUGHS, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
     for (let y = 0; y < ROWS; y++) g.board[y].fill(0);
     rows.forEach((s, i) => { const y = ROWS - rows.length + i; [...s].forEach((ch, x) => { g.board[y][x] = LETTERS[ch] || 0; }); });
@@ -3358,6 +3411,7 @@ const dbg = {
   setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; } return bossLaugh(w || 'test'); },
+  laughState() { const V = BG.vamp; return V ? { lv: V.lv, lt: V.lt, ld: V.ld } : null; },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
   get amb() { return { on: !!AMB.L, kind: AMB.kind, events: AMB.events, waves: AMB.waves, out: AMB.L ? AMB.L.out.gain.value : 0, bus: A.amb ? A.amb.gain.value : 0 }; },
@@ -3675,7 +3729,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v14';
+const VERSION = 'v15';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
@@ -4617,7 +4671,7 @@ window.__bb = {
   get bg() { return { cur: bgCur, fade: bgFade, draws: BG.draws.slice(), layers: Object.keys(BG.L), gator: BG.gator ? { state: BG.gator.state, blinks: BG.gator.blinks, doubles: BG.gator.doubles, sinks: BG.gator.sinks } : null, storm: BG.storm ? { flashes: BG.storm.flashes, thunders: BG.storm.thunders } : null, hole: BG.hole ? { eaten: BG.hole.eaten } : null, surf: BG.surf ? { n: BG.surf.list.length, rides: BG.surf.rides, wipes: BG.surf.wipes, crashes: BG.surf.crashes, states: BG.surf.list.map((q) => q.st), xs: BG.surf.list.map((q) => Math.round(q.x)) } : null, ambCrashes: AMB.crashes || 0, water: BG.water ? { tbub: BG.water.tb.length, splashes: BG.water.splashes, sbub: BG.water.sb.length, pops: BG.water.pops, cur: BG.water.cur.length } : null, particles: { dust: BG.dust.length, fall: BG.fall.length, cars: BG.cars.length } }; },
   get wallet() { return JSON.parse(JSON.stringify(wallet)); }, get edition() { return wallet.edition; }, get shop() { return { tab: shop.tab, modal: shop.modal, msg: shop.msg ? shop.msg.text : null, thumbs: Object.keys(shop.thumbs).length }; }, get pmenu() { return pmenu; }, get stats() { return g.stats ? Object.assign({}, g.stats) : null; }, get queue() { return g.queue ? g.queue.map((q) => q.t) : []; }, get bank() { return g.bank ? { amt: g.bank.amt, from: g.bank.from } : null; }, get ads() { return Object.assign({}, BB_ADS); },
   isFullEdition, get level() { return g.level; }, get time() { return g.time; },
-  get boss() { return g.boss ? { hp: g.boss.hp, max: g.boss.max, attacks: g.boss.attacks, dmg: g.boss.dmg, ouches: g.boss.ouches.slice(), laughs: g.boss.laughs, why: Object.assign({}, g.boss.why), laughing: g.boss.laugh > 0, ouch: g.boss.ouch, cries: g.boss.cries } : null; },
+  get boss() { return g.boss ? { hp: g.boss.hp, max: g.boss.max, attacks: g.boss.attacks, dmg: g.boss.dmg, ouches: g.boss.ouches.slice(), laughs: g.boss.laughs, why: Object.assign({}, g.boss.why), kinds: Object.assign({}, g.boss.kinds || {}), lv: g.boss.lv, laughing: g.boss.laugh > 0, ouch: g.boss.ouch, cries: g.boss.cries } : null; },
   get tomb() { return { vamp: BG.vamp ? Object.assign({}, BG.vamp) : null, spiders: BG.spiders ? BG.spiders.length : 0, scurry: BG.scurry ? BG.scurry.length : 0, kinds: BG.spiders ? BG.spiders.map((x) => x.k) : [], tar: BG.tar ? { x: BG.tar.x, dir: BG.tar.dir } : null, jumper: BG.jumper ? { x: BG.jumper.x } : null, stats: BG.spStats ? Object.assign({}, BG.spStats) : null }; }, get won() { return !!g.won; }, get fog() { return g.fog ? Object.assign({}, g.fog) : null; },
   get conv() { return { n: g.convN || 0, dir: g.convDir || 1, warn: !!g.convWarn }; }, get grav() { return gravInterval(); }, get bats() { return g.bats ? g.bats.length : 0; },
   get start() { return { armed: ST.armed, out: ST.out, playing: !!ST.src, plays: ST.plays, taps: ST.taps, critters: ST.critters.length, decoded: !!ST.buf, version: VERSION }; },
