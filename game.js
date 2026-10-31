@@ -302,6 +302,8 @@ const sfx = {
   clunk() { tone(90, 0.25, 'square', 0.16, { lp: 600, to: 55 }); noise(0.18, 0.3, 'bandpass', 900, { q: 2 }); noise(0.5, 0.08, 'highpass', 4000); }, // conveyor shifts + steam hiss
   whoosh() { if (!aok()) return; const c = A.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g2 = c.createGain(); s.buffer = A.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + 0.8); f.frequency.exponentialRampToValueAtTime(250, t + 1.8); g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.22, t + 0.6); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); s.connect(f); f.connect(g2); g2.connect(A.sfx); s.start(t); s.stop(t + 2); tone(220, 1.6, 'sine', 0.035, { when: t + 0.2, to: 180 }); }, // ghostly fog
   laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
+  surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
+  womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
   mwaha(kind) { if (!aok()) return false; vampLaugh3(A.ctx, anow() + 0.02, A.sfx, kind || 'cackle', 104 + rand(-5, 5), LAUGH_V[kind || 'cackle'], A.noise); return true; }, // v15 theatrical laughs on the SFX bus
   ouch(q) { if (!aok()) return false; vampOuch(A.ctx, anow() + 0.01, A.sfx, q, 1.0, A.noise); tone(900 + q * 300, 0.07, 'square', 0.04, { to: 500 }); return true; }, // v14 cartoony OUCH! (q = 1..3, sillier each time)
   bats() { if (!aok()) return; const t = anow(); for (let i = 0; i < 7; i++) tone(rand(3200, 5600), 0.06, 'sine', 0.05, { when: t + i * 0.07, to: rand(1800, 2600) }); noise(0.6, 0.12, 'bandpass', 900, { q: 3 }); }, // screeching bat swarm + wing flutter
@@ -862,10 +864,10 @@ const BOSS_LINES = {
     chill: { t: [...HEHS(3, 1.0), ['_', 0.06], ['h', 0.08, 0.95], ['uh', 0.32, 0.98, 0.82, 0.6], ['_', 0.14], ...DUDE], text: 'HEH HEH... DUUUDE.' },
     stoked: { t: [['w', 0.08, 1.0], ['o', 0.36, 1.05, 1.25, 1, 1.6], ['h', 0.05, 1.4], ['o', 0.14, 1.45, 1.3, 0.9], ['h', 0.05, 1.35], ['o', 0.22, 1.4, 1.1, 0.85], ['_', 0.14], ...GNARLY], text: 'WHOA-HO-HO! GNARLY!' },
     loose: { t: [['h', 0.06, 1.1], ['ae', 0.26, 1.15, 1.05, 1, 1.3], ['n', 0.12, 1.05], ['_', 0.04], ['l', 0.07, 1.05], ['uu', 0.3, 1.1, 1.0, 1, 1.25], ['s', 0.14, 1.0], ['_', 0.06], ...BRO, ['_', 0.1], ...HEHS(2, 1.05)], text: 'HANG LOOSE, BRO! HEH HEH' },
-    ouch1: { t: [['w', 0.07, 1.4], ['o', 0.34, 1.5, 1.2, 1, 1.85], ['_', 0.08], ...DUDE.map((x) => [x[0], x[1], (x[2] || 1) * 1.15, (x[3] || x[2] || 1) * 1.15, x[4], x[5] ? x[5] * 1.15 : 0])], text: 'WHOA! NOT COOL, DUDE!' },
-    ouch2: { t: [['a', 0.1, 1.6, 1.8, 1], ['w', 0.12, 1.7, 1.3], ['_', 0.12], ...GNARLY.map((x) => [x[0], x[1], (x[2] || 1) * 1.1, (x[3] || x[2] || 1) * 0.95, x[4], x[5] ? x[5] * 1.1 : 0])], text: 'OW! GNARLY... THAT STINGS, BRO!' },
-    ouch3: { t: [['t', 0.04, 1.3], ['o', 0.14, 1.35, 1.3], ['d', 0.03, 1.3], ['uh', 0.07, 1.25], ['l', 0.05, 1.2], ['i', 0.12, 1.2, 1.15], ['_', 0.05], ['b', 0.04, 1.3], ['o', 0.2, 1.35, 1.3, 1, 1.5], ['g', 0.04, 1.3], ['uh', 0.08, 1.2], ['s', 0.12, 1.15], ['_', 0.06], ...BRO.map((x) => [x[0], x[1], (x[2] || 1) * 1.25, (x[3] || x[2] || 1) * 1.25, x[4], x[5] ? x[5] * 1.3 : 0])], text: 'TOTALLY BOGUS, BRO!' },
-    defeat: { t: [['w', 0.07, 1.4], ['a', 0.16, 1.5, 1.6, 1], ['i', 0.1, 1.6], ['p', 0.05, 1.5], ['a', 0.22, 1.6, 1.3, 1, 1.85], ['uu', 0.1, 1.3], ['t', 0.06, 1.2], ['_', 0.32], ['b', 0.04, 1.0], ['uh', 0.14, 1.0, 0.95, 0.8], ['m', 0.08, 0.95], ['er', 0.3, 0.95, 0.8, 0.8], ['_', 0.1], ['d', 0.05, 0.9], ['uu', 0.8, 0.9, 0.62, 0.7, 1.0], ['d', 0.06, 0.6]], text: 'WIPEOUT! ...BUMMER, DUUUDE.' },
+    ouch1: { t: [['w', 0.07, 1.3], ['o', 0.34, 1.4, 1.15, 1, 1.75], ['_', 0.1], ...GNARLY.map((x) => [x[0], x[1], (x[2] || 1) * 1.08, (x[3] || x[2] || 1) * 1.08, x[4], x[5] ? x[5] * 1.1 : 0]), ['_', 0.08], ...DUDE.map((x) => [x[0], x[1] * 0.75, (x[2] || 1) * 1.12, (x[3] || x[2] || 1) * 1.12, x[4], x[5] ? x[5] * 1.12 : 0])], text: 'WHOA! GNARLY, DUDE!' },
+    ouch2: { t: [['n', 0.09, 1.2], ['a', 0.78, 1.25, 1.05, 1, 1.6], ['r', 0.14, 1.05], ['l', 0.06, 1.1], ['i', 0.36, 1.25, 1.0, 0.9, 1.4], ['_', 0.22], ...BRO.map((x) => [x[0], x[1], (x[2] || 1) * 1.2, (x[3] || x[2] || 1) * 1.2, x[4], x[5] ? x[5] * 1.25 : 0])], text: 'GNAAARLY... BRO!' },
+    ouch3: { t: [['t', 0.04, 1.4], ['o', 0.14, 1.45, 1.4], ['d', 0.03, 1.4], ['uh', 0.07, 1.35], ['l', 0.05, 1.3], ['i', 0.12, 1.3, 1.25], ['_', 0.05], ...GNARLY.map((x) => [x[0], x[1] * 0.9, (x[2] || 1) * 1.3, (x[3] || x[2] || 1) * 1.3, x[4], x[5] ? x[5] * 1.3 : 0]), ['_', 0.06], ['w', 0.06, 1.5], ['a', 0.16, 1.6, 1.7, 1], ['i', 0.1, 1.7], ['p', 0.05, 1.6], ['a', 0.3, 1.75, 1.4, 1, 2.0], ['uu', 0.12, 1.4], ['t', 0.06, 1.3]], text: 'TOTALLY GNARLY WIPEOUT!' },
+    defeat: { t: [['w', 0.07, 1.4], ['a', 0.16, 1.5, 1.6, 1], ['i', 0.1, 1.6], ['p', 0.05, 1.5], ['a', 0.22, 1.6, 1.3, 1, 1.85], ['uu', 0.1, 1.3], ['t', 0.06, 1.2], ['_', 0.3], ['g', 0.04, 0.95], ['l', 0.06, 0.95], ['uh', 0.16, 0.95, 0.85, 0.8], ['b', 0.05, 0.85], ['_', 0.18], ['g', 0.04, 0.85], ['l', 0.06, 0.85], ['uh', 0.2, 0.85, 0.7, 0.65], ['b', 0.05, 0.7]], text: 'WIPEOUT! GLUB... GLUB...' },
   },
   gator: {
     intro: { t: [...GDAY, ['_', 0.08], ...MATE], text: "G'DAY, MATE!" },
@@ -883,6 +885,37 @@ const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
 function bossLineSpec(kind, key) { const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
 function bossSay(c, t, dest, kind, key, v, nb) { const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
+// v18: a big wave crashing (rumble + white-water hiss + low thump), original synthesis
+function surfCrash(c, t, dest, nb, v) {
+  v = v || 1; const n = c.createBufferSource(), lp = c.createBiquadFilter(), g1 = c.createGain(); n.buffer = nb; n.loop = true;
+  lp.type = 'lowpass'; lp.Q.value = 0.7; lp.frequency.setValueAtTime(250, t); lp.frequency.exponentialRampToValueAtTime(3800, t + 0.28); lp.frequency.exponentialRampToValueAtTime(500, t + 1.6);
+  g1.gain.setValueAtTime(0.0001, t); g1.gain.exponentialRampToValueAtTime(0.42 * v, t + 0.22); g1.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+  n.connect(lp); lp.connect(g1); g1.connect(dest); n.start(t, Math.random() * 0.4); n.stop(t + 1.75);
+  const h = c.createBufferSource(), hp = c.createBiquadFilter(), g2 = c.createGain(); h.buffer = nb; h.loop = true; hp.type = 'highpass'; hp.frequency.value = 3500;
+  g2.gain.setValueAtTime(0.0001, t + 0.2); g2.gain.exponentialRampToValueAtTime(0.16 * v, t + 0.3); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+  h.connect(hp); hp.connect(g2); g2.connect(dest); h.start(t + 0.2, Math.random() * 0.4); h.stop(t + 1.25);
+  const o = c.createOscillator(), g3 = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(85, t + 0.2); o.frequency.exponentialRampToValueAtTime(38, t + 0.75);
+  g3.gain.setValueAtTime(0.0001, t + 0.2); g3.gain.exponentialRampToValueAtTime(0.38 * v, t + 0.23); g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); o.connect(g3); g3.connect(dest); o.start(t + 0.2); o.stop(t + 0.85);
+  return t + 1.75;
+}
+// v18: sad-trombone "womp womp (womp wommmp)": four falling notes from a brassy saw pair through a wah filter,
+// the last one long with a wobbly vibrato. Original synthesis (a generic chromatic fall, no samples).
+function wompWomp(c, t, dest, v) {
+  v = v || 0.3; const base = 233.08, notes = [[0, 0.36, 0], [0.44, 0.36, -1], [0.88, 0.36, -2], [1.32, 1.55, -3]];
+  for (const [o, d, st] of notes) {
+    const t0 = t + o, f = base * Math.pow(2, st / 12), last = d > 1, a = c.createOscillator(), b = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+    a.type = 'sawtooth'; b.type = 'sawtooth'; a.frequency.setValueAtTime(f * 1.01, t0); a.frequency.exponentialRampToValueAtTime(f * (last ? 0.94 : 0.985), t0 + d); b.frequency.setValueAtTime(f * 0.996, t0); b.frequency.exponentialRampToValueAtTime(f * (last ? 0.935 : 0.98), t0 + d);
+    lp.type = 'lowpass'; lp.Q.value = 3; lp.frequency.setValueAtTime(350, t0); lp.frequency.exponentialRampToValueAtTime(1900, t0 + 0.09); lp.frequency.exponentialRampToValueAtTime(700, t0 + Math.min(d, 0.35));
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + 0.04); g.gain.setValueAtTime(v * 0.85, t0 + d * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    if (last) { // the wobble: vibrato on pitch + a wah on the filter
+      const l = c.createOscillator(), lg = c.createGain(), l2 = c.createGain(); l.frequency.setValueAtTime(5.2, t0); l.frequency.linearRampToValueAtTime(6.5, t0 + d); lg.gain.setValueAtTime(0, t0); lg.gain.linearRampToValueAtTime(f * 0.025, t0 + 0.35); l2.gain.setValueAtTime(0, t0); l2.gain.linearRampToValueAtTime(500, t0 + 0.35);
+      l.connect(lg); lg.connect(a.frequency); lg.connect(b.frequency); l.connect(l2); l2.connect(lp.frequency); l.start(t0); l.stop(t0 + d + 0.05);
+      lp.frequency.setValueAtTime(900, t0 + 0.36);
+    }
+    a.connect(lp); b.connect(lp); lp.connect(g); g.connect(dest); a.start(t0); b.start(t0); a.stop(t0 + d + 0.05); b.stop(t0 + d + 0.05);
+  }
+  return t + 1.32 + 1.55;
+}
 // procedural evil vampire laugh: "MWAH-HA-HA-HA-HA" - a deep voice (saw + sub) through vowel formants,
 // per-syllable pitch + amplitude envelopes, breathy 'h' noise at each syllable, wobbly vibrato
 function vampLaugh(c, t, dest, base, v, noiseBuf) {
@@ -2921,17 +2954,19 @@ function miniAnim(kind, dt) {
     F.jaw = F.lt >= 0 ? specJaw(bossLineSpec(kind, F.key), F.lt) : 0;
     F.lk = F.lt >= 0 ? Math.max(0, Math.min(1, F.lt / 0.12, (F.dur - F.lt) / 0.25)) : 0;
     F.ok = b.ouch > 0 ? Math.min(1, b.ouch / 0.4) : 0; F.hit = b.hit || 0; F.dead = b.hp <= 0;
-    F.gone = F.dead ? Math.max(0, Math.min(1, (g.time - b.deadT - 1.6) / 1.5)) : 0;
+    F.dw = F.dead ? g.time - b.deadT : -1; F.ww = b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup ? g.time - b.wipe.t0 : -1;
+    F.gone = F.dead ? (kind === 'surfer' ? Math.max(0, Math.min(1, (F.dw - SURF_DIE.end) / SURF_DIE.fade)) : Math.max(0, Math.min(1, (g.time - b.deadT - 1.6) / 1.5))) : 0;
+    if (kind === 'surfer') F.pose = surferPose(F)[0];
     F.taunt = F.lt >= 0 && !!F.key && !/^(ouch|defeat)/.test(F.key);
-  } else { F.lt = -1; F.jaw = 0; F.lk = 0; F.ok = 0; F.hit = 0; F.dead = false; F.taunt = false; F.gone = 1; }
+  } else { F.lt = -1; F.jaw = 0; F.lk = 0; F.ok = 0; F.hit = 0; F.dead = false; F.taunt = false; F.gone = 1; F.dw = -1; F.ww = -1; F.pose = null; }
   return F;
 }
 function drawBgFigure(kind, t, dt, yk) {
   const F = miniAnim(kind, dt); if (F.gone >= 1) return null;
   const s = Math.min(W * 0.16, H * 0.085), ox = 3 * s, oy = 1.5 * s, vw = 6 * s, vh = 6.4 * s;
   let C = BG['fcv_' + kind]; if (!C || C.s !== s) { C = BG['fcv_' + kind] = document.createElement('canvas'); C.width = Math.ceil(vw); C.height = Math.ceil(vh); C.s = s; C.x = C.getContext('2d'); C.t = -1; }
-  if (t - C.t >= (F.lt >= 0 || F.ok > 0 || F.hit > 0 || F.dead ? 1 / 30 : 1 / 15) || t < C.t) { C.t = t; const X = C.x; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, C.width, C.height); (kind === 'surfer' ? paintSurfer : paintGator)(X, t, F, s, ox, oy, true); }
-  const x0 = L.bx + L.cell * COLS / 2 - ox, y0 = H * yk - oy; ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
+  if (t - C.t >= (F.lt >= 0 || F.ok > 0 || F.hit > 0 || F.dead || kind === 'surfer' ? 1 / 30 : 1 / 15) || t < C.t) { C.t = t; const X = C.x; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, C.width, C.height); (kind === 'surfer' ? paintSurfer : paintGator)(X, t, F, s, ox, oy, true); }
+  const x0 = L.bx + L.cell * COLS / 2 - ox + (kind === 'surfer' ? Math.sin(t * 0.45) * L.cell * 2.2 : 0), y0 = H * yk - oy; /* v18: he carves back and forth */ ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
 }
 function drawMiniPortrait(kind, cx, cy, s) {
   const F = miniAnim(kind, 0); if (F.gone >= 1) return;
@@ -2940,31 +2975,71 @@ function drawMiniPortrait(kind, cx, cy, s) {
   const k = s * 0.62; (kind === 'surfer' ? paintSurfer : paintGator)(ctx, T, F, k, cx + (kind === 'gator' ? k * 0.5 : 0), cy - k * 0.25, false);
   ctx.restore();
 }
-// SUNNY THE SURFER: shaggy blond hair, shades, zinc on the nose, tank top, board under his arm, riding a wave crest
+// SUNNY THE SURFER (v18): actually surfing the whole fight - riding / carving on his board, bobbing, crouching,
+// arms out for balance, a spray trail. Each quarter: a big wave crashes over him, he wipes out (tumbles, board flips),
+// yells a gnarly line, paddles back and pops up again. Defeat: a final wave, then a silly sink (bubbles, the board
+// floating alone, a hand waving bye) with a sad-trombone womp womp.
+const SURF_WIPE = { crash: 0.5, tumble: 1.7, paddle: 3.3, popup: 3.8 }, SURF_DIE = { crash: 0.5, tumble: 1.4, wave: 2.6, end: 4.2, fade: 0.8 };
+function surferPose(F) {
+  const dw = F.dw == null ? -1 : F.dw, ww = F.ww == null ? -1 : F.ww;
+  if (dw >= 0) return dw < SURF_DIE.crash ? ['crash', dw / SURF_DIE.crash] : dw < SURF_DIE.tumble ? ['tumble', (dw - SURF_DIE.crash) / (SURF_DIE.tumble - SURF_DIE.crash)] : ['sink', Math.min(1, (dw - SURF_DIE.tumble) / (SURF_DIE.end - SURF_DIE.tumble))];
+  if (ww >= 0 && ww < SURF_WIPE.popup) { const W2 = SURF_WIPE; return ww < W2.crash ? ['crash', ww / W2.crash] : ww < W2.tumble ? ['tumble', (ww - W2.crash) / (W2.tumble - W2.crash)] : ww < W2.paddle ? ['paddle', (ww - W2.tumble) / (W2.paddle - W2.tumble)] : ['popup', (ww - W2.paddle) / (W2.popup - W2.paddle)]; }
+  return ['surf', 0];
+}
+function drawSurfboard(X, s, x, y, rot) {
+  X.save(); X.translate(x, y); X.rotate(rot);
+  X.fillStyle = '#fff6e0'; X.beginPath(); X.ellipse(0, 0, s * 1.55, s * 0.17, 0, 0, 7); X.fill();
+  X.fillStyle = '#ff4fa3'; X.fillRect(-s * 1.4, -s * 0.035, s * 2.8, s * 0.07); X.fillStyle = '#19c3c9'; X.fillRect(-s * 1.3, -s * 0.11, s * 2.6, s * 0.03); X.fillRect(-s * 1.3, s * 0.08, s * 2.6, s * 0.03);
+  X.fillStyle = '#19c3c9'; X.beginPath(); X.moveTo(s * 1.0, s * 0.12); X.lineTo(s * 1.25, s * 0.42); X.lineTo(s * 1.3, s * 0.12); X.fill(); // fin
+  X.strokeStyle = 'rgba(80,40,20,0.5)'; X.lineWidth = Math.max(1, s * 0.03); X.beginPath(); X.ellipse(0, 0, s * 1.55, s * 0.17, 0, 0, 7); X.stroke(); X.restore();
+}
 function paintSurfer(X, t, F, s, cx, cy, full) {
   const lk = F.lk, jaw = F.jaw, ok = F.ok, hurt = Math.max(ok, F.hit > 0 ? F.hit / 0.9 * 0.5 : 0), gone = F.gone;
-  const bob = F.taunt ? Math.abs(Math.sin(t * 9)) * s * 0.06 * lk : Math.sin(t * 1.5) * s * 0.05, flinch = ok * Math.sin(t * 44) * s * 0.1;
-  X.save(); X.globalAlpha = 1 - gone; X.translate(cx + flinch + gone * s * 1.2, cy - bob + gone * s * 1.6); X.rotate(gone * 1.1 + (F.dead ? Math.sin(t * 6) * 0.1 : 0));
-  if (full) { X.globalCompositeOperation = 'lighter'; glowX(X, 'rgba(255,170,80,1)', 0, s * 1.4, s * 2.8, 0.18 + lk * 0.12 + hurt * 0.2); X.globalCompositeOperation = 'source-over'; }
-  // surfboard tucked under his right arm (behind him)
-  X.save(); X.translate(-s * 1.35, s * 1.75); X.rotate(-0.14 + Math.sin(t * 1.5) * 0.02);
-  X.fillStyle = '#fff6e0'; X.beginPath(); X.ellipse(0, 0, s * 0.36, s * 2.25, 0, 0, 7); X.fill();
-  X.fillStyle = '#ff4fa3'; X.fillRect(-s * 0.06, -s * 2.1, s * 0.12, s * 4.2); X.fillStyle = '#19c3c9'; X.fillRect(-s * 0.16, -s * 2.0, s * 0.05, s * 4.0); X.fillRect(s * 0.11, -s * 2.0, s * 0.05, s * 4.0);
-  X.strokeStyle = 'rgba(80,40,20,0.5)'; X.lineWidth = Math.max(1, s * 0.03); X.beginPath(); X.ellipse(0, 0, s * 0.36, s * 2.25, 0, 0, 7); X.stroke(); X.restore();
-  const skin = hurt > 0.3 ? '#ff9e80' : '#e7a467', skinD = '#c98348';
+  const [pose, p] = surferPose(F), ease = (u) => u * u * (3 - 2 * u), dw = F.dw == null ? -1 : F.dw;
+  const carve = Math.sin(t * 0.9), crouch = 0.5 + 0.5 * Math.sin(t * 2.3), wy = s * 3.45;
+  const bob = F.taunt ? Math.abs(Math.sin(t * 9)) * s * 0.06 * lk : Math.sin(t * 1.5) * s * 0.05, flinch = ok * Math.sin(t * 44) * s * 0.05;
+  // body transform (pivot at the hips)
+  let bx = flinch, by = -bob, rot = 0, board = null;
+  if (pose === 'surf') { by += crouch * s * 0.22; rot = carve * 0.16; }
+  else if (pose === 'crash') { rot = carve * 0.16 + p * 0.5; by += p * s * 0.3; bx += -p * s * 0.2; }
+  else if (pose === 'tumble') { rot = 0.5 + ease(p) * Math.PI * 2.4; by += -Math.sin(p * Math.PI) * s * 1.3 + p * s * 0.9; bx += -s * 0.2 - p * s * 0.6; board = [s * (0.4 + p * 1.2), s * 3.3 - Math.sin(p * Math.PI) * s * 2.4, p * Math.PI * 3]; }
+  else if (pose === 'paddle') { rot = -1.5; by += s * 0.62 + Math.sin(t * 5) * s * 0.04; bx += -s * 0.8 + ease(p) * s * 0.8; board = [bx + s * 0.1, s * 3.33, -0.04 + Math.sin(t * 5) * 0.03]; }
+  else if (pose === 'popup') { rot = -1.5 * (1 - ease(p)); by += s * 0.62 * (1 - ease(p)) + Math.sin(p * Math.PI) * s * -0.35; }
+  else if (pose === 'sink') { rot = 0.3 * Math.sin(t * 5) * (1 - p); by += s * (0.9 + ease(p) * 3.9); bx += -s * 0.6; board = [s * (0.9 + p * 0.9), s * 3.33 + Math.sin(t * 2.2) * s * 0.06, 0.12 * Math.sin(t * 1.7)]; }
+  X.save(); X.globalAlpha = 1 - gone; X.translate(cx, cy);
+  if (full) { X.globalCompositeOperation = 'lighter'; glowX(X, 'rgba(255,170,80,1)', 0, s * 1.6, s * 2.8, 0.18 + lk * 0.12 + hurt * 0.2); X.globalCompositeOperation = 'source-over'; }
+  // spray trail off the tail of the board while he rides
+  if (full && (pose === 'surf' || pose === 'popup')) {
+    const dir = Math.cos(t * 0.9) >= 0 ? 1 : -1;
+    for (let k = 0; k < 10; k++) { const u = (t * 2.2 + k / 10) % 1; X.fillStyle = 'rgba(255,255,255,' + (0.75 * (1 - u)).toFixed(3) + ')'; X.beginPath(); X.arc(-dir * s * (1.3 + u * 1.5) + Math.sin(k * 7.3) * s * 0.15, s * 3.2 - Math.sin(u * Math.PI) * s * (0.6 + 0.3 * Math.sin(k * 3.1)), s * (0.07 + 0.08 * (1 - u)), 0, 7); X.fill(); }
+  }
+  if (board) drawSurfboard(X, s, board[0], board[1], board[2]);
+  X.save(); X.translate(bx, by + s * 2.6); X.rotate(rot); X.translate(0, -s * 2.6);
+  if (!board) drawSurfboard(X, s, 0, s * 3.33, 0);
+  const skin = hurt > 0.3 ? '#ff9e80' : '#e7a467';
+  // legs in a surf crouch (feet planted on the board), board shorts
+  const kc = pose === 'surf' ? crouch : pose === 'popup' ? 1 : 0.6;
+  X.lineCap = 'round'; X.lineJoin = 'round'; X.strokeStyle = skin; X.lineWidth = s * 0.24;
+  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.38, s * 2.8); X.lineTo(sd * s * (0.7 + 0.15 * kc), s * (3.0 - 0.1 * kc)); X.lineTo(sd * s * 0.95, s * 3.2); X.stroke(); }
+  X.fillStyle = '#ff4fa3'; X.beginPath(); X.moveTo(-s * 0.84, s * 2.35); X.lineTo(s * 0.84, s * 2.35); X.lineTo(s * 0.7, s * 2.95); X.lineTo(s * 0.05, s * 2.95); X.lineTo(0, s * 2.7); X.lineTo(-s * 0.05, s * 2.95); X.lineTo(-s * 0.7, s * 2.95); X.fill();
+  X.fillStyle = '#ffb347'; X.fillRect(-s * 0.8, s * 2.6, s * 0.12, s * 0.3); X.fillRect(s * 0.68, s * 2.6, s * 0.12, s * 0.3);
   // torso in a teal tank top with a sunset stripe
   X.fillStyle = skin; X.beginPath(); X.moveTo(-s * 0.95, s * 1.1); X.quadraticCurveTo(-s * 1.0, s * 0.62, -s * 0.35, s * 0.55); X.lineTo(s * 0.35, s * 0.55); X.quadraticCurveTo(s * 1.0, s * 0.62, s * 0.95, s * 1.1); X.lineTo(s * 0.8, s * 1.6); X.lineTo(-s * 0.8, s * 1.6); X.fill();
-  X.fillStyle = '#17b8be'; X.beginPath(); X.moveTo(-s * 0.62, s * 0.62); X.lineTo(-s * 0.42, s * 0.62); X.quadraticCurveTo(0, s * 1.35, s * 0.42, s * 0.62); X.lineTo(s * 0.62, s * 0.62); X.quadraticCurveTo(s * 0.86, s * 1.3, s * 0.82, s * 3.6); X.lineTo(-s * 0.82, s * 3.6); X.quadraticCurveTo(-s * 0.86, s * 1.3, -s * 0.62, s * 0.62); X.fill();
-  X.fillStyle = '#ff4fa3'; X.fillRect(-s * 0.84, s * 2.0, s * 1.68, s * 0.16); X.fillStyle = '#ffb347'; X.fillRect(-s * 0.84, s * 2.16, s * 1.68, s * 0.1);
-  // arms: right arm hugs the board; left arm throws a shaka while taunting, flails on an ouch
-  X.lineCap = 'round'; X.lineJoin = 'round'; X.strokeStyle = skin; X.lineWidth = s * 0.26;
-  X.beginPath(); X.moveTo(-s * 0.82, s * 0.8); X.lineTo(-s * 1.22, s * 1.75); X.lineTo(-s * 1.0, s * 2.35); X.stroke();
-  X.fillStyle = skin; X.beginPath(); X.arc(-s * 1.0, s * 2.35, s * 0.15, 0, 7); X.fill();
-  const up = Math.max(F.taunt ? lk : 0, ok), wig = F.taunt ? Math.sin(t * 16) * s * 0.08 : Math.sin(t * 30) * s * 0.06 * ok;
-  const ex = s * (1.15 + 0.35 * up), ey = s * (1.8 - 1.2 * up), hx = s * (1.0 + 0.35 * up) + wig, hy = s * (2.55 - 2.95 * up);
-  X.beginPath(); X.moveTo(s * 0.82, s * 0.8); X.lineTo(ex, ey); X.lineTo(hx, hy); X.stroke();
-  X.beginPath(); X.arc(hx, hy, s * 0.16, 0, 7); X.fill();
-  if (up > 0.4) { X.lineWidth = s * 0.08; X.beginPath(); X.moveTo(hx - s * 0.1, hy); X.lineTo(hx - s * 0.32, hy - s * 0.12); X.moveTo(hx + s * 0.08, hy - s * 0.06); X.lineTo(hx + s * 0.18, hy - s * 0.34); X.stroke(); } // shaka: thumb + pinky out
+  X.fillStyle = '#17b8be'; X.beginPath(); X.moveTo(-s * 0.62, s * 0.62); X.lineTo(-s * 0.42, s * 0.62); X.quadraticCurveTo(0, s * 1.35, s * 0.42, s * 0.62); X.lineTo(s * 0.62, s * 0.62); X.quadraticCurveTo(s * 0.86, s * 1.3, s * 0.84, s * 2.45); X.lineTo(-s * 0.84, s * 2.45); X.quadraticCurveTo(-s * 0.86, s * 1.3, -s * 0.62, s * 0.62); X.fill();
+  X.fillStyle = '#ff4fa3'; X.fillRect(-s * 0.84, s * 1.9, s * 1.68, s * 0.16); X.fillStyle = '#ffb347'; X.fillRect(-s * 0.84, s * 2.06, s * 1.68, s * 0.1);
+  // arms: out for balance while riding (left one throws a shaka on a taunt), flailing in a wipeout, paddling when prone
+  X.strokeStyle = skin; X.lineWidth = s * 0.26; X.fillStyle = skin;
+  const arm = (sx, e, h) => { X.beginPath(); X.moveTo(sx * s * 0.82, s * 0.8); X.lineTo(e[0] * s, e[1] * s); X.lineTo(h[0] * s, h[1] * s); X.stroke(); X.beginPath(); X.arc(h[0] * s, h[1] * s, s * 0.15, 0, 7); X.fill(); };
+  const up = F.taunt ? lk : 0;
+  if (pose === 'crash' || pose === 'tumble' || pose === 'sink') { const wg = Math.sin(t * 26) * 0.15; arm(-1, [-1.25, 0.2], [-1.45 + wg, -0.55]); arm(1, [1.25, 0.2], [1.45 - wg, -0.55]); }
+  else if (pose === 'paddle') { for (const sd of [-1, 1]) { const a = t * 7 + (sd > 0 ? Math.PI : 0); arm(sd, [-0.9 * 1 + sd * 0.05, 0.9 + 0.5 * Math.cos(a)], [-1.55 - 0.5 * Math.abs(Math.sin(a)), 0.9 + 1.2 * Math.cos(a)]); } }
+  else {
+    const sw = Math.sin(t * 2.3) * 0.15;
+    arm(-1, [-1.45, 1.2 + sw * 0.5], [-2.05, 1.0 + sw]);
+    if (up > 0.05) { const wig = Math.sin(t * 16) * 0.08, ex = 1.15 + 0.35 * up, ey = 1.8 - 1.2 * up, hx = 1.0 + 0.35 * up + wig, hy = 2.55 - 2.95 * up; arm(1, [ex, ey], [hx, hy]);
+      if (up > 0.4) { X.lineWidth = s * 0.08; X.beginPath(); X.moveTo(hx * s - s * 0.1, hy * s); X.lineTo(hx * s - s * 0.32, hy * s - s * 0.12); X.moveTo(hx * s + s * 0.08, hy * s - s * 0.06); X.lineTo(hx * s + s * 0.18, hy * s - s * 0.34); X.stroke(); } }
+    else arm(1, [1.45, 1.2 - sw * 0.5], [2.05, 1.0 - sw]);
+  }
   X.lineCap = 'butt'; X.lineJoin = 'miter';
   X.fillStyle = skin; X.fillRect(-s * 0.16, s * 0.3, s * 0.32, s * 0.35); // neck
   X.fillStyle = '#7a3a1a'; X.beginPath(); X.arc(0, s * 0.68, s * 0.05, 0, 7); X.fill(); X.strokeStyle = '#f2e6c8'; X.lineWidth = Math.max(1, s * 0.03); X.beginPath(); X.arc(0, s * 0.45, s * 0.22, 0.3, Math.PI - 0.3); X.stroke(); // shell necklace
@@ -2993,12 +3068,28 @@ function paintSurfer(X, t, F, s, cx, cy, full) {
     X.fillStyle = '#ffffff'; X.fillRect(-mw * 0.7, s * 0.27, mw * 1.4, s * 0.045);
     X.fillStyle = '#e06a6a'; X.beginPath(); X.ellipse(0, s * 0.3 + mh * 1.25, mw * 0.45, mh * 0.3, 0, 0, 7); X.fill();
   } else { X.fillStyle = '#5a1a14'; X.beginPath(); X.moveTo(-s * 0.22, s * 0.26); X.quadraticCurveTo(0, s * 0.44, s * 0.22, s * 0.26); X.quadraticCurveTo(0, s * 0.33, -s * 0.22, s * 0.26); X.fill(); X.fillStyle = '#fff'; X.beginPath(); X.moveTo(-s * 0.17, s * 0.28); X.quadraticCurveTo(0, s * 0.35, s * 0.17, s * 0.28); X.quadraticCurveTo(0, s * 0.31, -s * 0.17, s * 0.28); X.fill(); }
-  X.restore();
-  // the wave he's riding (foam crest in front of his legs)
+  X.restore(); // head
+  X.restore(); // body
   if (full) {
-    const wy = s * 3.45; X.fillStyle = '#1aa6c9'; X.beginPath(); X.moveTo(-s * 3, wy + s * 0.5); for (let k = 0; k <= 12; k++) { const u = -3 + k * 0.5; X.lineTo(s * u, wy + Math.sin(t * 2.2 + k * 0.9) * s * 0.12 + (k % 2 ? s * 0.1 : 0)); } X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
-    X.fillStyle = 'rgba(255,255,255,0.92)'; for (let k = 0; k < 9; k++) { const u = -2.8 + k * 0.7; X.beginPath(); X.arc(s * u + Math.sin(t * 1.7 + k) * s * 0.06, wy + Math.sin(t * 2.2 + k * 1.2) * s * 0.1, s * (0.2 + 0.06 * Math.sin(t * 3 + k)), 0, 7); X.fill(); }
-    X.fillStyle = 'rgba(255,255,255,0.5)'; X.fillRect(-s * 3, wy + s * 0.45, s * 6, s * 0.06);
+      const wy = s * 3.45; X.fillStyle = '#1aa6c9'; X.beginPath(); X.moveTo(-s * 3, wy + s * 0.5); for (let k = 0; k <= 12; k++) { const u = -3 + k * 0.5; X.lineTo(s * u, wy + Math.sin(t * 2.2 + k * 0.9) * s * 0.12 + (k % 2 ? s * 0.1 : 0)); } X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
+      X.fillStyle = 'rgba(255,255,255,0.92)'; for (let k = 0; k < 9; k++) { const u = -2.8 + k * 0.7; X.beginPath(); X.arc(s * u + Math.sin(t * 1.7 + k) * s * 0.06, wy + Math.sin(t * 2.2 + k * 1.2) * s * 0.1, s * (0.2 + 0.06 * Math.sin(t * 3 + k)), 0, 7); X.fill(); }
+      X.fillStyle = 'rgba(255,255,255,0.5)'; X.fillRect(-s * 3, wy + s * 0.45, s * 6, s * 0.06);
+    // bubbles while he sinks, then a hand waving bye-bye above the water
+    if (pose === 'sink') {
+      for (let k = 0; k < 9; k++) { const u = (t * 0.9 + k / 9) % 1; X.strokeStyle = 'rgba(230,250,255,' + (0.85 * (1 - u)).toFixed(3) + ')'; X.lineWidth = Math.max(1, s * 0.035); X.beginPath(); X.arc(bx + Math.sin(k * 5.1 + t * 3) * s * 0.35, wy - u * s * 1.4, s * (0.06 + 0.06 * Math.sin(k * 2.3) ** 2), 0, 7); X.stroke(); }
+      if (dw >= 2.4 && dw < SURF_DIE.end) { const hu = Math.min(1, (dw - 2.4) / 0.3) * Math.min(1, (SURF_DIE.end - dw) / 0.35), hx2 = bx + s * 0.3, hy2 = wy - s * 0.95 * hu, wv = Math.sin(t * 12) * 0.5;
+        X.strokeStyle = skin; X.lineWidth = s * 0.24; X.lineCap = 'round'; X.beginPath(); X.moveTo(hx2, wy + s * 0.1); X.lineTo(hx2 + Math.sin(wv) * s * 0.3, hy2); X.stroke(); X.lineCap = 'butt';
+        X.fillStyle = skin; X.save(); X.translate(hx2 + Math.sin(wv) * s * 0.3, hy2); X.rotate(wv); X.beginPath(); X.ellipse(0, -s * 0.08, s * 0.16, s * 0.2, 0, 0, 7); X.fill(); for (let f2 = 0; f2 < 4; f2++) { X.fillRect(-s * 0.15 + f2 * s * 0.085, -s * 0.38, s * 0.055, s * 0.2); } X.restore(); }
+      X.strokeStyle = 'rgba(255,255,255,0.6)'; X.lineWidth = Math.max(1, s * 0.03); const rr3 = s * (0.4 + (t * 0.7 % 1) * 0.8); X.beginPath(); X.ellipse(bx, wy + s * 0.05, rr3 * 1.4, rr3 * 0.2, 0, 0, 7); X.stroke();
+    }
+    // the big wave: the lip curls in from the right and crashes over him into white water
+    if (pose === 'crash' || (pose === 'tumble' && p < 0.6)) {
+      const q = pose === 'crash' ? p : 1 + p / 0.6, lipX = s * (3.2 - Math.min(1, q) * 4.4), lipY = -s * 1.2 + Math.max(0, q - 0.6) * s * 3.2;
+      X.fillStyle = 'rgba(16,120,170,0.95)'; X.beginPath(); X.moveTo(s * 3.1, wy + s * 0.6); X.lineTo(s * 3.1, -s * 1.4); X.quadraticCurveTo(s * 1.0, -s * 1.6, lipX, lipY); X.quadraticCurveTo(lipX - s * 0.3, lipY + s * 1.2, lipX + s * 0.7, lipY + s * 0.9); X.quadraticCurveTo(s * 1.4, s * 1.8, s * 1.6, wy + s * 0.6); X.fill();
+      X.fillStyle = 'rgba(40,180,215,0.8)'; X.beginPath(); X.moveTo(s * 3.1, -s * 0.9); X.quadraticCurveTo(s * 1.4, -s * 1.1, lipX + s * 0.4, lipY + s * 0.2); X.quadraticCurveTo(s * 1.8, s * 0.8, s * 3.1, s * 1.6); X.fill();
+      X.fillStyle = 'rgba(255,255,255,0.95)'; for (let k = 0; k < 7; k++) { X.beginPath(); X.arc(lipX + s * (0.1 + k * 0.32), lipY + Math.sin(k * 1.9 + t * 9) * s * 0.12 - s * 0.05 * k, s * (0.16 + 0.05 * Math.sin(k + t * 7)), 0, 7); X.fill(); }
+      if (q > 0.7) { const sp = Math.min(1, (q - 0.7) / 0.9); X.fillStyle = 'rgba(255,255,255,' + (0.9 * (1 - Math.max(0, sp - 0.6) / 0.4)).toFixed(3) + ')'; for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI - Math.PI, r = s * (0.6 + sp * 2.0) * (0.7 + 0.3 * Math.sin(k * 4.7)); X.beginPath(); X.arc(r * Math.cos(a) * 1.2, s * 2.4 + r * Math.sin(a), s * (0.3 - sp * 0.12), 0, 7); X.fill(); } }
+    }
   }
   X.restore(); X.globalAlpha = 1;
 }
@@ -3290,15 +3381,15 @@ function startMini(kind) {
   if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 // say one of the boss's lines (sound + the jaw/face animation follows it)
-function bossTalk(key) {
-  const b = g.boss; if (!isMini()) return false;
-  const o = bossLineSpec(b.kind, key); b.talk = { key, t0: g.time, dur: o.dur }; b.said.push(key);
-  if (aok()) bossSay(A.ctx, anow() + 0.02, A.sfx, b.kind, key, 0, A.noise);
+function bossTalk(key, delay) {
+  const b = g.boss; if (!isMini()) return false; delay = delay || 0;
+  const o = bossLineSpec(b.kind, key); b.talk = { key, t0: g.time + delay, dur: o.dur }; b.said.push(key);
+  if (aok()) bossSay(A.ctx, anow() + 0.02 + delay, A.sfx, b.kind, key, 0, A.noise);
   return true;
 }
 function miniLaugh(why) {
   const b = g.boss, MB = MINI[b.kind]; if (b.hp <= 0 || state !== 'play') return false;
-  if (g.time - b.lastLaugh < 7 || b.ouch > 0 || (b.talk && g.time - b.talk.t0 < b.talk.dur)) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
+  if (g.time - b.lastLaugh < 7 || b.ouch > 0 || (b.talk && g.time - b.talk.t0 < b.talk.dur) || (b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup)) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
   const [t0, big, t2] = MB.taunts; // the big one for hazards / top-outs, otherwise alternate the other two (never the same idle one twice)
   const kind = why === 'hazard' || why === 'danger' || why === 'test' ? big : (b.lv === t0 ? t2 : t0);
   b.lv = kind; b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laughs++; b.why[why] = (b.why[why] || 0) + 1; b.kinds[kind] = (b.kinds[kind] || 0) + 1;
@@ -3308,10 +3399,21 @@ function miniLaugh(why) {
 }
 function miniHit(b, d, q) {
   const MB = MINI[b.kind], c = L.cell;
-  if (b.hp <= 0) {
+  if (b.hp <= 0 && b.kind === 'surfer') { // v18: a final wave knocks him off, he sinks (silly), then the sad trombone
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.surfCrash(1.15); bossTalk('defeat', 0.3);
+    const wd = 0.3 + bossLineSpec(b.kind, 'defeat').dur + 0.1; sfx.womp(wd); b.womps = (b.womps || 0) + 1; b.wompAt = g.time + wd; b.crashes = (b.crashes || 0) + 1;
+    shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
+    floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
+  } else if (b.hp <= 0) {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat'); sfx.miniDefeat(b.kind);
     shake(0.45, 10); flashA = 0.4; hurtA = 0.3; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
+  } else if (q && b.kind === 'surfer') { // v18: a big wave crashes over him, he wipes out, yells a gnarly line, paddles back
+    const ln = BOSS_LINES[b.kind]['ouch' + q];
+    b.wipe = { q, t0: g.time }; b.wipes = (b.wipes || []); b.wipes.push(q); b.crashes = (b.crashes || 0) + 1; sfx.surfCrash(0.8 + q * 0.1);
+    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q, 0.3); b.ouch = b.talk.dur + 0.3; b.ouchQ = q;
+    shake(0.25, 4 + q * 2); hurtA = 0.12 + q * 0.04; vib(30 + q * 15);
+    setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#5ee7ff', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.6); }, 300);
   } else if (q) {
     const ln = BOSS_LINES[b.kind]['ouch' + q];
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
@@ -3814,7 +3916,7 @@ function updateGame(dt) {
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
   if (g.handoff) updateHandoff();
-  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > 3 && !g.res && state === 'play') miniNext();
+  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
   updateTwists(dt);
@@ -3861,9 +3963,9 @@ const best = () => Math.max(scores.length ? scores[0].s : 0, g.score);
 const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L: LAVA, W: WEB,
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
-  voices: { laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
+  figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
-  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
+  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
@@ -4195,7 +4297,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v17';
+const VERSION = 'v18';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
