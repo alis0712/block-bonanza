@@ -3003,8 +3003,8 @@ function paintSurfer(X, t, F, s, cx, cy, full) {
   if (pose === 'surf') { by += crouch * s * 0.22; rot = carve * 0.16; }
   else if (pose === 'crash') { rot = carve * 0.16 + p * 0.5; by += p * s * 0.3; bx += -p * s * 0.2; }
   else if (pose === 'tumble') { rot = 0.5 + ease(p) * Math.PI * 2.4; by += -Math.sin(p * Math.PI) * s * 1.3 + p * s * 0.9; bx += -s * 0.2 - p * s * 0.6; board = [s * (0.4 + p * 1.2), s * 3.3 - Math.sin(p * Math.PI) * s * 2.4, p * Math.PI * 3]; }
-  else if (pose === 'paddle') { rot = -1.5; by += s * 0.62 + Math.sin(t * 5) * s * 0.04; bx += -s * 0.8 + ease(p) * s * 0.8; board = [bx + s * 0.1, s * 3.33, -0.04 + Math.sin(t * 5) * 0.03]; }
-  else if (pose === 'popup') { rot = -1.5 * (1 - ease(p)); by += s * 0.62 * (1 - ease(p)) + Math.sin(p * Math.PI) * s * -0.35; }
+  else if (pose === 'paddle') { rot = -1.5; by += s * 0.62 + Math.sin(t * 5) * s * 0.04; bx += ease(p) * s * 0.4; board = [bx - s * 1.0, s * 3.33, -0.04 + Math.sin(t * 5) * 0.03]; }
+  else if (pose === 'popup') { bx += s * 0.4 * (1 - ease(p)); rot = -1.5 * (1 - ease(p)); by += s * 0.62 * (1 - ease(p)) + Math.sin(p * Math.PI) * s * -0.35; }
   else if (pose === 'sink') { rot = 0.3 * Math.sin(t * 5) * (1 - p); by += s * (0.9 + ease(p) * 3.9); bx += -s * 0.6; board = [s * (0.9 + p * 0.9), s * 3.33 + Math.sin(t * 2.2) * s * 0.06, 0.12 * Math.sin(t * 1.7)]; }
   X.save(); X.globalAlpha = 1 - gone; X.translate(cx, cy);
   if (full) { X.globalCompositeOperation = 'lighter'; glowX(X, 'rgba(255,170,80,1)', 0, s * 1.6, s * 2.8, 0.18 + lk * 0.12 + hurt * 0.2); X.globalCompositeOperation = 'source-over'; }
