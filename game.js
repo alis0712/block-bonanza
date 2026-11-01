@@ -160,7 +160,7 @@ function audioUnlock() {
       A.master = c.createGain(); A.master.gain.value = settings.sound ? 0.8 : 0;
       A.mus = c.createGain(); A.mus.gain.value = BUS.mus;
       A.sfx = c.createGain(); A.sfx.gain.value = BUS.sfx;
-      A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.mus.connect(A.master); A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
+      A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.musHs = c.createBiquadFilter(); A.musHs.type = 'highshelf'; A.musHs.frequency.value = 7000; A.musHs.gain.value = -7; A.musLp = c.createBiquadFilter(); A.musLp.type = 'lowpass'; A.musLp.frequency.value = 13000; A.musLp.Q.value = 0.5; A.mus.connect(A.musHs); A.musHs.connect(A.musLp); A.musLp.connect(A.master); /* v24 de-hiss: the music loops carry a steady 6-16 kHz floor; shelve it down, keep hat attack */ A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
       const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
       lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
       const clip = c.createWaveShaper(), cn = 2048, cv2 = new Float32Array(cn); // v14: last-ditch soft clip (transparent below 0.85) so stacked boss cries can never overshoot 0 dBFS
@@ -645,7 +645,7 @@ function uplifter(E, t0, tEnd, v) {
   const s = c.createBufferSource(); s.buffer = E.noise; s.loop = true;
   const fl = c.createBiquadFilter(), g = c.createGain();
   fl.type = 'bandpass'; fl.Q.value = 1.8;
-  fl.frequency.setValueAtTime(350, t0); fl.frequency.exponentialRampToValueAtTime(9500, tEnd);
+  fl.frequency.setValueAtTime(350, t0); fl.frequency.exponentialRampToValueAtTime(6500, tEnd); // v24: was 9500 (hissy top)
   g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v || 0.3, tEnd - 0.01); g.gain.exponentialRampToValueAtTime(0.0001, tEnd + 0.08);
   s.connect(fl); fl.connect(g); g.connect(E.fx); s.start(t0); s.stop(tEnd + 0.1);
   return d;
@@ -694,7 +694,7 @@ function formantVoice(c, t, dest, o, noiseBuf) {
   kfp(vg.gain, t, o.vibD || [[0, o.vib ? o.vib[1] : 20]]);
   const wob = mk('sine'), wg = c.createGain(); wob.frequency.value = 1.7; wg.gain.value = 9; wob.connect(wg); wg.connect(s1.detune); // slow drift (less robotic)
   let nz = null; const br = c.createGain();
-  if (noiseBuf) { nz = c.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true; const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 400; nz.connect(hp); hp.connect(br); br.connect(src); kfp(br.gain, t, o.br || [[0, 0.05]]); }
+  if (noiseBuf) { nz = c.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true; const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 400; const blp = c.createBiquadFilter(); blp.type = 'lowpass'; blp.frequency.value = 3200; nz.connect(hp); hp.connect(blp); blp.connect(br); br.connect(src); kfp(br.gain, t, (o.br || [[0, 0.05]]).map(([a, b]) => [a, b * 0.55])); /* v24 de-hiss: breath lowpassed + quieter */ }
   // the formant bank: each band glides through the vowel keyframes
   for (let k = 0; k < 4; k++) {
     const bp = c.createBiquadFilter(), bg = c.createGain(); bp.type = 'bandpass'; bp.Q.value = VQ[k];
@@ -3025,7 +3025,9 @@ function drawBgFigure(kind, t, dt, yk) {
     const k = F.dw >= 0 || F.ww >= 0 ? 0.3 : 0.5 + 0.5 * Math.sin(t * 0.35), sc = 0.85 + 0.45 * k; F.close = k;
     const cxF = L.bx + L.cell * COLS / 2 + Math.sin(t * 0.45) * L.cell * 2.2, cyF = H * yk + k * H * 0.12;
     const surfing = !(F.dw >= 0 || F.ww >= 0), fc = t % 6.5, tk = F.taunt && F.lt >= 0 && F.lt < 1.0 ? F.lt / 1.0 : -1, fp = !surfing ? -1 : tk >= 0 ? tk : fc < 1.1 ? fc / 1.1 : -1; // v23: aerials off the wave lip every ~6.5 s and on every taunt
-    const kind2 = Math.floor(t / 6.5) % 3, spin = fp >= 0 ? (kind2 === 1 ? 1 : -1) * fp * Math.PI * 2 : 0, lift = fp >= 0 ? Math.sin(Math.PI * fp) * H * 0.09 : 0; F.spin = spin; F.flip = fp; F.flips = (F.flips || 0) + (fp >= 0 && (F.lastFp == null || F.lastFp < 0) ? 1 : 0); F.lastFp = fp;
+    const kind2 = Math.floor(t / 6.5) % 3; let spin = fp >= 0 ? (kind2 === 1 ? 1 : -1) * fp * Math.PI * 2 : 0, lift = fp >= 0 ? Math.sin(Math.PI * fp) * H * 0.13 : 0;
+    if (fp < 0 && !surfing && F.spinS) { const r2 = Math.round(F.spinS / (Math.PI * 2)) * Math.PI * 2; spin = r2 + (F.spinS - r2) * 0.8; lift = (F.liftS || 0) * 0.8; } // v24: a wave mid-flip eases him out of the trick instead of snapping
+    F.spinS = Math.abs(spin) > 0.01 ? spin : 0; F.liftS = lift > 0.5 ? lift : 0; F.spin = spin; F.flip = fp; F.flips = (F.flips || 0) + (fp >= 0 && (F.lastFp == null || F.lastFp < 0) ? 1 : 0); F.lastFp = fp;
     ctx.save(); ctx.translate(cxF, cyF + 2 * s * sc - lift); if (kind2 === 2 && fp >= 0) ctx.scale(Math.cos(fp * Math.PI * 2), 1); else ctx.rotate(spin); /* backflip / frontflip / 360 spin */ ctx.drawImage(C, -ox * sc, -oy * sc - 2 * s * sc, vw * sc, vh * sc); ctx.restore();
     // spray trail behind his board
     ctx.fillStyle = 'rgba(255,236,225,0.55)'; for (let i = 0; i < 10; i++) { const ph = (t * 1.6 + i / 10) % 1, dir = Math.cos(t * 0.45) >= 0 ? -1 : 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cxF + dir * (0.8 + ph * 2.4) * s * sc, cyF + 3.1 * s * sc - ph * s * 0.6 + Math.sin(i * 2.1) * s * 0.15, (1 - ph) * s * 0.18 + 1, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
@@ -3085,16 +3087,19 @@ function paintSurfer(X, t, F, s, cx, cy, full) {
   // legs in a surf crouch (feet planted on the board), board shorts
   const kc = pose === 'surf' ? crouch : pose === 'popup' ? 1 : 0.6;
   X.lineCap = 'round'; X.lineJoin = 'round'; X.strokeStyle = skin; X.lineWidth = s * 0.24;
-  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.38, s * 2.8); X.lineTo(sd * s * (0.7 + 0.15 * kc), s * (3.0 - 0.1 * kc)); X.lineTo(sd * s * 0.95, s * 3.2); X.stroke(); }
+  // v24 side-on stance: feet across the board (front foot to the nose, back foot to the tail), both knees bent toward the nose
+  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.22, s * 2.8); X.lineTo(sd * s * 0.68 + s * 0.22 * kc, s * (3.0 - 0.14 * kc)); X.lineTo(sd * s * 1.12, s * 3.2); X.stroke(); }
+  X.save(); X.scale(0.62, 1); // v24: torso + shorts seen side-on (narrow), the head stays turned to the camera
   X.fillStyle = '#ff4fa3'; X.beginPath(); X.moveTo(-s * 0.84, s * 2.35); X.lineTo(s * 0.84, s * 2.35); X.lineTo(s * 0.7, s * 2.95); X.lineTo(s * 0.05, s * 2.95); X.lineTo(0, s * 2.7); X.lineTo(-s * 0.05, s * 2.95); X.lineTo(-s * 0.7, s * 2.95); X.fill();
   X.fillStyle = '#ffb347'; X.fillRect(-s * 0.8, s * 2.6, s * 0.12, s * 0.3); X.fillRect(s * 0.68, s * 2.6, s * 0.12, s * 0.3);
   // torso in a teal tank top with a sunset stripe
   X.fillStyle = skin; X.beginPath(); X.moveTo(-s * 0.95, s * 1.1); X.quadraticCurveTo(-s * 1.0, s * 0.62, -s * 0.35, s * 0.55); X.lineTo(s * 0.35, s * 0.55); X.quadraticCurveTo(s * 1.0, s * 0.62, s * 0.95, s * 1.1); X.lineTo(s * 0.8, s * 1.6); X.lineTo(-s * 0.8, s * 1.6); X.fill();
   X.fillStyle = '#17b8be'; X.beginPath(); X.moveTo(-s * 0.62, s * 0.62); X.lineTo(-s * 0.42, s * 0.62); X.quadraticCurveTo(0, s * 1.35, s * 0.42, s * 0.62); X.lineTo(s * 0.62, s * 0.62); X.quadraticCurveTo(s * 0.86, s * 1.3, s * 0.84, s * 2.45); X.lineTo(-s * 0.84, s * 2.45); X.quadraticCurveTo(-s * 0.86, s * 1.3, -s * 0.62, s * 0.62); X.fill();
   X.fillStyle = '#ff4fa3'; X.fillRect(-s * 0.84, s * 1.9, s * 1.68, s * 0.16); X.fillStyle = '#ffb347'; X.fillRect(-s * 0.84, s * 2.06, s * 1.68, s * 0.1);
+  X.restore(); // side-on torso
   // arms: out for balance while riding (left one throws a shaka on a taunt), flailing in a wipeout, paddling when prone
   X.strokeStyle = skin; X.lineWidth = s * 0.26; X.fillStyle = skin;
-  const arm = (sx, e, h) => { X.beginPath(); X.moveTo(sx * s * 0.82, s * 0.8); X.lineTo(e[0] * s, e[1] * s); X.lineTo(h[0] * s, h[1] * s); X.stroke(); X.beginPath(); X.arc(h[0] * s, h[1] * s, s * 0.15, 0, 7); X.fill(); };
+  const arm = (sx, e, h) => { X.beginPath(); X.moveTo(sx * s * 0.5, s * 0.8); X.lineTo(e[0] * s, e[1] * s); X.lineTo(h[0] * s, h[1] * s); X.stroke(); X.beginPath(); X.arc(h[0] * s, h[1] * s, s * 0.15, 0, 7); X.fill(); };
   const up = F.taunt ? lk : 0;
   if (pose === 'crash' || pose === 'tumble' || pose === 'sink') { const wg = Math.sin(t * 26) * 0.15; arm(-1, [-1.25, 0.2], [-1.45 + wg, -0.55]); arm(1, [1.25, 0.2], [1.45 - wg, -0.55]); }
   else if (pose === 'paddle') { for (const sd of [-1, 1]) { const a = t * 7 + (sd > 0 ? Math.PI : 0); arm(sd, [-0.9 * 1 + sd * 0.05, 0.9 + 0.5 * Math.cos(a)], [-1.55 - 0.5 * Math.abs(Math.sin(a)), 0.9 + 1.2 * Math.cos(a)]); } }
@@ -4162,6 +4167,7 @@ const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L
 const dbg = {
   figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, chomp: gatorChomp, clank: metalClank, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
+  audio() { return A; }, ambKind() { return AMB.kind; }, // v24 hiss meter hooks
   miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, emerge: F ? F.emerge || 0 : 0, close: F ? F.close || 0 : 0, spin: F ? F.spin || 0 : 0, flip: F ? (F.flip == null ? -1 : F.flip) : -1, flips: F ? F.flips || 0 : 0, oceanRows: BG.oceanRows || 0, tell: F ? F.tell || 0 : 0, boot: !!BG.boot, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
@@ -4494,7 +4500,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v23';
+const VERSION = 'v24';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
