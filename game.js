@@ -304,6 +304,8 @@ const sfx = {
   laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
   surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
+  chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
+  clank(v) { if (!aok()) return false; metalClank(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   mwaha(kind) { if (!aok()) return false; vampLaugh3(A.ctx, anow() + 0.02, A.sfx, kind || 'cackle', 104 + rand(-5, 5), LAUGH_V[kind || 'cackle'], A.noise); return true; }, // v15 theatrical laughs on the SFX bus
   ouch(q) { if (!aok()) return false; vampOuch(A.ctx, anow() + 0.01, A.sfx, q, 1.0, A.noise); tone(900 + q * 300, 0.07, 'square', 0.04, { to: 500 }); return true; }, // v14 cartoony OUCH! (q = 1..3, sillier each time)
   bats() { if (!aok()) return; const t = anow(); for (let i = 0; i < 7; i++) tone(rand(3200, 5600), 0.06, 'sine', 0.05, { when: t + i * 0.07, to: rand(1800, 2600) }); noise(0.6, 0.12, 'bandpass', 900, { q: 3 }); }, // screeching bat swarm + wing flutter
@@ -857,6 +859,8 @@ const MATE = [['m', 0.08, 1.2], ['a', 0.18, 1.22, 1.12, 1], ['i', 0.14, 1.12, 1.
 const CRIKEY = [['k', 0.06, 1.3], ['r', 0.07, 1.32], ['a', 0.2, 1.35, 1.25, 1, 1.5], ['i', 0.08, 1.25], ['k', 0.06, 1.1], ['i', 0.34, 1.05, 1.32, 0.95, 0.98]];
 const STREWTH = [['s', 0.14, 1.2], ['t', 0.03, 1.2], ['r', 0.07, 1.25], ['u', 0.38, 1.3, 0.95, 1, 1.42], ['th', 0.16, 0.95]];
 const FAIRDINKUM = [['f', 0.1, 1.0], ['e', 0.22, 1.05, 1.0, 1, 1.15], ['er', 0.12, 1.0], ['_', 0.04], ['d', 0.04, 1.1], ['ih', 0.1, 1.15], ['n', 0.06, 1.1], ['k', 0.06, 1.05], ['uh', 0.08, 1.0], ['m', 0.08, 0.95], ['_', 0.05]];
+const TASTY = [['t', 0.05, 1.2], ['a', 0.16, 1.25, 1.32, 1], ['i', 0.1, 1.32], ['s', 0.12, 1.25], ['t', 0.04, 1.3], ['i', 0.34, 1.38, 1.1, 0.95, 1.55]];
+const ME = [['m', 0.06, 1.3], ['i', 0.12, 1.35, 1.3, 0.9]];
 const HURS = (n, p) => { const r = []; for (let i = 0; i < n; i++) { const last = i === n - 1; r.push(['h', 0.07, p], ['er', last ? 0.46 : 0.17, p + 0.08 - i * 0.03, last ? p - 0.3 : p - 0.05, 1 - i * 0.05]); if (!last) r.push(['_', 0.07, p]); } return r; };
 const BOSS_LINES = {
   surfer: {
@@ -874,10 +878,13 @@ const BOSS_LINES = {
     chuckle: { t: HURS(3, 1.05), text: 'HUR HUR HURRR' },
     crikey: { t: [['h', 0.05, 1.3], ['a', 0.13, 1.35, 1.2, 0.9], ['h', 0.05, 1.3], ['a', 0.13, 1.3, 1.15, 0.9], ['h', 0.06, 1.25], ['a', 0.36, 1.35, 0.95, 1, 1.6], ['_', 0.14], ...CRIKEY], text: 'HA-HA-HAAA! CRIKEY!' },
     gday: { t: [...GDAY, ['_', 0.06], ...MATE, ['_', 0.14], ...HURS(2, 1.0)], text: "G'DAY, MATE! HUR HUR" },
-    ouch1: { t: CRIKEY.map((x) => [x[0], x[1], (x[2] || 1) * 1.15, (x[3] || x[2] || 1) * 1.15, x[4], x[5] ? x[5] * 1.2 : 0]), text: 'CRIKEY!' },
-    ouch2: { t: [['a', 0.12, 1.5, 1.7, 0.9], ['_', 0.1], ...STREWTH.map((x) => [x[0], x[1], (x[2] || 1) * 1.15, (x[3] || x[2] || 1) * 1.15, x[4], x[5] ? x[5] * 1.2 : 0])], text: 'STREWTH!' },
-    ouch3: { t: [...FAIRDINKUM.map((x) => [x[0], x[1], (x[2] || 1) * 1.2, (x[3] || x[2] || 1) * 1.2, x[4], x[5] ? x[5] * 1.2 : 0]), ...MATE.map((x) => [x[0], x[1], (x[2] || 1) * 1.25, (x[3] || x[2] || 1) * 1.3, x[4], x[5] ? x[5] * 1.3 : 0])], text: 'FAIR DINKUM, MATE!' },
-    defeat: { t: [...STREWTH.map((x) => [x[0], x[1] * 1.2, (x[2] || 1) * 1.1, (x[3] || x[2] || 1) * 0.95, x[4], x[5] || 0]), ['_', 0.3], ['a', 0.18, 1.0, 0.95, 0.8], ['i', 0.08, 0.95], ['m', 0.08, 0.9], ['_', 0.05], ['k', 0.06, 1.0], ['ae', 0.18, 1.05, 1.0, 0.9], ['k', 0.05, 1.0], ['t', 0.04, 1.0], ['uh', 0.08, 0.95], ['s', 0.12, 0.92], ['_', 0.08], ['m', 0.08, 0.9], ['a', 0.2, 0.9, 0.82, 0.8], ['i', 0.24, 0.82, 0.62, 0.65], ['t', 0.08, 0.6]], text: "STREWTH... I'M CACTUS, MATE!" },
+    // v21 chase: chewing bits off your boat, then breaking a tooth on something hard each quarter (same original voice)
+    tasty: { t: [['h', 0.05, 1.1], ['a', 0.14, 1.15, 1.05, 0.8], ['_', 0.08], ...TASTY], text: 'HA! TASTY!' },
+    tasty2: { t: [['m', 0.34, 1.0, 1.25, 0.8, 1.3], ['_', 0.1], ...TASTY, ['_', 0.06], ...MATE], text: 'MMM, TASTY, MATE!' },
+    ouch1: { t: [...CRIKEY.map((x) => [x[0], x[1], (x[2] || 1) * 1.15, (x[3] || x[2] || 1) * 1.15, x[4], x[5] ? x[5] * 1.2 : 0]), ['_', 0.08], ...ME, ['t', 0.04, 1.45], ['u', 0.38, 1.55, 1.2, 1, 1.75], ['th', 0.14, 1.2]], text: 'CRIKEY, ME TOOTH!' },
+    ouch2: { t: [...STREWTH.map((x) => [x[0], x[1], (x[2] || 1) * 1.15, (x[3] || x[2] || 1) * 1.15, x[4], x[5] ? x[5] * 1.2 : 0]), ['_', 0.1], ...ME, ['f', 0.08, 1.4], ['ae', 0.32, 1.45, 1.25, 1, 1.62], ['n', 0.12, 1.25], ['g', 0.04, 1.2]], text: 'STREWTH! ME FANG!' },
+    ouch3: { t: [['o', 0.16, 1.5, 1.6, 1], ['i', 0.14, 1.6, 1.4, 0.9], ['_', 0.08], ...ME, ['t', 0.03, 1.45], ['sh', 0.08, 1.45], ['o', 0.18, 1.5, 1.4, 1, 1.65], ['m', 0.06, 1.35], ['p', 0.04, 1.3], ['er', 0.14, 1.3, 1.25], ['z', 0.1, 1.2], ['_', 0.06], ...MATE.map((x) => [x[0], x[1], (x[2] || 1) * 1.25, (x[3] || x[2] || 1) * 1.3, x[4], x[5] ? x[5] * 1.3 : 0])], text: 'OI! ME CHOMPERS, MATE!' },
+    defeat: { t: [...STREWTH.map((x) => [x[0], x[1] * 1.2, (x[2] || 1) * 1.1, (x[3] || x[2] || 1) * 0.95, x[4], x[5] || 0]), ['_', 0.28], ['n', 0.07, 1.0], ['o', 0.22, 1.0, 0.9, 0.85], ['_', 0.05], ['t', 0.04, 0.95], ['i', 0.3, 0.95, 0.85, 0.85], ['th', 0.14, 0.85], ['_', 0.3], ['a', 0.14, 0.9], ['i', 0.06, 0.88], ['g', 0.04, 0.88], ['ih', 0.1, 0.88], ['v', 0.06, 0.85], ['uh', 0.14, 0.85, 0.8, 0.8], ['p', 0.06, 0.8], ['_', 0.08], ['m', 0.08, 0.82], ['a', 0.2, 0.82, 0.74, 0.75], ['i', 0.26, 0.74, 0.56, 0.6], ['t', 0.08, 0.55]], text: 'STREWTH... NO TEETH... I GIVE UP, MATE!' },
   },
 };
 const BOSS_VOX = { surfer: SURF_V, gator: GATOR_V };
@@ -885,6 +892,23 @@ const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
 function bossLineSpec(kind, key) { const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
 function bossSay(c, t, dest, kind, key, v, nb) { const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
+// v21 gator chase: a woody CHOMP (jaw snap + crunchy splinter crackle + thump) and a metallic CLANK with a tooth pinging
+// off (inharmonic struck-metal partials). Original synthesis.
+function gatorChomp(c, t, dest, nb, v) {
+  v = v || 1; const o = c.createOscillator(), g0 = c.createGain(); o.type = 'square'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.04);
+  g0.gain.setValueAtTime(0.0001, t); g0.gain.exponentialRampToValueAtTime(0.22 * v, t + 0.004); g0.gain.exponentialRampToValueAtTime(0.0001, t + 0.06); o.connect(g0); g0.connect(dest); o.start(t); o.stop(t + 0.08);
+  const th = c.createOscillator(), g1 = c.createGain(); th.frequency.setValueAtTime(130, t); th.frequency.exponentialRampToValueAtTime(45, t + 0.22); g1.gain.setValueAtTime(0.0001, t); g1.gain.exponentialRampToValueAtTime(0.4 * v, t + 0.01); g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.26); th.connect(g1); g1.connect(dest); th.start(t); th.stop(t + 0.3);
+  for (let i = 0; i < 9; i++) { const tt = t + 0.01 + i * 0.022 + Math.random() * 0.015, n = c.createBufferSource(), bp = c.createBiquadFilter(), g2 = c.createGain(); n.buffer = nb; bp.type = 'bandpass'; bp.frequency.value = 1400 + Math.random() * 2600; bp.Q.value = 3;
+    g2.gain.setValueAtTime(0.0001, tt); g2.gain.exponentialRampToValueAtTime((0.3 - i * 0.025) * v, tt + 0.003); g2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.03 + Math.random() * 0.03); n.connect(bp); bp.connect(g2); g2.connect(dest); n.start(tt, Math.random() * 0.5); n.stop(tt + 0.08); }
+  return t + 0.3;
+}
+function metalClank(c, t, dest, nb, v) {
+  v = v || 1; for (const [f, a, d] of [[523, 0.22, 0.7], [1271, 0.16, 0.5], [1987, 0.12, 0.35], [2731, 0.09, 0.25], [3511, 0.06, 0.18]]) {
+    const o = c.createOscillator(), g0 = c.createGain(); o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.01); g0.gain.setValueAtTime(0.0001, t); g0.gain.exponentialRampToValueAtTime(a * v, t + 0.002); g0.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g0); g0.connect(dest); o.start(t); o.stop(t + d + 0.02); }
+  const n = c.createBufferSource(), hp = c.createBiquadFilter(), g1 = c.createGain(); n.buffer = nb; hp.type = 'highpass'; hp.frequency.value = 3000; g1.gain.setValueAtTime(0.3 * v, t); g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.05); n.connect(hp); hp.connect(g1); g1.connect(dest); n.start(t); n.stop(t + 0.06);
+  for (let i = 0; i < 3; i++) { const tt = t + 0.18 + i * (0.16 - i * 0.04), o = c.createOscillator(), g2 = c.createGain(); o.frequency.setValueAtTime(3100 + i * 150, tt); g2.gain.setValueAtTime(0.0001, tt); g2.gain.exponentialRampToValueAtTime(0.07 * v * (1 - i * 0.25), tt + 0.002); g2.gain.exponentialRampToValueAtTime(0.0001, tt + 0.07); o.connect(g2); g2.connect(dest); o.start(tt); o.stop(tt + 0.09); } // the tooth pings away
+  return t + 0.75;
+}
 // v18: a big wave crashing (rumble + white-water hiss + low thump), original synthesis
 function surfCrash(c, t, dest, nb, v) {
   v = v || 1; const n = c.createBufferSource(), lp = c.createBiquadFilter(), g1 = c.createGain(); n.buffer = nb; n.loop = true;
@@ -2957,8 +2981,15 @@ function miniAnim(kind, dt) {
     F.dw = F.dead ? g.time - b.deadT : -1; F.ww = b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup ? g.time - b.wipe.t0 : -1;
     F.gone = F.dead ? (kind === 'surfer' ? Math.max(0, Math.min(1, (F.dw - SURF_DIE.end) / SURF_DIE.fade)) : Math.max(0, Math.min(1, (g.time - b.deadT - 1.6) / 1.5))) : 0;
     if (kind === 'surfer') F.pose = surferPose(F)[0];
+    if (kind === 'gator') { // v21 chase: lunge envelope, jaw wide open on the way in, snapped shut at the chomp; teeth lost
+      const Lg = b.lunge, lp = Lg ? g.time - Lg.t0 : -1; F.lunge = lungeEnv(lp); F.lungeX = Lg ? Lg.x : 0.3; F.teeth = b.teeth || 0;
+      if (lp >= 0 && lp < LUNGE.chomp) F.jaw = Math.max(F.jaw, Math.sin(Math.min(1, lp / LUNGE.chomp * 1.4) * Math.PI / 2) * (lp > LUNGE.chomp - 0.08 ? (LUNGE.chomp - lp) / 0.08 : 1));
+      if (g.time < (b.ouchAt || 0)) F.ok = 0; // he only feels it once the tooth breaks
+      if (F.dead && g.time - b.deadT < LUNGE.chomp) F.dead = false; // the final bite first
+      F.gone = F.dead ? Math.max(0, Math.min(1, (F.dw - GATOR_GONE.start) / GATOR_GONE.fade)) : 0;
+    }
     F.taunt = F.lt >= 0 && !!F.key && !/^(ouch|defeat)/.test(F.key);
-  } else { F.lt = -1; F.jaw = 0; F.lk = 0; F.ok = 0; F.hit = 0; F.dead = false; F.taunt = false; F.gone = 1; F.dw = -1; F.ww = -1; F.pose = null; }
+  } else { F.lt = -1; F.jaw = 0; F.lk = 0; F.ok = 0; F.hit = 0; F.dead = false; F.taunt = false; F.gone = 1; F.dw = -1; F.ww = -1; F.pose = null; F.lunge = 0; F.teeth = 0; }
   return F;
 }
 function drawBgFigure(kind, t, dt, yk) {
@@ -2966,6 +2997,16 @@ function drawBgFigure(kind, t, dt, yk) {
   const s = Math.min(W * 0.16, H * 0.085), ox = 3 * s, oy = 1.5 * s, vw = 6 * s, vh = 6.4 * s;
   let C = BG['fcv_' + kind]; if (!C || C.s !== s) { C = BG['fcv_' + kind] = document.createElement('canvas'); C.width = Math.ceil(vw); C.height = Math.ceil(vh); C.s = s; C.x = C.getContext('2d'); C.t = -1; }
   if (t - C.t >= (F.lt >= 0 || F.ok > 0 || F.hit > 0 || F.dead || kind === 'surfer' ? 1 / 30 : 1 / 15) || t < C.t) { C.t = t; const X = C.x; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, C.width, C.height); (kind === 'surfer' ? paintSurfer : paintGator)(X, t, F, s, ox, oy, true); }
+  if (kind === 'gator') { // v21 chase: he swims after the boat, lunges in big at the stern, then drifts back (and away when beaten)
+    const e = F.lunge || 0, dr = F.dead ? Math.max(0, Math.min(1, (F.dw - 1.0) / 2.6)) : 0, sc = (1 + 0.55 * e) * (1 - 0.5 * dr);
+    const bcx = L.bx + L.cell * COLS / 2 + Math.sin(t * 0.8) * L.cell * 1.2, tx = (F.lungeX || 0.3) * W, tipK = 2.75 * s * sc;
+    const fcx = bcx + e * (tx + tipK - bcx), x0 = fcx - ox * sc, y0 = H * yk - oy * sc + Math.sin(t * 2.1) * s * 0.06 + e * H * 0.2 + dr * H * 0.04 + Math.max(0, F.dw - GATOR_GONE.start) * s * 0.6;
+    ctx.save(); ctx.globalAlpha = 1 - (F.gone || 0); ctx.beginPath(); ctx.rect(0, 0, W, y0 + (oy + 3.9 * s) * sc); ctx.clip(); ctx.drawImage(C, x0, y0, vw * sc, vh * sc); ctx.restore(); // cut at his waterline: he's swimming
+    // bow wave where he cuts through the water
+    const wy = y0 + (oy + 3.8 * s) * sc, wx = fcx - 0.4 * s * sc; ctx.fillStyle = 'rgba(225,255,215,0.55)';
+    for (let i = 0; i < 9; i++) { const k2 = i / 8 - 0.5; ctx.beginPath(); ctx.ellipse(wx + k2 * s * 3.6 * sc, wy + Math.abs(k2) * s * 0.5 * sc + Math.sin(t * 9 + i) * s * 0.04, s * 0.32 * sc, s * 0.09 * sc, 0, 0, 7); ctx.fill(); }
+    return [x0, y0, vw * sc, vh * sc];
+  }
   const x0 = L.bx + L.cell * COLS / 2 - ox + (kind === 'surfer' ? Math.sin(t * 0.45) * L.cell * 2.2 : 0), y0 = H * yk - oy; /* v18: he carves back and forth */ ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
 }
 function drawMiniPortrait(kind, cx, cy, s) {
@@ -3122,12 +3163,12 @@ function paintGator(X, t, F, s, cx, cy, full) {
   X.fillStyle = '#d8606e'; X.beginPath(); X.moveTo(0, -s * 0.05); X.lineTo(-s * 2.55, -s * 0.02); X.lineTo(-s * 2.55, s * 0.12); X.lineTo(0, s * 0.18); X.fill();
   X.fillStyle = G1; X.beginPath(); X.moveTo(s * 0.1, -s * 0.02); X.quadraticCurveTo(-s * 1.2, s * 0.12, -s * 2.6, s * 0.06); X.quadraticCurveTo(-s * 2.75, s * 0.24, -s * 2.45, s * 0.36); X.quadraticCurveTo(-s * 1.2, s * 0.5, s * 0.25, s * 0.42); X.fill();
   X.fillStyle = BELLY; X.beginPath(); X.moveTo(-s * 2.45, s * 0.3); X.quadraticCurveTo(-s * 1.2, s * 0.44, s * 0.2, s * 0.36); X.lineTo(s * 0.22, s * 0.42); X.quadraticCurveTo(-s * 1.2, s * 0.5, -s * 2.45, s * 0.36); X.fill();
-  X.fillStyle = '#ffffff'; for (let k = 0; k < 8; k++) { const u = -0.3 - k * 0.29; X.beginPath(); X.moveTo(s * u, s * 0.06); X.lineTo(s * (u - 0.09), -s * 0.1); X.lineTo(s * (u - 0.18), s * 0.06); X.fill(); }
+  X.fillStyle = '#ffffff'; for (let k = 0; k < 8; k++) { if ((F.teeth || 0) >= 8) break; const u = -0.3 - k * 0.29; X.beginPath(); X.moveTo(s * u, s * 0.06); X.lineTo(s * (u - 0.09), -s * 0.1); X.lineTo(s * (u - 0.18), s * 0.06); X.fill(); }
   X.restore();
   if (a > 0.12) { X.fillStyle = '#7a2030'; X.beginPath(); X.moveTo(hxj, hyj); X.lineTo(-s * 2.2, s * 0.12); X.lineTo(hxj - Math.cos(a) * s * 2.6, hyj + Math.sin(a) * s * 2.6 - s * 0.02); X.fill(); }
   // upper jaw + skull
   X.fillStyle = G1; X.beginPath(); X.moveTo(s * 0.9, s * 0.25); X.quadraticCurveTo(s * 1.05, -s * 0.6, s * 0.2, -s * 0.62); X.quadraticCurveTo(-s * 0.4, -s * 0.6, -s * 0.6, -s * 0.28); X.quadraticCurveTo(-s * 1.6, -s * 0.2, -s * 2.5, -s * 0.12); X.quadraticCurveTo(-s * 2.85, -s * 0.02, -s * 2.62, s * 0.14); X.lineTo(s * 0.6, s * 0.22); X.fill();
-  X.fillStyle = '#ffffff'; for (let k = 0; k < 8; k++) { const u = -0.35 - k * 0.28; X.beginPath(); X.moveTo(s * u, s * 0.14); X.lineTo(s * (u - 0.08), s * 0.3); X.lineTo(s * (u - 0.16), s * 0.14); X.fill(); }
+  X.fillStyle = '#ffffff'; for (let k = 0; k < 8; k++) { if (TOOTH_ORDER.indexOf(k) < (F.teeth || 0)) continue; const u = -0.35 - k * 0.28; X.beginPath(); X.moveTo(s * u, s * 0.14); X.lineTo(s * (u - 0.08), s * 0.3); X.lineTo(s * (u - 0.16), s * 0.14); X.fill(); }
   X.fillStyle = G2; for (const [u, v, r] of [[-1.0, -0.14, 0.07], [-1.5, -0.1, 0.06], [-1.95, -0.07, 0.05], [-0.3, -0.42, 0.08], [0.4, -0.45, 0.08]]) { X.beginPath(); X.arc(s * u, s * v, s * r, 0, 7); X.fill(); }
   X.fillStyle = '#1a3a1a'; X.beginPath(); X.ellipse(-s * 2.5, -s * 0.12, s * 0.06, s * 0.035, 0, 0, 7); X.fill(); // nostril
   X.strokeStyle = 'rgba(20,50,20,0.6)'; X.lineWidth = Math.max(1, s * 0.03); X.beginPath(); X.moveTo(s * 0.6, s * 0.22); X.quadraticCurveTo(s * 0.75, s * 0.32, s * 0.85, s * 0.18); X.stroke(); // grin crease
@@ -3147,7 +3188,7 @@ function paintGator(X, t, F, s, cx, cy, full) {
   X.restore();
   // billabong water line in front of his belly
   if (full) {
-    const wy = s * 3.75; X.fillStyle = 'rgba(40,70,40,0.94)'; X.beginPath(); X.moveTo(-s * 3, wy); for (let k = 0; k <= 12; k++) X.lineTo(s * (-3 + k * 0.5), wy + Math.sin(t * 1.8 + k * 1.1) * s * 0.06); X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
+    const wy = s * 3.75, wg = X.createLinearGradient(-s * 3, 0, s * 3, 0); wg.addColorStop(0, 'rgba(40,70,40,0)'); wg.addColorStop(0.2, 'rgba(40,70,40,0.94)'); wg.addColorStop(0.8, 'rgba(40,70,40,0.94)'); wg.addColorStop(1, 'rgba(40,70,40,0)'); X.fillStyle = wg; // v21: soft edges so it blends while he chases X.beginPath(); X.moveTo(-s * 3, wy); for (let k = 0; k <= 12; k++) X.lineTo(s * (-3 + k * 0.5), wy + Math.sin(t * 1.8 + k * 1.1) * s * 0.06); X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
     X.strokeStyle = 'rgba(200,255,170,0.35)'; X.lineWidth = Math.max(1, s * 0.03); for (let k = 0; k < 3; k++) { const rr2 = s * (0.6 + k * 0.45 + (t * 0.4 % 0.45)); X.beginPath(); X.ellipse(0, wy + s * 0.08, rr2 * 1.6, rr2 * 0.18, 0, 0, Math.PI); X.stroke(); }
   }
   X.restore(); X.globalAlpha = 1;
@@ -3239,6 +3280,7 @@ function bgBillabong(t) {
   ctx.strokeStyle = 'rgba(220,255,200,0.22)'; ctx.lineWidth = 1;
   for (let k = 0; k < 6; k++) { const ph = (t * 0.1 + k / 6) % 1, y = hz + (H - hz) * (0.1 + 0.9 * ph), w2 = W * (0.1 + 0.15 * hash(k)); ctx.globalAlpha = Math.sin(Math.PI * ph); ctx.beginPath(); ctx.ellipse(hash(k * 7) * W, y, w2, 3, 0, 0, 7); ctx.stroke(); }
   ctx.globalAlpha = 1;
+  chaseWater(t, hz);
   drawBgFigure('gator', t, dt, 0.27);
   // fireflies
   ctx.globalCompositeOperation = 'lighter';
@@ -3246,6 +3288,80 @@ function bgBillabong(t) {
   ctx.globalCompositeOperation = 'source-over';
   // a little croc snout + eyes cruising past the side column now and then
   const cz = (t * 0.06) % 1, ex2 = cx - 60 + cz * 120, ey2 = hz + (H - hz) * 0.55; ctx.fillStyle = '#2a5a2a'; ctx.beginPath(); ctx.ellipse(ex2, ey2, 16, 4, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#ffd23d'; ctx.beginPath(); ctx.arc(ex2 - 4, ey2 - 4, 1.6, 0, 7); ctx.arc(ex2 + 4, ey2 - 4, 1.6, 0, 7); ctx.fill();
+  chaseStern(t, dt);
+}
+// GAZZA'S CHASE (v21): you're fleeing down the billabong in a little tinny; the camera looks back over the stern.
+// Water, lily pads and reeds stream away toward the horizon, Gazza swims after you and lunges to chew bits off the
+// boat (purely cosmetic). Each quarter he bites something hard (anchor, outboard, cleat) and a tooth snaps off with a
+// clank; the last bite costs him the lot and he gives up, toothless, and sinks away. Hazards keep their fixed pace.
+const LUNGE = { chomp: 0.62, dur: 1.35 }, GATOR_GONE = { start: 3.6, fade: 1.4 }, STERN_Y = 0.8, TOOTH_ORDER = [2, 5, 0, 7, 3, 6, 1, 4];
+const STERN_HARD = [{ x: 0.22, what: 'anchor' }, { x: 0.5, what: 'motor' }, { x: 0.78, what: 'cleat' }];
+function lungeEnv(p) { if (p < 0 || p > LUNGE.dur) return 0; const k = p < LUNGE.chomp ? p / LUNGE.chomp : 1 - (p - LUNGE.chomp) / (LUNGE.dur - LUNGE.chomp); return k * k * (3 - 2 * k); }
+function gatorLunge(b, o) {
+  o = o || {}; b.lunge = { t0: g.time, hard: !!o.hard, q: o.q || 0, fin: !!o.fin, x: o.x != null ? o.x : rand(0.3, 0.7), done: false, what: o.what || 'boat' }; b.lunges = (b.lunges || 0) + 1;
+}
+function gatorChase(dt) {
+  const b = g.boss; if (!b || b.kind !== 'gator') return; const Lg = b.lunge, c = L.cell;
+  b.bites = b.bites || []; b.dents = b.dents || []; b.teeth = b.teeth || 0;
+  if (Lg && !Lg.done && g.time - Lg.t0 >= LUNGE.chomp) {
+    Lg.done = true; b.chomps = (b.chomps || 0) + 1; const px = Lg.x * W, py = H * STERN_Y;
+    if (Lg.hard) {
+      sfx.clank(Lg.fin ? 1.2 : 1); b.clanks = (b.clanks || 0) + 1; b.dents.push(Lg.x); b.hit = 0.9;
+      const lose = Lg.fin ? 8 - b.teeth : 1; b.teeth += lose; for (let i = 0; i < lose; i++) BG.teethFly = (BG.teethFly || []).concat([{ x: px + rand(-c, c), y: py - c * 0.6, vx: rand(-1, 1) * c * 6 + (i - lose / 2) * c, vy: -c * rand(14, 20), r: 0, vr: rand(-14, 14), t: 0 }]);
+      for (let i = 0; i < 14; i++) part(px, py - c * 0.3, rand(-1, 1) * c * 8, -rand(2, 9) * c, 0.4, c * 0.12, '#fff3a0', c * 22);
+      shake(0.3, Lg.fin ? 11 : 7); vib(40);
+    } else {
+      sfx.chomp(1); b.bites.push({ x: Lg.x, r: rand(0.035, 0.05), s: Math.random() }); if (b.bites.length > 16) b.bites.shift(); BG.sternKey = null;
+      for (let i = 0; i < 16; i++) part(px + rand(-1, 1) * c, py, rand(-1, 1) * c * 7, -rand(3, 11) * c, rand(0.6, 1.1), c * rand(0.08, 0.2), ['#8a5a2a', '#c08a4a', '#e0b070'][i % 3], c * 26);
+      shake(0.14, 3);
+    }
+  }
+  const busy = Lg && g.time - Lg.t0 < LUNGE.dur + 0.6;
+  if (b.hp > 0 && state === 'play' && !busy && g.time >= (b.nextLunge || b.start + 6) && !(b.talk && g.time - b.talk.t0 < b.talk.dur) && b.ouch <= 0) { gatorLunge(b); b.nextLunge = g.time + rand(5, 7); }
+}
+function chaseWater(t, hz) { // streaming water streaks, lily pads and reeds -> motion away from the camera
+  const sp = 0.32; ctx.save();
+  for (let i = 0; i < 26; i++) { const ph = (t * sp + hash(i * 2.3)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.15 + d * d * 1.2, x = W / 2 + (hash(i * 5.1) - 0.5) * W * 1.6 * sc;
+    ctx.globalAlpha = Math.min(1, ph * 4) * 0.35; ctx.fillStyle = '#dff8c8'; ctx.fillRect(x - 18 * sc, y, 36 * sc, Math.max(1, 2 * sc)); }
+  for (let i = 0; i < 7; i++) { const ph = (t * sp * 0.8 + hash(i * 7.7)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.12 + d * d * 1.3, side = i % 2 ? 1 : -1, x = W / 2 + side * (0.18 + hash(i * 3.3) * 0.35) * W * 1.4 * sc + side * W * 0.05;
+    ctx.globalAlpha = Math.min(1, ph * 5); ctx.fillStyle = '#3a7a32'; ctx.beginPath(); ctx.ellipse(x, y, 14 * sc, 5.5 * sc, 0, 0.3, Math.PI * 2 - 0.1); ctx.lineTo(x, y); ctx.fill();
+    if (i % 3 === 0) { ctx.fillStyle = '#ffb3d0'; ctx.beginPath(); ctx.arc(x + 3 * sc, y - 2 * sc, 3 * sc, 0, 7); ctx.fill(); } }
+  for (let i = 0; i < 12; i++) { const ph = (t * sp * 1.1 + hash(i * 4.9)) % 1, d = 1 - ph, y = hz + (H - hz) * 0.5 * d * d + 4, side = i % 2 ? 1 : -1, x = W / 2 + side * (W * 0.45 + d * d * W * 0.5), h = (8 + hash(i) * 10) * (0.3 + d * 2.2);
+    ctx.globalAlpha = Math.min(1, ph * 4) * 0.9; ctx.strokeStyle = '#1e3a18'; ctx.lineWidth = 1 + d * 2; for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(x + j * 3 * (0.4 + d), y); ctx.quadraticCurveTo(x + j * 4 * (0.4 + d), y - h * 0.6, x + j * 6 * (0.4 + d), y - h); ctx.stroke(); } }
+  // wake: two foam lines from the stern spreading behind the boat
+  ctx.globalAlpha = 0.45; ctx.strokeStyle = '#eaffdf'; ctx.lineWidth = 2; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -t * 60;
+  for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(W / 2 + sd * W * 0.2, H * STERN_Y + 6); ctx.quadraticCurveTo(W / 2 + sd * W * 0.12, hz + (H - hz) * 0.4, W / 2 + sd * W * 0.03, hz + 4); ctx.stroke(); }
+  ctx.setLineDash([]); ctx.restore();
+}
+function chaseStern(t, dt) { // the back of your boat, bitten up; anchor, outboard and a cleat; flying teeth on top
+  const b = g.boss && g.boss.kind === 'gator' ? g.boss : null; if (!b && !(BG.teethFly && BG.teethFly.length)) return;
+  const bites = b ? b.bites || [] : [], dents = b ? b.dents || [] : [], top = H * STERN_Y, bob = Math.sin(t * 2.4) * H * 0.004, key = W + 'x' + H + ':' + bites.length + ':' + dents.length + ':' + (bites.length ? bites[bites.length - 1].x : 0);
+  let S = BG.sternCv; if (!S || BG.sternKey !== key) {
+    S = BG.sternCv = BG.sternCv || document.createElement('canvas'); S.width = Math.ceil(W); S.height = Math.ceil(H - top + H * 0.1); BG.sternKey = key; const x = S.getContext('2d'), y0 = H * 0.1, hh = S.height - y0; x.clearRect(0, 0, S.width, S.height);
+    x.fillStyle = lgx(x, y0, S.height, [[0, '#9a6a34'], [0.5, '#6e4220'], [1, '#432612']]); x.beginPath(); x.moveTo(W * 0.02, y0); x.lineTo(W * 0.98, y0); x.lineTo(W * 0.9, S.height); x.lineTo(W * 0.1, S.height); x.fill();
+    x.strokeStyle = 'rgba(40,20,8,0.45)'; x.lineWidth = 2; for (let k = 1; k < 5; k++) { const yy = y0 + hh * k / 5; x.beginPath(); x.moveTo(W * (0.02 + 0.08 * k / 5), yy); x.lineTo(W * (0.98 - 0.08 * k / 5), yy); x.stroke(); }
+    x.fillStyle = '#c99050'; x.fillRect(W * 0.02, y0, W * 0.96, hh * 0.12); x.fillStyle = 'rgba(255,255,255,0.15)'; x.fillRect(W * 0.02, y0, W * 0.96, 2);
+    x.fillStyle = '#ffd23d'; x.font = 'bold ' + Math.round(hh * 0.16) + 'px sans-serif'; x.textAlign = 'center'; x.fillText('BONANZA II', W * 0.5, y0 + hh * 0.55);
+    // bite chunks: jagged scallops cut out of the gunwale, with pale splintered edges
+    for (const bt of bites) { const bx = bt.x * W, r = bt.r * W; x.globalCompositeOperation = 'destination-out'; x.beginPath(); for (let k = 0; k <= 10; k++) { const a = Math.PI * k / 10, rr2 = r * (k % 2 ? 0.78 : 1); x.lineTo(bx + Math.cos(a) * rr2, y0 + Math.sin(a) * rr2); } x.fill(); x.globalCompositeOperation = 'source-over';
+      x.strokeStyle = '#ecc488'; x.lineWidth = 2; x.beginPath(); for (let k = 0; k <= 10; k++) { const a = Math.PI * k / 10, rr2 = r * (k % 2 ? 0.78 : 1) + 1.5; x.lineTo(bx + Math.cos(a) * rr2, y0 + Math.sin(a) * rr2); } x.stroke(); }
+    // anchor hanging over the transom
+    const ax = W * 0.22; x.strokeStyle = '#59606a'; x.lineWidth = Math.max(3, W * 0.008); x.lineCap = 'round'; x.beginPath(); x.moveTo(ax, y0 - hh * 0.25); x.lineTo(ax, y0 + hh * 0.6); x.moveTo(ax - hh * 0.25, y0 + hh * 0.45); x.quadraticCurveTo(ax, y0 + hh * 0.75, ax + hh * 0.25, y0 + hh * 0.45); x.moveTo(ax - hh * 0.12, y0 + hh * 0.05); x.lineTo(ax + hh * 0.12, y0 + hh * 0.05); x.stroke();
+    x.beginPath(); x.arc(ax, y0 - hh * 0.3, hh * 0.06, 0, 7); x.stroke();
+    // outboard motor
+    const mx = W * 0.5, mw = Math.max(W * 0.16, hh * 0.7), mh = hh * 0.55; x.fillStyle = '#3a3f48'; x.fillRect(mx - mw * 0.1, y0 - hh * 0.02, mw * 0.2, hh);
+    x.fillStyle = lgx(x, y0 - mh, y0, [[0, '#c5ccd6'], [1, '#5a626e']]); x.beginPath(); x.moveTo(mx - mw / 2, y0); x.lineTo(mx - mw / 2, y0 - mh * 0.6); x.quadraticCurveTo(mx - mw / 2, y0 - mh, mx - mw * 0.2, y0 - mh); x.lineTo(mx + mw * 0.3, y0 - mh); x.quadraticCurveTo(mx + mw / 2, y0 - mh, mx + mw / 2, y0 - mh * 0.5); x.lineTo(mx + mw / 2, y0); x.fill();
+    x.fillStyle = '#ff4fa3'; x.fillRect(mx - mw / 2, y0 - mh * 0.45, mw, mh * 0.12);
+    // cleat
+    const cx2 = W * 0.78; x.fillStyle = '#9aa2ac'; x.fillRect(cx2 - hh * 0.04, y0 - hh * 0.08, hh * 0.08, hh * 0.08); x.beginPath(); x.ellipse(cx2, y0 - hh * 0.1, hh * 0.2, hh * 0.05, 0, 0, 7); x.fill();
+    // tooth dents (where he bit metal)
+    for (const dx of dents) { x.fillStyle = 'rgba(30,30,40,0.6)'; for (let k = 0; k < 3; k++) { x.beginPath(); x.ellipse(dx * W + (k - 1) * hh * 0.07, y0 - (Math.abs(dx - 0.5) < 0.1 ? mh * 0.7 : hh * 0.06), hh * 0.025, hh * 0.04, 0, 0, 7); x.fill(); } }
+  }
+  ctx.drawImage(S, 0, top - H * 0.1 + bob);
+  // flying teeth
+  const TF = BG.teethFly || []; for (const f of TF) { f.t += dt; f.vy += L.cell * 40 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.r += f.vr * dt;
+    ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.r); const z = L.cell * 0.32; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#6a6a6a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-z * 0.5, -z * 0.5); ctx.lineTo(z * 0.5, -z * 0.5); ctx.lineTo(0, z); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  BG.teethFly = TF.filter((f) => f.t < 2.5 && f.y < H + 40);
 }
 // board overlays for the mid-boss hazards
 function drawMiniFX(bx, by, c, bw) {
@@ -3375,7 +3491,7 @@ const MINI = {
     taunts: ['chill', 'stoked', 'loose'], banner: ['SURFER BOSS!', "SANTA MONICA'S SUNNY THE SURFER"], warn: "SURF'S UP!", win: ['WIPEOUT!', '+$5,000 SURF BONUS!'],
     twist: { text: 'BOSS! Pop matches to wipe him out! Waves nudge, beach balls drop.', icon: 2 } },
   gator: { stage: 5, hp: 240, bonus: 10000, bg: 15, track: 12, name: 'GAZZA THE GATOR', place: 'THE BILLABONG', c1: '#8dff5a', c2: '#ffd23d', bar: ['#2f9e3a', '#6fdc4a', '#d8ff9a'], per: 22,
-    taunts: ['chuckle', 'crikey', 'gday'], banner: ['GATOR BOSS!', 'GAZZA THE GATOR OF THE BILLABONG'], warn: 'TAIL SPLASH!', win: ['CROC-BLOCKED!', '+$10,000 GATOR BONUS!'],
+    taunts: ['tasty', 'crikey', 'tasty2'], banner: ['GATOR BOSS!', 'GAZZA IS CHASING YOUR BOAT!'], warn: 'TAIL SPLASH!', win: ['CROC-BLOCKED!', '+$10,000 GATOR BONUS!'],
     twist: { text: 'BOSS! Pop matches to send him packing! His tail splashes murky blocks.', icon: 4 } },
 };
 const MINI_AT = { 2: 'surfer', 5: 'gator' };
@@ -3399,10 +3515,14 @@ function bossTalk(key, delay) {
 }
 function miniLaugh(why) {
   const b = g.boss, MB = MINI[b.kind]; if (b.hp <= 0 || state !== 'play') return false;
-  if (g.time - b.lastLaugh < 7 || b.ouch > 0 || (b.talk && g.time - b.talk.t0 < b.talk.dur) || (b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup)) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
+  if (g.time - b.lastLaugh < 7 || b.ouch > 0 || (b.talk && g.time - b.talk.t0 < b.talk.dur) || (b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup) || (b.lunge && g.time - b.lunge.t0 < LUNGE.dur + 0.4)) { if (why === 'idle') b.nextLaugh = g.time + 2; return false; }
   const [t0, big, t2] = MB.taunts; // the big one for hazards / top-outs, otherwise alternate the other two (never the same idle one twice)
   const kind = why === 'hazard' || why === 'danger' || why === 'test' ? big : (b.lv === t0 ? t2 : t0);
   b.lv = kind; b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laughs++; b.why[why] = (b.why[why] || 0) + 1; b.kinds[kind] = (b.kinds[kind] || 0) + 1;
+  if (b.kind === 'gator') { // v21: every taunt is a lunge at the boat; he says it as he chomps
+    gatorLunge(b); b.nextLunge = g.time + rand(6, 8); b.laugh = LUNGE.chomp + 0.08 + bossLineSpec(b.kind, kind).dur; bossTalk(kind, LUNGE.chomp + 0.08);
+    setTimeout(() => { if (isMini() && g.boss === b) floatText(BOSS_LINES[b.kind][kind].text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.55, 1.4); }, 700); return true;
+  }
   b.laugh = bossLineSpec(b.kind, kind).dur; bossTalk(kind);
   floatText(BOSS_LINES[b.kind][kind].text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.55, 1.4);
   return true;
@@ -3414,6 +3534,11 @@ function miniHit(b, d, q) {
     const wd = 0.3 + bossLineSpec(b.kind, 'defeat').dur + 0.1; sfx.womp(wd); b.womps = (b.womps || 0) + 1; b.wompAt = g.time + wd; b.crashes = (b.crashes || 0) + 1;
     shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
+  } else if (b.hp <= 0 && b.kind === 'gator') { // v21: one last greedy bite on the outboard - there go the rest of his teeth
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; gatorLunge(b, { hard: true, fin: true, x: 0.5, what: 'motor' });
+    bossTalk('defeat', LUNGE.chomp + 0.45); setTimeout(() => { if (g.boss === b) sfx.miniDefeat(b.kind); }, 1000 * (LUNGE.chomp + 0.45 + bossLineSpec(b.kind, 'defeat').dur + 0.1));
+    shake(0.3, 6); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
+    setTimeout(() => { if (g.boss === b) floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.55, 2.6); }, 900);
   } else if (b.hp <= 0) {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat'); sfx.miniDefeat(b.kind);
     shake(0.45, 10); flashA = 0.4; hurtA = 0.3; showBanner(MB.win[0], MB.win[1], '#ffd23d');
@@ -3424,6 +3549,10 @@ function miniHit(b, d, q) {
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q, 0.3); b.ouch = b.talk.dur + 0.3; b.ouchQ = q;
     shake(0.25, 4 + q * 2); hurtA = 0.12 + q * 0.04; vib(30 + q * 15);
     setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#5ee7ff', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.6); }, 300);
+  } else if (q && b.kind === 'gator') { // v21: he chomps something hard and a tooth snaps off
+    const ln = BOSS_LINES[b.kind]['ouch' + q], H2 = STERN_HARD[q - 1]; gatorLunge(b, { hard: true, q, x: H2.x, what: H2.what }); b.nextLunge = g.time + 6;
+    b.laugh = 0; b.barShake = 0.8; bossTalk('ouch' + q, LUNGE.chomp + 0.12); b.ouch = b.talk.dur + LUNGE.chomp + 0.12; b.ouchQ = q; b.ouchAt = g.time + LUNGE.chomp; hurtA = 0.12 + q * 0.04;
+    setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.6 : 0.95), 1.6); }, 700);
   } else if (q) {
     const ln = BOSS_LINES[b.kind]['ouch' + q];
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
@@ -3816,7 +3945,7 @@ function applyGlitch() {
 }
 function updateTwists(dt) {
   g.twistT += dt;
-  if (isMini()) { miniTwist(dt); return; } // v16 mid-boss replaces the stage twist
+  if (isMini()) { gatorChase(dt); miniTwist(dt); return; } // v16 mid-boss replaces the stage twist
   if (g.stage === 2 && g.twistT > 30) { g.twistT = 0; riseRow('vine'); return; }
   if (g.stage === 3) {
     const PER = 20;
@@ -3926,7 +4055,7 @@ function updateGame(dt) {
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
   if (g.handoff) updateHandoff();
-  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
+  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : g.boss.kind === 'gator' ? 5.2 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
   updateTwists(dt);
@@ -3973,9 +4102,9 @@ const best = () => Math.max(scores.length ? scores[0].s : 0, g.score);
 const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L: LAVA, W: WEB,
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
-  figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
+  figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, chomp: gatorChomp, clank: metalClank, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
-  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
+  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
@@ -3986,7 +4115,7 @@ const dbg = {
   },
   setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
-  bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; } return bossLaugh(w || 'test'); },
+  bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; if (g.boss.lunge && g.boss.lunge.done) g.boss.lunge = null; } return bossLaugh(w || 'test'); },
   laughState() { const V = BG.vamp; return V ? { lv: V.lv, lt: V.lt, ld: V.ld } : null; },
   hitBoss(n) { if (g.boss) hitBoss(n); },
   musicTrack(i, bar) { if (!M.timer) return false; M.pending = null; pendBanner = null; M.track = i; M.step = (bar || 0) * 16; M.E.setTrack(i, A.ctx.currentTime); if (xmUsable(i)) xmPlay(i, A.ctx.currentTime + 0.05); return true; },
@@ -4307,7 +4436,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v21';
+const VERSION = 'v21.1';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
