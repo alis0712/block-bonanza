@@ -885,6 +885,32 @@ const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
 function bossLineSpec(kind, key) { const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
 function bossSay(c, t, dest, kind, key, v, nb) { const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
+// v19: Sunny's voice is a set of pre-rendered takes (2 per line, music/vox-surfer-<line>-<a|b>.b64 = base64 MP3), made offline
+// with the open Kokoro-82M TTS model (Apache-2.0 weights) from an original blend of its stock voices, then given an emotional
+// performance per line (pace, pitch, breaths, a strained shake on the wipeouts, an underwater gargle + bubbles on the drown).
+// The jaw follows the take's own loudness. Until the takes load (or if they fail), the formant synth above says the line.
+const VOX_V = 19, VOX = { surfer: { keys: ['intro', 'chill', 'stoked', 'loose', 'ouch1', 'ouch2', 'ouch3', 'defeat'], buf: {}, env: {}, next: {}, plays: 0, fail: 0, p: null } };
+function voxB64(t) { const s = atob(t.trim()), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; }
+function voxEnv(buf) { // ~60 fps loudness envelope -> jaw openness 0..1
+  const d = buf.getChannelData(0), hop = Math.round(buf.sampleRate / 60), n = Math.ceil(d.length / hop), e = new Float32Array(n);
+  for (let i = 0; i < n; i++) { let a = 0; const s0 = i * hop, s1 = Math.min(d.length, s0 + hop); for (let j = s0; j < s1; j++) a += d[j] * d[j]; e[i] = Math.sqrt(a / Math.max(1, s1 - s0)); }
+  const srt = Array.from(e).sort((x, y) => x - y), ref = srt[Math.floor(n * 0.95)] || 1;
+  for (let i = 0; i < n; i++) e[i] = Math.max(0, Math.min(1, (e[i] / ref - 0.08) * 1.15)); return e;
+}
+function voxLoad(kind) {
+  const V = VOX[kind]; if (!V || V.p || !A.ctx) return V ? V.p : null;
+  V.p = Promise.all(V.keys.flatMap((k) => ['a', 'b'].map((t) => fetch('music/vox-' + kind + '-' + k + '-' + t + '.b64?v=' + VOX_V)
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then((tx) => new Promise((res, rej) => A.ctx.decodeAudioData(voxB64(tx), res, rej)))
+    .then((b) => { V.buf[k + '-' + t] = b; V.env[k + '-' + t] = voxEnv(b); }).catch(() => { V.fail++; }))));
+  return V.p;
+}
+function voxPick(kind, key) { // alternate the two takes (random first), so a line never sounds the same twice in a row
+  const V = VOX[kind]; if (!V || !V.buf[key + '-a'] || !V.buf[key + '-b']) return null;
+  const t = V.next[key] || (Math.random() < 0.5 ? 'a' : 'b'); V.next[key] = t === 'a' ? 'b' : 'a'; return key + '-' + t;
+}
+function voxJaw(kind, take, lt) { const e = VOX[kind] && VOX[kind].env[take]; if (!e || lt < 0) return 0; return e[Math.min(e.length - 1, Math.floor(lt * 60))] || 0; }
+function voxPlay(kind, take, t, v) { const b = VOX[kind].buf[take], s = A.ctx.createBufferSource(), gn = A.ctx.createGain(); s.buffer = b; gn.gain.value = v || 0.78; s.connect(gn); gn.connect(A.sfx); s.start(t); VOX[kind].plays++; return t + b.duration; }
 // v18: a big wave crashing (rumble + white-water hiss + low thump), original synthesis
 function surfCrash(c, t, dest, nb, v) {
   v = v || 1; const n = c.createBufferSource(), lp = c.createBiquadFilter(), g1 = c.createGain(); n.buffer = nb; n.loop = true;
@@ -2951,7 +2977,7 @@ function miniAnim(kind, dt) {
   if (b) {
     const tk = b.talk, lt = tk ? g.time - tk.t0 : -1;
     F.key = tk ? tk.key : null; F.dur = tk ? tk.dur : 0; F.lt = tk && lt <= tk.dur ? lt : -1;
-    F.jaw = F.lt >= 0 ? specJaw(bossLineSpec(kind, F.key), F.lt) : 0;
+    F.take = tk ? tk.take : null; F.jaw = F.lt >= 0 ? (F.take ? voxJaw(kind, F.take, F.lt) : specJaw(bossLineSpec(kind, F.key), F.lt)) : 0;
     F.lk = F.lt >= 0 ? Math.max(0, Math.min(1, F.lt / 0.12, (F.dur - F.lt) / 0.25)) : 0;
     F.ok = b.ouch > 0 ? Math.min(1, b.ouch / 0.4) : 0; F.hit = b.hit || 0; F.dead = b.hp <= 0;
     F.dw = F.dead ? g.time - b.deadT : -1; F.ww = b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup ? g.time - b.wipe.t0 : -1;
@@ -3372,7 +3398,7 @@ const MINI_AT = { 2: 'surfer', 5: 'gator' };
 const isMini = () => !!(g.boss && g.boss.kind && g.boss.kind !== 'vamp');
 const effPop = () => g.popped - (g.bossPops || 0);
 function startMini(kind) {
-  const MB = MINI[kind];
+  const MB = MINI[kind]; voxLoad(kind);
   g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = []; g.wave = null; g.murk = null;
   g.boss = { kind, hp: MB.hp, max: MB.hp, disp: MB.hp, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0,
     lastLaugh: g.time, nextLaugh: g.time + rand(8, 11), laughs: 0, why: {}, cries: 0, kinds: {}, lv: null, talk: null, said: [], hz: 0, nudges: 0, drops: 0, murks: 0, deadT: 0, doneAt: 0, start: g.time };
@@ -3382,9 +3408,10 @@ function startMini(kind) {
 }
 // say one of the boss's lines (sound + the jaw/face animation follows it)
 function bossTalk(key, delay) {
-  const b = g.boss; if (!isMini()) return false; delay = delay || 0;
-  const o = bossLineSpec(b.kind, key); b.talk = { key, t0: g.time + delay, dur: o.dur }; b.said.push(key);
-  if (aok()) bossSay(A.ctx, anow() + 0.02 + delay, A.sfx, b.kind, key, 0, A.noise);
+  const b = g.boss; if (!isMini()) return false; delay = delay || 0; voxLoad(b.kind);
+  const tk = aok() ? voxPick(b.kind, key) : null, dur = tk ? VOX[b.kind].buf[tk].duration : bossLineSpec(b.kind, key).dur;
+  b.talk = { key, t0: g.time + delay, dur, take: tk }; b.said.push(key); b.takes = b.takes || []; b.takes.push(tk || 'synth');
+  if (aok()) { if (tk) voxPlay(b.kind, tk, anow() + 0.02 + delay); else bossSay(A.ctx, anow() + 0.02 + delay, A.sfx, b.kind, key, 0, A.noise); }
   return true;
 }
 function miniLaugh(why) {
@@ -3393,7 +3420,7 @@ function miniLaugh(why) {
   const [t0, big, t2] = MB.taunts; // the big one for hazards / top-outs, otherwise alternate the other two (never the same idle one twice)
   const kind = why === 'hazard' || why === 'danger' || why === 'test' ? big : (b.lv === t0 ? t2 : t0);
   b.lv = kind; b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laughs++; b.why[why] = (b.why[why] || 0) + 1; b.kinds[kind] = (b.kinds[kind] || 0) + 1;
-  b.laugh = bossLineSpec(b.kind, kind).dur; bossTalk(kind);
+  bossTalk(kind); b.laugh = b.talk.dur;
   floatText(BOSS_LINES[b.kind][kind].text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.55, 1.4);
   return true;
 }
@@ -3401,7 +3428,7 @@ function miniHit(b, d, q) {
   const MB = MINI[b.kind], c = L.cell;
   if (b.hp <= 0 && b.kind === 'surfer') { // v18: a final wave knocks him off, he sinks (silly), then the sad trombone
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.surfCrash(1.15); bossTalk('defeat', 0.3);
-    const wd = 0.3 + bossLineSpec(b.kind, 'defeat').dur + 0.1; sfx.womp(wd); b.womps = (b.womps || 0) + 1; b.wompAt = g.time + wd; b.crashes = (b.crashes || 0) + 1;
+    const wd = 0.3 + b.talk.dur + 0.1; sfx.womp(wd); b.womps = (b.womps || 0) + 1; b.wompAt = g.time + wd; b.crashes = (b.crashes || 0) + 1;
     shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0) {
@@ -3588,7 +3615,7 @@ function hardDrop() {
     if (d > 0) TRAILS.push({ x: a[0], y1: a[1], y2: b[1] + c, w: c, t: 0, color: cellColor(p.cols[i]) });
     if (!(cx in bottoms) || gy + cy > bottoms[cx].y) bottoms[cx] = { y: gy + cy, col: cellColor(p.cols[i]) };
   });
-  p.y = gy; addScore(d * 2);
+  p.y = gy; // v19: no cash for dropping (it made a non-matching drop, e.g. 2 same blocks touching, look like it scored); only pops pay
   for (const k in bottoms) {
     const [sx, sy] = cellXY(p.x + Number(k), bottoms[k].y + 1);
     for (let i = 0; i < 7; i++) part(sx + rand(0, c), sy, rand(-260, 260), rand(-380, -60), rand(0.3, 0.6), 3, i % 2 ? '#fff6b0' : bottoms[k].col, 1200, 1);
@@ -3718,6 +3745,7 @@ function beginPop(pop) {
   }
 }
 function enterStage(ns, queued) {
+  if (ns === 2 || ns === 3) voxLoad('surfer'); // v19: fetch Sunny's voice takes ahead of his fight
   g.stage = ns; M.stage = ns; setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
   g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 } : null;
   stageBanner(ns, queued);
@@ -3916,7 +3944,7 @@ function updateGame(dt) {
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
   if (g.handoff) updateHandoff();
-  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
+  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? Math.max(4.6, (g.boss.wompAt || 0) - g.boss.doneAt + 2.4) : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
   updateTwists(dt);
@@ -3927,7 +3955,7 @@ function updateGame(dt) {
   g.grav += dt;
   while (g.grav >= step) {
     g.grav -= step;
-    if (!grounded()) { g.piece.y++; if (g.soft) addScore(1); if (g.piece.y > g.lowY) { g.lowY = g.piece.y; g.resets = 0; g.lock = 0; } }
+    if (!grounded()) { g.piece.y++; if (g.piece.y > g.lowY) { g.lowY = g.piece.y; g.resets = 0; g.lock = 0; } }
     else { g.grav = 0; break; }
   }
   if (grounded()) { g.lock += dt; if (g.lock >= LOCK_T || g.resets >= 15) lockPiece(false); }
@@ -3963,9 +3991,10 @@ const best = () => Math.max(scores.length ? scores[0].s : 0, g.score);
 const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L: LAVA, W: WEB,
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
+  vox(kind) { const V = VOX[kind || 'surfer']; return { loaded: Object.keys(V.buf).length, fail: V.fail, plays: V.plays, durs: Object.fromEntries(Object.entries(V.buf).map(([k, b]) => [k, +b.duration.toFixed(3)])) }; }, voxLoad(kind) { return voxLoad(kind || 'surfer') ? true : false; },
   figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
-  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
+  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, takes: (b.takes || []).slice(), take: F ? F.take : null, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
@@ -4012,7 +4041,7 @@ function act(a) {
     case 'right': if (tryMove(1, 0)) sfx.move(); break;
     case 'rot': rotate(1); break;
     case 'ccw': rotate(-1); break;
-    case 'soft': if (tryMove(0, 1)) { addScore(1); g.grav = 0; sfx.move(); } break;
+    case 'soft': if (tryMove(0, 1)) { g.grav = 0; sfx.move(); } break;
     case 'hard': hardDrop(); break;
   }
 }
@@ -4297,7 +4326,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v18';
+const VERSION = 'v19';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
