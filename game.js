@@ -3021,6 +3021,16 @@ function drawBgFigure(kind, t, dt, yk) {
       for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * s * 0.28, 0, s * 0.24, s * 0.15, 0, 0, 7); ctx.fill(); ctx.stroke(); } ctx.beginPath(); ctx.moveTo(-s * 0.06, -s * 0.03); ctx.lineTo(s * 0.06, -s * 0.03); ctx.stroke(); ctx.restore(); }
     return [x0, y0, vw * sc, vh * sc];
   }
+  if (kind === 'surfer' && g.boss && g.boss.kind === 'surfer') { // v23 chase: he carves after your boat, closing in and dropping back; a spin trick on his taunts
+    const k = F.dw >= 0 || F.ww >= 0 ? 0.3 : 0.5 + 0.5 * Math.sin(t * 0.35), sc = 0.85 + 0.45 * k; F.close = k;
+    const cxF = L.bx + L.cell * COLS / 2 + Math.sin(t * 0.45) * L.cell * 2.2, cyF = H * yk + k * H * 0.12;
+    const surfing = !(F.dw >= 0 || F.ww >= 0), fc = t % 6.5, tk = F.taunt && F.lt >= 0 && F.lt < 1.0 ? F.lt / 1.0 : -1, fp = !surfing ? -1 : tk >= 0 ? tk : fc < 1.1 ? fc / 1.1 : -1; // v23: aerials off the wave lip every ~6.5 s and on every taunt
+    const kind2 = Math.floor(t / 6.5) % 3, spin = fp >= 0 ? (kind2 === 1 ? 1 : -1) * fp * Math.PI * 2 : 0, lift = fp >= 0 ? Math.sin(Math.PI * fp) * H * 0.09 : 0; F.spin = spin; F.flip = fp; F.flips = (F.flips || 0) + (fp >= 0 && (F.lastFp == null || F.lastFp < 0) ? 1 : 0); F.lastFp = fp;
+    ctx.save(); ctx.translate(cxF, cyF + 2 * s * sc - lift); if (kind2 === 2 && fp >= 0) ctx.scale(Math.cos(fp * Math.PI * 2), 1); else ctx.rotate(spin); /* backflip / frontflip / 360 spin */ ctx.drawImage(C, -ox * sc, -oy * sc - 2 * s * sc, vw * sc, vh * sc); ctx.restore();
+    // spray trail behind his board
+    ctx.fillStyle = 'rgba(255,236,225,0.55)'; for (let i = 0; i < 10; i++) { const ph = (t * 1.6 + i / 10) % 1, dir = Math.cos(t * 0.45) >= 0 ? -1 : 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cxF + dir * (0.8 + ph * 2.4) * s * sc, cyF + 3.1 * s * sc - ph * s * 0.6 + Math.sin(i * 2.1) * s * 0.15, (1 - ph) * s * 0.18 + 1, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+    return [cxF - ox * sc, cyF - oy * sc, vw * sc, vh * sc];
+  }
   const x0 = L.bx + L.cell * COLS / 2 - ox + (kind === 'surfer' ? Math.sin(t * 0.45) * L.cell * 2.2 : 0), y0 = H * yk - oy; /* v18: he carves back and forth */ ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
 }
 function drawMiniPortrait(kind, cx, cy, s) {
@@ -3254,12 +3264,14 @@ function bgPier(t) {
   ctx.globalCompositeOperation = 'lighter';
   for (let k = 0; k < 8; k++) { const y = hz + 6 + k * k * 2, w2 = R * (1.3 - k * 0.12) * (0.75 + 0.25 * Math.sin(t * 2.2 + k * 1.7)); if (w2 <= 0) continue; ctx.fillStyle = 'rgba(255,190,110,' + (0.22 - k * 0.02) + ')'; ctx.fillRect(sx - w2 / 2 + Math.sin(t * 1.3 + k) * 5, y, w2, 1.6); }
   ctx.globalCompositeOperation = 'source-over';
+  oceanWaves(t, hz, sy); // v23 simulated ocean
   // rolling surf lines (sunset-tinted)
   ctx.strokeStyle = 'rgba(255,215,195,0.55)'; ctx.lineWidth = 1.5;
   for (let k = 0; k < 5; k++) { const ph = ((t * 0.12 + k / 5) % 1), y = hz + (sy - hz) * (0.15 + 0.85 * ph); ctx.globalAlpha = Math.sin(Math.PI * ph) * 0.8; ctx.beginPath(); for (let px = 0; px <= W; px += 12) ctx.lineTo(px, y + Math.sin(px * 0.05 + t * 2 + k) * 2); ctx.stroke(); }
   ctx.globalAlpha = 1;
   // shore foam
   ctx.fillStyle = 'rgba(255,228,215,0.75)'; ctx.beginPath(); ctx.moveTo(0, sy + 2); for (let px = 0; px <= W; px += 10) ctx.lineTo(px, sy - 2 + Math.sin(px * 0.08 + t * 1.6) * 2.5 + Math.sin(t * 0.8) * 2); ctx.lineTo(W, sy + 6); ctx.lineTo(0, sy + 6); ctx.fill();
+  if (g.boss && g.boss.kind === 'surfer') chaseWater(t, hz, true); // v23: you're fleeing out to sea, Sunny surfs after you
   drawBgFigure('surfer', t, dt, 0.25);
   // seagulls
   BG.gulls = BG.gulls || [0, 1, 2, 3].map((i) => ({ x: Math.random() * W, y: rand(0.08, 0.3) * H, v: rand(18, 34) * (i % 2 ? 1 : -1), p: rand(0, 6) }));
@@ -3268,6 +3280,7 @@ function bgPier(t) {
   // beach umbrella + ball by the side column
   const ux = cx, uy = sy + (H - sy) * 0.35; ctx.fillStyle = '#5a3a2a'; ctx.fillRect(ux - 1.5, uy - 40, 3, 46);
   for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#ffffff' : '#ff4fa3'; ctx.beginPath(); ctx.moveTo(ux, uy - 46); ctx.arc(ux, uy - 40, 30, Math.PI + k * Math.PI / 6, Math.PI + (k + 1) * Math.PI / 6); ctx.closePath(); ctx.fill(); }
+  if (g.boss && g.boss.kind === 'surfer') chaseStern(t, dt);
 }
 // ---- 6b. THE BILLABONG (gator boss): outback dusk, red mesa, ghost gums, murky water with lily pads and fireflies
 function bgBillabong(t) {
@@ -3333,14 +3346,44 @@ function gatorChase(dt) {
   const busy = Lg && g.time - Lg.t0 < LUNGE.dur + 0.6;
   if (b.hp > 0 && state === 'play' && !busy && g.time >= (b.nextLunge || b.start + 6) && !(b.talk && g.time - b.talk.t0 < b.talk.dur) && b.ouch <= 0) { gatorLunge(b); b.nextLunge = g.time + rand(5, 7); }
 }
-function chaseWater(t, hz) { // streaming water streaks, lily pads and reeds -> motion away from the camera
+// v23 OCEAN: a simulated sea for the pier. Height = a sum of four directional wave trains (different wavelengths,
+// speeds and headings; Gerstner-style sharpened crests), modulated by slow swell sets that build and break. Drawn as
+// ~22 perspective rows from the horizon down (distant rows thin, small and dense), each band shaded by depth, crest
+// highlights catching the sunset where the slope faces the sun, and foam where the set is breaking. ~70 draw calls.
+const OCEAN_TRAINS = [[1.0, 0.0, 0.9, 1.0], [0.62, 0.35, 1.25, 0.6], [1.7, -0.5, 0.7, 0.45], [2.9, 0.2, 0.5, 0.25]]; // [k, heading, speed, amp]
+function oceanH(x, zz, t) {
+  let h = 0; for (const [k, hd, sp, a] of OCEAN_TRAINS) { const ph = k * (x * Math.cos(hd) + zz * Math.sin(hd) * 3 + zz) - sp * t * 2.2; const sn = Math.sin(ph); h += a * (sn - 0.35 * Math.cos(2 * ph)); } // sharpened crests
+  return h;
+}
+function oceanPaint(ctx, t, hz, y1) {
+  const N = 14, M = 22, rows = []; BG.oceanRows = N;
+  for (let i = 0; i <= N; i++) { const z = i / N, y = hz + (y1 - hz) * Math.pow(z, 1.7), zz = 1 / (0.06 + z), A = 1 + 13 * z * z, set = 0.65 + 0.35 * Math.sin(t * 0.35 - zz * 0.22), fx = 0.012 / (0.18 + z), pts = [];
+    for (let j = 0; j <= M; j++) { const x = (j / M) * W; pts.push([x, y - oceanH(x * fx * 6, zz, t) * A * set]); } rows.push({ y, z, A, set, pts }); }
+  ctx.save();
+  for (let i = 1; i <= N; i++) { const r0 = rows[i - 1], r1 = rows[i], z = r1.z;
+    const cA = [255 - 120 * z, 106 - 70 * z, 140 - 30 * z].map(Math.round); ctx.fillStyle = `rgba(${cA[0]},${cA[1]},${cA[2]},${0.55 + 0.35 * z})`; // depth shading: sunset pink far, deep violet near
+    ctx.beginPath(); ctx.moveTo(r0.pts[0][0], r0.pts[0][1]); for (const q of r0.pts) ctx.lineTo(q[0], q[1]); for (let j = r1.pts.length - 1; j >= 0; j--) ctx.lineTo(r1.pts[j][0], r1.pts[j][1]); ctx.fill();
+    // crest highlights where the slope faces the low sun
+    ctx.strokeStyle = `rgba(255,${190 + Math.round(40 * (1 - z))},120,${0.25 + 0.4 * (1 - z)})`; ctx.lineWidth = 0.6 + 1.6 * z; ctx.beginPath();
+    for (let j = 1; j < r1.pts.length; j++) { const a = r1.pts[j - 1], b = r1.pts[j]; if (b[1] - a[1] < -0.35 * r1.A * 0.2) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); } } ctx.stroke();
+    // foam on breaking crests (more when the swell set peaks)
+    ctx.fillStyle = `rgba(255,236,228,${0.35 + 0.45 * z})`; ctx.beginPath(); const thr = r1.y - r1.A * (1.25 - (r1.set - 0.65) * 1.6);
+    for (let j = 0; j < r1.pts.length; j++) { const q = r1.pts[j]; if (q[1] < thr) { const rr2 = 0.8 + 2.4 * z; ctx.rect(q[0] - rr2 * 2, q[1] - rr2 * 0.5, rr2 * 4, rr2); } } ctx.fill(); }
+  ctx.restore();
+}
+function oceanWaves(t, hz, y1) { // rendered at half resolution, refreshed ~24x a second (phones)
+  const k = 0.4, h2 = Math.ceil((y1 - hz + 20) * k) + 2; let O = BG.ocean; if (!O || O.width !== Math.ceil(W * k) || O.height !== h2) { O = BG.ocean = document.createElement('canvas'); O.width = Math.ceil(W * k); O.height = h2; O.t = -1; O.x = O.getContext('2d'); }
+  if (t - O.t >= 1 / 20 || t < O.t) { O.t = t; O.x.setTransform(1, 0, 0, 1, 0, 0); O.x.clearRect(0, 0, O.width, O.height); O.x.setTransform(k, 0, 0, k, 0, -(hz - 10) * k); oceanPaint(O.x, t, hz, y1); }
+  ctx.drawImage(O, 0, hz - 10, W, O.height / k);
+}
+function chaseWater(t, hz, ocean) { // streaming water streaks, lily pads and reeds -> motion away from the camera
   const sp = 0.32; ctx.save();
-  for (let i = 0; i < 26; i++) { const ph = (t * sp + hash(i * 2.3)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.15 + d * d * 1.2, x = W / 2 + (hash(i * 5.1) - 0.5) * W * 1.6 * sc;
-    ctx.globalAlpha = Math.min(1, ph * 4) * 0.35; ctx.fillStyle = '#dff8c8'; ctx.fillRect(x - 18 * sc, y, 36 * sc, Math.max(1, 2 * sc)); }
-  for (let i = 0; i < 7; i++) { const ph = (t * sp * 0.8 + hash(i * 7.7)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.12 + d * d * 1.3, side = i % 2 ? 1 : -1, x = W / 2 + side * (0.18 + hash(i * 3.3) * 0.35) * W * 1.4 * sc + side * W * 0.05;
+  for (let i = 0; i < (ocean ? 12 : 26); i++) { const ph = (t * sp + hash(i * 2.3)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.15 + d * d * 1.2, x = W / 2 + (hash(i * 5.1) - 0.5) * W * 1.6 * sc;
+    ctx.globalAlpha = Math.min(1, ph * 4) * 0.35; ctx.fillStyle = ocean ? '#ffe0d8' : '#dff8c8'; ctx.fillRect(x - 18 * sc, y, 36 * sc, Math.max(1, 2 * sc)); }
+  if (!ocean) for (let i = 0; i < 7; i++) { const ph = (t * sp * 0.8 + hash(i * 7.7)) % 1, d = 1 - ph, y = hz + (H - hz) * d * d, sc = 0.12 + d * d * 1.3, side = i % 2 ? 1 : -1, x = W / 2 + side * (0.18 + hash(i * 3.3) * 0.35) * W * 1.4 * sc + side * W * 0.05;
     ctx.globalAlpha = Math.min(1, ph * 5); ctx.fillStyle = '#3a7a32'; ctx.beginPath(); ctx.ellipse(x, y, 14 * sc, 5.5 * sc, 0, 0.3, Math.PI * 2 - 0.1); ctx.lineTo(x, y); ctx.fill();
     if (i % 3 === 0) { ctx.fillStyle = '#ffb3d0'; ctx.beginPath(); ctx.arc(x + 3 * sc, y - 2 * sc, 3 * sc, 0, 7); ctx.fill(); } }
-  for (let i = 0; i < 12; i++) { const ph = (t * sp * 1.1 + hash(i * 4.9)) % 1, d = 1 - ph, y = hz + (H - hz) * 0.5 * d * d + 4, side = i % 2 ? 1 : -1, x = W / 2 + side * (W * 0.45 + d * d * W * 0.5), h = (8 + hash(i) * 10) * (0.3 + d * 2.2);
+  if (!ocean) for (let i = 0; i < 12; i++) { const ph = (t * sp * 1.1 + hash(i * 4.9)) % 1, d = 1 - ph, y = hz + (H - hz) * 0.5 * d * d + 4, side = i % 2 ? 1 : -1, x = W / 2 + side * (W * 0.45 + d * d * W * 0.5), h = (8 + hash(i) * 10) * (0.3 + d * 2.2);
     ctx.globalAlpha = Math.min(1, ph * 4) * 0.9; ctx.strokeStyle = '#1e3a18'; ctx.lineWidth = 1 + d * 2; for (let j = -2; j <= 2; j++) { ctx.beginPath(); ctx.moveTo(x + j * 3 * (0.4 + d), y); ctx.quadraticCurveTo(x + j * 4 * (0.4 + d), y - h * 0.6, x + j * 6 * (0.4 + d), y - h); ctx.stroke(); } }
   // wake: two foam lines from the stern spreading behind the boat
   ctx.globalAlpha = 0.45; ctx.strokeStyle = '#eaffdf'; ctx.lineWidth = 2; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -t * 60;
@@ -3348,7 +3391,7 @@ function chaseWater(t, hz) { // streaming water streaks, lily pads and reeds -> 
   ctx.setLineDash([]); ctx.restore();
 }
 function chaseStern(t, dt) { // the back of your boat, bitten up; anchor, outboard and a cleat; flying teeth on top
-  const b = g.boss && g.boss.kind === 'gator' ? g.boss : null; if (!b && !(BG.teethFly && BG.teethFly.length)) return;
+  const b = g.boss && g.boss.kind === 'gator' ? g.boss : null; if (!b && !(g.boss && g.boss.kind === 'surfer') && !(BG.teethFly && BG.teethFly.length)) return;
   const bites = b ? b.bites || [] : [], dents = b ? b.dents || [] : [], top = H * STERN_Y, bob = Math.sin(t * 2.4) * H * 0.004, key = W + 'x' + H + ':' + bites.length + ':' + dents.length + ':' + (bites.length ? bites[bites.length - 1].x : 0);
   let S = BG.sternCv; if (!S || BG.sternKey !== key) {
     S = BG.sternCv = BG.sternCv || document.createElement('canvas'); S.width = Math.ceil(W); S.height = Math.ceil(H - top + H * 0.1); BG.sternKey = key; const x = S.getContext('2d'), y0 = H * 0.1, hh = S.height - y0; x.clearRect(0, 0, S.width, S.height);
@@ -3503,7 +3546,7 @@ const BOSS_HP = 340, WIN_BONUS = 25000;
 // then the next stage starts. Pops made during a mid-boss don't count towards stage/level progress (no skipped stages).
 const MINI = {
   surfer: { stage: 2, hp: 150, bonus: 5000, bg: 14, track: 11, name: 'SUNNY THE SURFER', place: 'SANTA MONICA PIER', c1: '#ffb347', c2: '#5ee7ff', bar: ['#ff7a1f', '#ffb347', '#ffe9a0'], per: 20,
-    taunts: ['chill', 'stoked', 'loose'], banner: ['SURFER BOSS!', "SANTA MONICA'S SUNNY THE SURFER"], warn: "SURF'S UP!", win: ['WIPEOUT!', '+$5,000 SURF BONUS!'],
+    taunts: ['chill', 'stoked', 'loose'], banner: ['SURFER BOSS!', 'SUNNY IS SURFING AFTER YOU!'], warn: "SURF'S UP!", win: ['WIPEOUT!', '+$5,000 SURF BONUS!'],
     twist: { text: 'BOSS! Pop matches to wipe him out! Waves nudge, beach balls drop.', icon: 2 } },
   gator: { stage: 5, hp: 240, bonus: 10000, bg: 15, track: 12, name: 'GAZZA THE GATOR', place: 'THE BILLABONG', c1: '#8dff5a', c2: '#ffd23d', bar: ['#2f9e3a', '#6fdc4a', '#d8ff9a'], per: 22,
     taunts: ['tasty', 'crikey', 'tasty2'], banner: ['GATOR BOSS!', 'GAZZA IS CHASING YOUR BOAT!'], warn: 'TAIL SPLASH!', win: ['CROC-BLOCKED!', '+$10,000 GATOR BONUS!'],
@@ -4119,7 +4162,7 @@ const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L
 const dbg = {
   figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, chomp: gatorChomp, clank: metalClank, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
-  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, emerge: F ? F.emerge || 0 : 0, tell: F ? F.tell || 0 : 0, boot: !!BG.boot, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
+  miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, emerge: F ? F.emerge || 0 : 0, close: F ? F.close || 0 : 0, spin: F ? F.spin || 0 : 0, flip: F ? (F.flip == null ? -1 : F.flip) : -1, flips: F ? F.flips || 0 : 0, oceanRows: BG.oceanRows || 0, tell: F ? F.tell || 0 : 0, boot: !!BG.boot, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
@@ -4451,7 +4494,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v22';
+const VERSION = 'v23';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
