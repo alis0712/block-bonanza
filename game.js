@@ -3028,9 +3028,9 @@ function drawBgFigure(kind, t, dt, yk) {
     const kind2 = Math.floor(t / 6.5) % 3; let spin = fp >= 0 ? (kind2 === 1 ? 1 : -1) * fp * Math.PI * 2 : 0, lift = fp >= 0 ? Math.sin(Math.PI * fp) * H * 0.13 : 0;
     if (fp < 0 && !surfing && F.spinS) { const r2 = Math.round(F.spinS / (Math.PI * 2)) * Math.PI * 2; spin = r2 + (F.spinS - r2) * 0.8; lift = (F.liftS || 0) * 0.8; } // v24: a wave mid-flip eases him out of the trick instead of snapping
     F.spinS = Math.abs(spin) > 0.01 ? spin : 0; F.liftS = lift > 0.5 ? lift : 0; F.spin = spin; F.flip = fp; F.flips = (F.flips || 0) + (fp >= 0 && (F.lastFp == null || F.lastFp < 0) ? 1 : 0); F.lastFp = fp;
-    ctx.save(); ctx.translate(cxF, cyF + 2 * s * sc - lift); if (kind2 === 2 && fp >= 0) ctx.scale(Math.cos(fp * Math.PI * 2), 1); else ctx.rotate(spin); /* backflip / frontflip / 360 spin */ ctx.drawImage(C, -ox * sc, -oy * sc - 2 * s * sc, vw * sc, vh * sc); ctx.restore();
+    ctx.save(); ctx.translate(cxF, cyF + 2 * s * sc - lift); const fk = fp >= 0 ? kind2 : (F.fkS == null ? 1 : F.fkS); if (fp >= 0) F.fkS = kind2; const cs2 = Math.cos(spin), sg = (cs2 < 0 ? -1 : 1) * Math.max(0.06, Math.abs(cs2)); /* v25 head-on: backflip = he flips over toward/away from you (vertical squash through upside-down), rodeo roll = in-plane barrel roll, 360 = horizontal turn */ if (fk === 0) ctx.scale(1, sg); else if (fk === 2) ctx.scale(sg, 1); else ctx.rotate(spin); ctx.drawImage(C, -ox * sc, -oy * sc - 2 * s * sc, vw * sc, vh * sc); ctx.restore();
     // spray trail behind his board
-    ctx.fillStyle = 'rgba(255,236,225,0.55)'; for (let i = 0; i < 10; i++) { const ph = (t * 1.6 + i / 10) % 1, dir = Math.cos(t * 0.45) >= 0 ? -1 : 1; ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cxF + dir * (0.8 + ph * 2.4) * s * sc, cyF + 3.1 * s * sc - ph * s * 0.6 + Math.sin(i * 2.1) * s * 0.15, (1 - ph) * s * 0.18 + 1, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,236,225,0.55)'; for (let i = 0; i < 10; i++) { const ph = (t * 1.6 + i / 10) % 1, dir = i % 2 ? -1 : 1; /* v25: wake fans off both rails */ ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.arc(cxF + dir * (0.95 + ph * 1.8) * s * sc, cyF + 3.1 * s * sc - ph * s * 0.6 + Math.sin(i * 2.1) * s * 0.15, (1 - ph) * s * 0.18 + 1, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
     return [cxF - ox * sc, cyF - oy * sc, vw * sc, vh * sc];
   }
   const x0 = L.bx + L.cell * COLS / 2 - ox + (kind === 'surfer' ? Math.sin(t * 0.45) * L.cell * 2.2 : 0), y0 = H * yk - oy; /* v18: he carves back and forth */ ctx.drawImage(C, x0, y0, vw, vh); return [x0, y0, vw, vh];
@@ -3060,6 +3060,19 @@ function drawSurfboard(X, s, x, y, rot) {
   X.fillStyle = '#19c3c9'; X.beginPath(); X.moveTo(s * 1.0, s * 0.12); X.lineTo(s * 1.25, s * 0.42); X.lineTo(s * 1.3, s * 0.12); X.fill(); // fin
   X.strokeStyle = 'rgba(80,40,20,0.5)'; X.lineWidth = Math.max(1, s * 0.03); X.beginPath(); X.ellipse(0, 0, s * 1.55, s * 0.17, 0, 0, 7); X.stroke(); X.restore();
 }
+// v25: the board seen head-on, nose pointing at the camera (the boat's stern): a foreshortened teardrop, the near nose
+// wide and low, the far tail narrow and high, pink stringer down the middle, teal rails, the fin tip peeking over the tail
+function drawBoardFront(X, s, x, y, rot) {
+  X.save(); X.translate(x, y); X.rotate(rot);
+  X.fillStyle = 'rgba(20,40,60,0.28)'; X.beginPath(); X.ellipse(0, s * 0.5, s * 0.66, s * 0.12, 0, 0, 7); X.fill(); // shadow on the water
+  X.fillStyle = '#19c3c9'; X.beginPath(); X.moveTo(-s * 0.05, -s * 0.62); X.lineTo(0, -s * 0.84); X.lineTo(s * 0.05, -s * 0.62); X.fill(); // fin over the tail
+  const outline = () => { X.beginPath(); X.moveTo(0, -s * 0.6); X.bezierCurveTo(s * 0.34, -s * 0.58, s * 0.66, s * 0.0, s * 0.62, s * 0.3); X.bezierCurveTo(s * 0.58, s * 0.52, s * 0.3, s * 0.56, 0, s * 0.56); X.bezierCurveTo(-s * 0.3, s * 0.56, -s * 0.58, s * 0.52, -s * 0.62, s * 0.3); X.bezierCurveTo(-s * 0.66, s * 0.0, -s * 0.34, -s * 0.58, 0, -s * 0.6); X.closePath(); };
+  X.fillStyle = '#fff6e0'; outline(); X.fill();
+  X.fillStyle = '#e8d6b0'; X.beginPath(); X.ellipse(0, s * 0.47, s * 0.5, s * 0.08, 0, 0, Math.PI); X.fill(); // nose rocker (underside)
+  X.fillStyle = '#ff4fa3'; X.beginPath(); X.moveTo(-s * 0.015, -s * 0.58); X.lineTo(s * 0.015, -s * 0.58); X.lineTo(s * 0.05, s * 0.52); X.lineTo(-s * 0.05, s * 0.52); X.fill(); // stringer (widens toward the camera)
+  X.strokeStyle = '#19c3c9'; X.lineWidth = Math.max(1, s * 0.04); X.beginPath(); X.moveTo(-s * 0.12, -s * 0.5); X.quadraticCurveTo(-s * 0.52, s * 0.05, -s * 0.44, s * 0.42); X.moveTo(s * 0.12, -s * 0.5); X.quadraticCurveTo(s * 0.52, s * 0.05, s * 0.44, s * 0.42); X.stroke();
+  X.strokeStyle = 'rgba(80,40,20,0.5)'; X.lineWidth = Math.max(1, s * 0.03); outline(); X.stroke(); X.restore();
+}
 function paintSurfer(X, t, F, s, cx, cy, full) {
   const lk = F.lk, jaw = F.jaw, ok = F.ok, hurt = Math.max(ok, F.hit > 0 ? F.hit / 0.9 * 0.5 : 0), gone = F.gone;
   const [pose, p] = surferPose(F), ease = (u) => u * u * (3 - 2 * u), dw = F.dw == null ? -1 : F.dw;
@@ -3070,39 +3083,41 @@ function paintSurfer(X, t, F, s, cx, cy, full) {
   if (pose === 'surf') { by += crouch * s * 0.22; rot = carve * 0.16; }
   else if (pose === 'crash') { rot = carve * 0.16 + p * 0.5; by += p * s * 0.3; bx += -p * s * 0.2; }
   else if (pose === 'tumble') { rot = 0.5 + ease(p) * Math.PI * 2.4; by += -Math.sin(p * Math.PI) * s * 1.3 + p * s * 0.9; bx += -s * 0.2 - p * s * 0.6; board = [s * (0.4 + p * 1.2), s * 3.3 - Math.sin(p * Math.PI) * s * 2.4, p * Math.PI * 3]; }
-  else if (pose === 'paddle') { rot = -1.5; by += s * 0.62 + Math.sin(t * 5) * s * 0.04; bx += ease(p) * s * 0.4; board = [bx - s * 1.0, s * 3.33, -0.04 + Math.sin(t * 5) * 0.03]; }
-  else if (pose === 'popup') { bx += s * 0.4 * (1 - ease(p)); rot = -1.5 * (1 - ease(p)); by += s * 0.62 * (1 - ease(p)) + Math.sin(p * Math.PI) * s * -0.35; }
+  else if (pose === 'paddle') { by += s * 1.75 + Math.sin(t * 5) * s * 0.04; rot = Math.sin(t * 3.5) * 0.06; } // v25: prone, paddling straight at the camera (head + shoulders over the nose)
+  else if (pose === 'popup') { by += s * 1.75 * (1 - ease(p)) + Math.sin(p * Math.PI) * s * -0.35; }
   else if (pose === 'sink') { rot = 0.3 * Math.sin(t * 5) * (1 - p); by += s * (0.9 + ease(p) * 3.9); bx += -s * 0.6; board = [s * (0.9 + p * 0.9), s * 3.33 + Math.sin(t * 2.2) * s * 0.06, 0.12 * Math.sin(t * 1.7)]; }
   X.save(); X.globalAlpha = 1 - gone; X.translate(cx, cy);
   if (full) { X.globalCompositeOperation = 'lighter'; glowX(X, 'rgba(255,170,80,1)', 0, s * 1.6, s * 2.8, 0.18 + lk * 0.12 + hurt * 0.2); X.globalCompositeOperation = 'source-over'; }
   // spray trail off the tail of the board while he rides
   if (full && (pose === 'surf' || pose === 'popup')) {
-    const dir = Math.cos(t * 0.9) >= 0 ? 1 : -1;
-    for (let k = 0; k < 10; k++) { const u = (t * 2.2 + k / 10) % 1; X.fillStyle = 'rgba(255,255,255,' + (0.75 * (1 - u)).toFixed(3) + ')'; X.beginPath(); X.arc(-dir * s * (1.3 + u * 1.5) + Math.sin(k * 7.3) * s * 0.15, s * 3.2 - Math.sin(u * Math.PI) * s * (0.6 + 0.3 * Math.sin(k * 3.1)), s * (0.07 + 0.08 * (1 - u)), 0, 7); X.fill(); }
+    const lean = Math.sin(t * 0.9); // v25 head-on: bow spray fans out off both rails, heavier on the side he leans into
+    for (let k = 0; k < 12; k++) { const u = (t * 2.2 + k / 12) % 1, sd = k % 2 ? 1 : -1, w2 = 1 + 0.6 * sd * lean; X.fillStyle = 'rgba(255,255,255,' + (0.5 * (1 - u)).toFixed(3) + ')'; X.beginPath(); X.arc(sd * s * (0.8 + u * 1.3 * w2) + Math.sin(k * 7.3) * s * 0.1, s * 3.75 - Math.sin(u * Math.PI) * s * (0.55 + 0.3 * Math.sin(k * 3.1)) * w2, s * (0.07 + 0.08 * (1 - u)), 0, 7); X.fill(); }
   }
-  if (board) drawSurfboard(X, s, board[0], board[1], board[2]);
+  if (board) drawBoardFront(X, s, board[0], board[1], board[2]);
+  const prone = pose === 'paddle' || (pose === 'popup' && p < 0.6); // v25: lying on the board, the near nose hides his legs
+  if (prone) { X.save(); X.beginPath(); X.rect(-s * 6, -s * 6, s * 12, s * 9.3); X.clip(); }
   X.save(); X.translate(bx, by + s * 2.6); X.rotate(rot); X.translate(0, -s * 2.6);
-  if (!board) drawSurfboard(X, s, 0, s * 3.33, 0);
+  if (!board && !prone) drawBoardFront(X, s, 0, s * 3.33, 0);
   const skin = hurt > 0.3 ? '#ff9e80' : '#e7a467';
   // legs in a surf crouch (feet planted on the board), board shorts
   const kc = pose === 'surf' ? crouch : pose === 'popup' ? 1 : 0.6;
   X.lineCap = 'round'; X.lineJoin = 'round'; X.strokeStyle = skin; X.lineWidth = s * 0.24;
-  // v24 side-on stance: feet across the board (front foot to the nose, back foot to the tail), both knees bent toward the nose
-  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.22, s * 2.8); X.lineTo(sd * s * 0.68 + s * 0.22 * kc, s * (3.0 - 0.14 * kc)); X.lineTo(sd * s * 1.12, s * 3.2); X.stroke(); }
-  X.save(); X.scale(0.62, 1); // v24: torso + shorts seen side-on (narrow), the head stays turned to the camera
+  // v25 head-on stance: facing the camera, feet planted either side of the stringer, knees bent and bowed out
+  for (const sd of [-1, 1]) { X.beginPath(); X.moveTo(sd * s * 0.36, s * 2.8); X.lineTo(sd * s * (0.56 + 0.16 * kc), s * (3.02 - 0.08 * kc)); X.lineTo(sd * s * 0.34, s * 3.28); X.stroke(); X.fillStyle = skin; X.beginPath(); X.ellipse(sd * s * 0.34, s * 3.3, s * 0.13, s * 0.07, 0, 0, 7); X.fill(); }
+  X.save();
   X.fillStyle = '#ff4fa3'; X.beginPath(); X.moveTo(-s * 0.84, s * 2.35); X.lineTo(s * 0.84, s * 2.35); X.lineTo(s * 0.7, s * 2.95); X.lineTo(s * 0.05, s * 2.95); X.lineTo(0, s * 2.7); X.lineTo(-s * 0.05, s * 2.95); X.lineTo(-s * 0.7, s * 2.95); X.fill();
   X.fillStyle = '#ffb347'; X.fillRect(-s * 0.8, s * 2.6, s * 0.12, s * 0.3); X.fillRect(s * 0.68, s * 2.6, s * 0.12, s * 0.3);
   // torso in a teal tank top with a sunset stripe
   X.fillStyle = skin; X.beginPath(); X.moveTo(-s * 0.95, s * 1.1); X.quadraticCurveTo(-s * 1.0, s * 0.62, -s * 0.35, s * 0.55); X.lineTo(s * 0.35, s * 0.55); X.quadraticCurveTo(s * 1.0, s * 0.62, s * 0.95, s * 1.1); X.lineTo(s * 0.8, s * 1.6); X.lineTo(-s * 0.8, s * 1.6); X.fill();
   X.fillStyle = '#17b8be'; X.beginPath(); X.moveTo(-s * 0.62, s * 0.62); X.lineTo(-s * 0.42, s * 0.62); X.quadraticCurveTo(0, s * 1.35, s * 0.42, s * 0.62); X.lineTo(s * 0.62, s * 0.62); X.quadraticCurveTo(s * 0.86, s * 1.3, s * 0.84, s * 2.45); X.lineTo(-s * 0.84, s * 2.45); X.quadraticCurveTo(-s * 0.86, s * 1.3, -s * 0.62, s * 0.62); X.fill();
   X.fillStyle = '#ff4fa3'; X.fillRect(-s * 0.84, s * 1.9, s * 1.68, s * 0.16); X.fillStyle = '#ffb347'; X.fillRect(-s * 0.84, s * 2.06, s * 1.68, s * 0.1);
-  X.restore(); // side-on torso
+  X.restore();
   // arms: out for balance while riding (left one throws a shaka on a taunt), flailing in a wipeout, paddling when prone
   X.strokeStyle = skin; X.lineWidth = s * 0.26; X.fillStyle = skin;
-  const arm = (sx, e, h) => { X.beginPath(); X.moveTo(sx * s * 0.5, s * 0.8); X.lineTo(e[0] * s, e[1] * s); X.lineTo(h[0] * s, h[1] * s); X.stroke(); X.beginPath(); X.arc(h[0] * s, h[1] * s, s * 0.15, 0, 7); X.fill(); };
+  const arm = (sx, e, h) => { X.beginPath(); X.moveTo(sx * s * 0.82, s * 0.8); X.lineTo(e[0] * s, e[1] * s); X.lineTo(h[0] * s, h[1] * s); X.stroke(); X.beginPath(); X.arc(h[0] * s, h[1] * s, s * 0.15, 0, 7); X.fill(); };
   const up = F.taunt ? lk : 0;
   if (pose === 'crash' || pose === 'tumble' || pose === 'sink') { const wg = Math.sin(t * 26) * 0.15; arm(-1, [-1.25, 0.2], [-1.45 + wg, -0.55]); arm(1, [1.25, 0.2], [1.45 - wg, -0.55]); }
-  else if (pose === 'paddle') { for (const sd of [-1, 1]) { const a = t * 7 + (sd > 0 ? Math.PI : 0); arm(sd, [-0.9 * 1 + sd * 0.05, 0.9 + 0.5 * Math.cos(a)], [-1.55 - 0.5 * Math.abs(Math.sin(a)), 0.9 + 1.2 * Math.cos(a)]); } }
+  else if (pose === 'paddle' || (pose === 'popup' && p < 0.35)) { for (const sd of [-1, 1]) { const a = t * 7 + (sd > 0 ? Math.PI : 0); arm(sd, [sd * (1.05 + 0.1 * Math.sin(a)), 1.0 + 0.35 * Math.cos(a)], [sd * (0.85 + 0.2 * Math.sin(a)), 1.25 + 0.7 * Math.cos(a)]); } } // v25: crawl strokes toward the camera
   else {
     const sw = Math.sin(t * 2.3) * 0.15;
     arm(-1, [-1.45, 1.2 + sw * 0.5], [-2.05, 1.0 + sw]);
@@ -3140,9 +3155,10 @@ function paintSurfer(X, t, F, s, cx, cy, full) {
   } else { X.fillStyle = '#5a1a14'; X.beginPath(); X.moveTo(-s * 0.22, s * 0.26); X.quadraticCurveTo(0, s * 0.44, s * 0.22, s * 0.26); X.quadraticCurveTo(0, s * 0.33, -s * 0.22, s * 0.26); X.fill(); X.fillStyle = '#fff'; X.beginPath(); X.moveTo(-s * 0.17, s * 0.28); X.quadraticCurveTo(0, s * 0.35, s * 0.17, s * 0.28); X.quadraticCurveTo(0, s * 0.31, -s * 0.17, s * 0.28); X.fill(); }
   X.restore(); // head
   X.restore(); // body
+  if (prone) { X.restore(); drawBoardFront(X, s, bx, s * 3.33 + Math.sin(t * 5) * s * 0.03, Math.sin(t * 3.5) * 0.06); }
   if (full) {
-      const wy = s * 3.45; X.fillStyle = '#9a3a8a'; X.beginPath(); X.moveTo(-s * 3, wy + s * 0.5); for (let k = 0; k <= 12; k++) { const u = -3 + k * 0.5; X.lineTo(s * u, wy + Math.sin(t * 2.2 + k * 0.9) * s * 0.12 + (k % 2 ? s * 0.1 : 0)); } X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
-      X.fillStyle = 'rgba(255,255,255,0.92)'; for (let k = 0; k < 9; k++) { const u = -2.8 + k * 0.7; X.beginPath(); X.arc(s * u + Math.sin(t * 1.7 + k) * s * 0.06, wy + Math.sin(t * 2.2 + k * 1.2) * s * 0.1, s * (0.2 + 0.06 * Math.sin(t * 3 + k)), 0, 7); X.fill(); }
+      const wy = s * (pose === 'surf' || pose === 'popup' || pose === 'crash' ? 4.02 : 3.45), ride = wy > s * 3.5; /* v25: riding head-on, the deck sits above the water line and the nose cuts the foam */ X.fillStyle = '#9a3a8a'; X.beginPath(); X.moveTo(-s * 3, wy + s * 0.5); for (let k = 0; k <= 12; k++) { const u = -3 + k * 0.5; X.lineTo(s * u, wy + Math.sin(t * 2.2 + k * 0.9) * s * 0.12 + (k % 2 ? s * 0.1 : 0)); } X.lineTo(s * 3, s * 5); X.lineTo(-s * 3, s * 5); X.fill();
+      X.fillStyle = 'rgba(255,255,255,0.92)'; for (let k = 0; k < 9; k++) { const u = -2.8 + k * 0.7; if (ride && Math.abs(u) < 0.75) continue; /* v25: the nose parts the foam */ X.beginPath(); X.arc(s * u + Math.sin(t * 1.7 + k) * s * 0.06, wy + Math.sin(t * 2.2 + k * 1.2) * s * 0.1, s * (0.2 + 0.06 * Math.sin(t * 3 + k)), 0, 7); X.fill(); }
       X.fillStyle = 'rgba(255,255,255,0.5)'; X.fillRect(-s * 3, wy + s * 0.45, s * 6, s * 0.06);
     // bubbles while he sinks, then a hand waving bye-bye above the water
     if (pose === 'sink') {
@@ -4167,7 +4183,7 @@ const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L
 const dbg = {
   figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, chomp: gatorChomp, clank: metalClank, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
   startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
-  audio() { return A; }, ambKind() { return AMB.kind; }, // v24 hiss meter hooks
+  audio() { return A; }, ambKind() { return AMB.kind; }, paintSurfer(...a) { return paintSurfer(...a); }, // v24 hiss meter hooks, v25 pose sheet
   miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, emerge: F ? F.emerge || 0 : 0, close: F ? F.close || 0 : 0, spin: F ? F.spin || 0 : 0, flip: F ? (F.flip == null ? -1 : F.flip) : -1, flips: F ? F.flips || 0 : 0, oceanRows: BG.oceanRows || 0, tell: F ? F.tell || 0 : 0, boot: !!BG.boot, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
@@ -4500,7 +4516,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v24';
+const VERSION = 'v25';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
