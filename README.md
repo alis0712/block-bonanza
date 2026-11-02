@@ -22,12 +22,12 @@ With sound off, one tap goes straight to the menu. `?stage=N` links skip the sta
 
 ## How it plays
 Each falling piece is one of the 7 classic shapes, but every block has its own color
-(blue circle, yellow triangle, pink diamond, teal plus, plus orange star from stage 5, so colors stay readable for colorblind players).
-Rows never clear. After a piece lands, any group of **4 or more touching blocks of one color pops**.
-Blocks above fall down, and new matches set off **CHAIN x2, x3...** combos. Groups of 8 or more score a **MEGA POP!**
-Only pops pay (v19): two or three touching blocks of one color do nothing, and dropping a piece (soft or hard) no longer adds cash.
+(blue circle, yellow triangle, pink diamond, teal plus, plus orange star from stage 9, so colors stay readable for colorblind players). Cells and blocks are round bubbles (v28).
+Rows never clear. After a piece lands, **4 or more blocks of one color in a straight line pop**: across, up-and-down, or either diagonal, anywhere on the board (v28; before v28 any touching group of 4 popped). Rainbow blocks are wild inside a line.
+Blocks above fall down (and bounce as they land), and new lines set off **CHAIN x2, x3...** combos. A line of 6 or more is a **MEGA POP!** (with a brief slow-mo). Crossing lines (a cross, L or X) pop together and each shared block adds a $30 bonus.
+Only pops pay: pairs and 3s do nothing, and dropping a piece (soft or hard) adds no cash. Hard drops and very fast soft drops leave a fire trail.
 
-Scoring is shown in dollars ($10 per popped block plus a big-group bonus, times chain multiplier, times level). Big gains rain coins and MEGA POP / COMEBACK ring the cash register.
+Scoring is shown in dollars ($10 per popped block plus $20 for each block past 4 in a line, plus the crossing bonus, times chain multiplier, times level). Big gains rain coins and MEGA POP / COMEBACK ring the cash register.
 Pop 50 blocks to level up (faster gravity). Pop 150 to reach the next stage, and each stage adds a twist:
 
 1. **Tropical Tides**: just colors. Sunny ocean with gentle rolling wave layers, shimmering sun reflections, foam and little splashes lapping the island shore, rising bubbles, swaying palms, jumping fish, seagulls
@@ -54,6 +54,15 @@ The boss doesn't get meaner as he weakens beyond one gentle step (bat swarms com
 **Danger zone + COMEBACK!** When the stack climbs into the top rows the board glows red, an alarm sounds and the music
 switches into an alarm layer. Get back below the safe line after at least 3 seconds in danger and you earn a **COMEBACK!**:
 a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x level** bonus, then the normal track fades back in.
+
+## v28 additions
+- **Tutorial**: the first game starts with 4 guided drops (pairs/3s don't pay, a horizontal 4, a vertical 4, a diagonal 4). SKIP any time; replay it from OPTIONS. `?tut=1` forces it.
+- **Daily challenge** (title screen): everyone gets the same pieces each day (seeded by date). Your streak counts consecutive days played.
+- **Stats & awards** (title screen): lifetime stats plus 14 achievements that pay cash into your wallet.
+- **Options**: VOICES slider (boss voices), REDUCE MOTION (no bounce, trails, shake or slow-mo), HAPTICS OFF/LOW/MED/HIGH, COLORBLIND patterns, REPLAY TUTORIAL, RESTORE PURCHASES.
+- **Ads**: FREE edition shows one skippable "Go FULL" card at game over, never during play or bosses. FULL has no ads.
+- **Auto low detail**: if frames get slow during play, particles drop to LOW automatically.
+- **Difficulty (rebalanced for the line rule)**: 3 colors in stages 1-3, 4 in stages 4-8, 5 in stages 9-10. Gravity starts at 1.0 s per row (6% faster per level for the first 5 levels, then 8%), 6% faster in stages 8-10, never faster than 0.16 s (0.14 s in stages 8-10). Boss fights keep a flat speed. Boss HP: Sunny 150, Gazza 170 (was 240), Vampire 260 (was 340).
 
 ## Wallet + STORE
 Every game's cash is **banked** into a wallet when the game ends ("Banked +$X"), saved on the device. The wallet shows on the
