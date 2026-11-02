@@ -108,3 +108,8 @@ redistribute or reuse any part of it. See [LICENSE](LICENSE).
 ## Audio de-hiss (v24)
 
 A steady 6-16 kHz floor in the pre-rendered music loops read as white noise on every stage, the menu and the boss fights. The music bus now runs through a high shelf (-7 dB at 7 kHz) and a 13 kHz low-pass before the master. Boss voice breath noise is low-passed at 3.2 kHz and 45% quieter, and the pre-drop uplifter sweep tops out at 6.5 kHz instead of 9.5 kHz. Ambience beds were already dark (brown noise below 1.2 kHz) and stop on transitions. The Unity port applies the same filters (MusicDeHiss on the music sources, breath low-pass in the voice synth).
+
+## Testing the full edition (v27)
+- `?preview=full` previews the full edition for the current page load only. Nothing is saved and no $1,000 bonus is granted. The edition badge reads PREVIEW.
+- `?edition=full|free` and the 5-tap logo toggle work only on dev hosts (localhost, 127.0.0.1, file:). The live site ignores them.
+- On touch devices in landscape, a "rotate to portrait" overlay pauses the game.

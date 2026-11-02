@@ -101,7 +101,9 @@ function applyVolumes() { if (!A.ctx) return; const t = A.ctx.currentTime, set =
   set(A.mus, BUS.mus * volK(settings.vMusic)); set(A.sfx, BUS.sfx * volK(settings.vSfx)); set(A.amb, BUS.amb * volK(settings.vAmb)); }
 const BUS = { mus: 0.21, sfx: 1.6, amb: 0.84 }; // v12 mix: music -6 dB, SFX +5 dB, ambient +6 dB vs v11 (0.42 / 0.9 / 0.42)
 const CAN_VIB = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
-function vib(p) { if (settings.vibrate && CAN_VIB) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } }
+let userGestured = false; // v27: set by audioUnlock (runs inside every touch/click/key handler)
+const gestured = () => userGestured || !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
+function vib(p) { if (settings.vibrate && CAN_VIB && gestured()) { try { navigator.vibrate(p); } catch (e) { /* ignore */ } } }
 const saveSettings = () => store.set('bb_settings', settings);
 let scores = store.get('bb_scores_v2', []);
 if (!Array.isArray(scores)) scores = [];
@@ -147,6 +149,7 @@ function silentWavURI() {
 }
 // Called synchronously from every touchend / pointerup / click / keydown handler.
 function audioUnlock() {
+  userGestured = true;
   try {
     // iOS 17+: treat the page as media playback so sound plays even with the ringer switch on silent
     if (navigator.audioSession && navigator.audioSession.type !== 'playback') { try { navigator.audioSession.type = 'playback'; } catch (e) { /* ignore */ } }
@@ -1325,7 +1328,7 @@ function ambSync() {
 // the sequencer grid follows the new tempos
 TRACKS.push(Object.assign({}, TRACKS[3], { name: 'SANTA MONICA SWELL' }), Object.assign({}, TRACKS[6], { name: 'BILLABONG BOOGIE' })); // v16 mid-boss tracks (procedural fallback)
 for (let i = 0; i < TRACKS.length && i < XM_BPM.length; i++) TRACKS[i].bpm = XM_BPM[i];
-xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); // + the start-screen theme // start downloading the title loop right away (decoded after the first tap)
+xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); try { const q = new URLSearchParams(location.search), n = parseInt(q.get('stage'), 10) || 0, bk = { surfer: 11, gator: 12, vampire: 10 }[q.get('boss')] || 0; for (const i of [n > 1 ? n : 0, bk]) if (i > 0 && i <= 12) xmFetch(xmKey('loop', i)).catch(() => {}); } catch (e) { /* ignore */ } // v27: ?stage=/?boss= links fetch their loop up front // + the start-screen theme // start downloading the title loop right away (decoded after the first tap)
 // live sequencer: look-ahead scheduler (setInterval 25 ms, schedules 150 ms ahead), bar-quantized track switches
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
@@ -1655,11 +1658,16 @@ function loadWallet() {
 let wallet = loadWallet();
 const saveWallet = () => store.set('bb_wallet', wallet);
 // ---- edition hooks (no real payments or ads exist yet)
-function isFullEdition() { return wallet.edition === 'full'; }
+// v27: editions can't be switched from the URL or the logo on the live site. DEV_HOST (localhost / 127.0.0.1 / file://) keeps
+// the old ?edition= and 5-tap test paths. Anywhere, ?preview=full previews the FULL edition for this page load only:
+// nothing is saved, no $1,000 bonus, no ads; the badge reads PREVIEW.
+const DEV_HOST = (() => { try { return location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname); } catch (e) { return false; } })();
+const PREVIEW_FULL = (() => { try { return new URLSearchParams(location.search).get('preview') === 'full'; } catch (e) { return false; } })();
+function isFullEdition() { return wallet.edition === 'full' || PREVIEW_FULL; }
 // One-time FULL starting bonus. Also called when a FREE player upgrades. Safe to call repeatedly.
 function grantFullEditionBonus() { if (wallet.grants.full) return false; wallet.grants.full = true; wallet.cash += START_CASH.full; saveWallet(); return true; }
 function applyEditionGrant() {
-  if (isFullEdition()) return grantFullEditionBonus();
+  if (wallet.edition === 'full') return grantFullEditionBonus(); // the real edition only, never the preview
   if (!wallet.grants.free) { wallet.grants.free = true; wallet.cash += START_CASH.free; saveWallet(); }
   return false;
 }
@@ -1674,7 +1682,7 @@ function maybeShowAd(where) { // hook: FREE edition = minimal ads (e.g. where ==
 }
 const BB_ADS = { requests: 0, last: null };
 (function initEdition() {
-  try { const q = new URLSearchParams(location.search).get('edition'); if (q === 'full' || q === 'free') wallet.edition = q; } catch (e) { /* ignore */ }
+  if (DEV_HOST) { try { const q = new URLSearchParams(location.search).get('edition'); if (q === 'full' || q === 'free') wallet.edition = q; } catch (e) { /* ignore */ } } // v27: dev hosts only
   applyEditionGrant(); saveWallet();
 })();
 function canAfford(p) { return wallet.cash >= p; }
@@ -4320,6 +4328,7 @@ function pressButton(b, x, y, pid) {
 function onDown(e) {
   if (e.cancelable) e.preventDefault();
   audioUnlock();
+  if (rotated()) return; // v27: no taps through the rotate screen
   if (state === 'start') { stTap(e.clientX, e.clientY); return; }
   const x = e.clientX, y = e.clientY, b = hitUI(x, y);
   if (b) { pressButton(b, x, y, e.pointerId); return; }
@@ -4519,7 +4528,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v26';
+const VERSION = 'v27';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
@@ -5270,6 +5279,7 @@ function drawWipe() {
 // ---- dev toggle: tap the logo 5 times within 3 s to switch FREE / FULL (or use ?edition=full / ?edition=free)
 let logoTaps = [], logoBox = { y0: 0, y1: 0 };
 function logoTap(y) {
+  if (!DEV_HOST) return; // v27: dev hosts only
   if (y < logoBox.y0 || y > logoBox.y1) return;
   const now = performance.now(); logoTaps = logoTaps.filter((t) => now - t < 3000); logoTaps.push(now);
   if (logoTaps.length >= 5) {
@@ -5282,7 +5292,7 @@ function logoTap(y) {
 function editionBadge(x, y) {
   const full = isFullEdition(), w = 46, h = 20;
   rr(x, y - h / 2, w, h, 6); ctx.fillStyle = full ? '#ffb703' : 'rgba(255,255,255,0.18)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = full ? '#fff3c4' : 'rgba(255,255,255,0.5)'; ctx.stroke();
-  txt(full ? 'FULL' : 'FREE', x + w / 2, y + 1, 12, full ? '#3a1500' : '#ffffff', null, 'center', NFONT);
+  txt(full ? (PREVIEW_FULL && wallet.edition !== 'full' ? 'PREVIEW' : 'FULL') : 'FREE', x + w / 2, y + 1, PREVIEW_FULL && wallet.edition !== 'full' ? 9 : 12, full ? '#3a1500' : '#ffffff', null, 'center', NFONT);
 }
 function drawBanked(cx, y, big) {
   const b = g.bank; if (!b) return;
@@ -5408,6 +5418,16 @@ function syncMusic() {
   syncTrack(); updatePending(); try { ambSync(); } catch (e) { /* ambience is optional */ }
 }
 let TS = 1; // test hook: game-speed multiplier
+// v27: a phone held sideways gets a 'rotate to portrait' screen and the game pauses (the board is unplayable that small)
+const IS_TOUCH = (() => { try { return matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window; } catch (e) { return false; } })();
+function rotated() { return IS_TOUCH && W > H * 1.15 && H < 600; }
+function drawRotate() {
+  if (state === 'play' && !paused) setPaused(true);
+  ctx.save(); ctx.fillStyle = 'rgba(4,20,40,0.94)'; ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 - 20, a = Math.min(1, ((T * 0.8) % 2)) * Math.PI / 2; ctx.translate(cx, cy); ctx.rotate(-Math.PI / 2 + a);
+  rr(-22, -38, 44, 76, 8); ctx.fillStyle = '#19c3c9'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.fillStyle = '#04141f'; ctx.fillRect(-16, -28, 32, 54);
+  ctx.restore(); txt('Please rotate to portrait', cx, cy + 62, 20, '#ffffff', '#03243a', 'center'); txt('The game is paused', cx, cy + 88, 14, '#9fe8ff', null, 'center');
+}
 function frame(now) {
   const rdt = (now - last) / 1000; if (rdt > 0 && rdt < 0.5) fpsS += (1 / rdt - fpsS) * 0.05;
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * TS; last = now; T += dt;
@@ -5460,6 +5480,7 @@ function frame(now) {
     }
     if (opt.open) drawOptions();
     drawBursts(); drawFPS();
+    if (rotated()) drawRotate();
   } catch (err) { console.error(err); }
   requestAnimationFrame(frame);
 }
