@@ -1329,7 +1329,7 @@ function ambSync() {
   ambTick();
 }
 // the sequencer grid follows the new tempos
-TRACKS.push(Object.assign({}, TRACKS[3], { name: 'SANTA MONICA SWELL' }), Object.assign({}, TRACKS[6], { name: 'BILLABONG BOOGIE' })); // v16 mid-boss tracks (procedural fallback)
+TRACKS.push(Object.assign({}, TRACKS[3], { name: 'GOLDEN COAST SWELL' }), Object.assign({}, TRACKS[6], { name: 'BILLABONG BOOGIE' })); // v16 mid-boss tracks (procedural fallback)
 for (let i = 0; i < TRACKS.length && i < XM_BPM.length; i++) TRACKS[i].bpm = XM_BPM[i];
 xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); try { const q = new URLSearchParams(location.search), n = parseInt(q.get('stage'), 10) || 0, bk = { surfer: 11, gator: 12, vampire: 10 }[q.get('boss')] || 0; for (const i of [n > 1 ? n : 0, bk]) if (i > 0 && i <= 12) xmFetch(xmKey('loop', i)).catch(() => {}); } catch (e) { /* ignore */ } // v27: ?stage=/?boss= links fetch their loop up front // + the start-screen theme // start downloading the title loop right away (decoded after the first tap)
 // live sequencer: look-ahead scheduler (setInterval 25 ms, schedules 150 ms ahead), bar-quantized track switches
@@ -1486,9 +1486,8 @@ function drawDanger() {
   const gr = ctx.createLinearGradient(0, y, 0, y + c * 5);
   gr.addColorStop(0, 'rgba(255,40,60,' + (0.18 + 0.22 * k) + ')'); gr.addColorStop(1, 'rgba(255,40,60,0)');
   ctx.fillStyle = gr; ctx.fillRect(x, y, w, c * 5);
-  ctx.strokeStyle = 'rgba(255,50,70,' + (0.45 + 0.5 * k) + ')'; ctx.lineWidth = 3 + 2 * k; ctx.shadowColor = '#ff2040'; ctx.shadowBlur = 14;
-  ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
   ctx.restore();
+  paintFrame(true, k);
   txt('DANGER!', x + w / 2, y + c * 1.1, Math.min(c * 0.95, 30) * (1 + 0.06 * k), '#ff4050', '#2a0008');
 }
 // ---------------------------------------------------------------- layout + caches
@@ -3267,43 +3266,92 @@ function paintGator(X, t, F, s, cx, cy, full) {
   X.restore(); X.globalAlpha = 1;
 }
 function rrX(X, a, b, w, h, r) { X.beginPath(); X.moveTo(a + r, b); X.arcTo(a + w, b, a + w, b + h, r); X.arcTo(a + w, b + h, a, b + h, r); X.arcTo(a, b + h, a, b, r); X.arcTo(a, b, a + w, b, r); X.closePath(); }
-// ---- 3b. SANTA MONICA PIER (surfer boss): vaporwave sunset, striped sun, pier with ferris wheel + coaster, palms, lifeguard tower
+// v29: cartoon setting sun. Eyes stay open when Reduce Motion is on; otherwise they blink shut for a moment every few seconds.
+let sunHold = null;
+function sunCenter() {
+  const hz = H * 0.56, R = Math.min(W, H) * 0.19, cx = colX();
+  const sx = Math.min(W - R * 0.62, Math.max(R * 0.62, cx));
+  return { sx, hz, R };
+}
+function sunLidAt(t) {
+  if (RM()) return 0;
+  const cyc = 4.6, at = 4.05, dur = 0.34;
+  const p = ((t % cyc) + cyc) % cyc;
+  if (p < at || p > at + dur) return 0;
+  const u = (p - at) / dur;
+  if (u < 0.32) return u / 0.32;
+  if (u > 0.68) return (1 - u) / 0.32;
+  return 1;
+}
+function sunLid(t) { return sunHold != null ? sunHold : sunLidAt(t); }
+function drawSettingSun(t) {
+  const { sx, hz, R } = sunCenter(), lid = sunLid(t);
+  BG.sunGeom = { sx, hz, R, lid, eyeY: hz - R * 0.46, eyeDX: R * 0.3, eyeR: R * 0.15 };
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hz); ctx.clip();
+  const eyeY = hz - R * 0.46, eyeDX = R * 0.3, eyeR = R * 0.15, open = 1 - 0.92 * lid;
+  for (const s of [-1, 1]) {
+    const ex = sx + s * eyeDX;
+    ctx.fillStyle = '#fffdf6'; ctx.beginPath(); ctx.ellipse(ex, eyeY, eyeR, Math.max(0.8, eyeR * open), 0, 0, 7); ctx.fill();
+    ctx.lineWidth = Math.max(1.5, R * 0.035); ctx.strokeStyle = '#7a3d08'; ctx.stroke();
+    if (lid < 0.72) {
+      ctx.fillStyle = '#2a1408'; ctx.beginPath(); ctx.arc(ex + s * eyeR * 0.08, eyeY + eyeR * 0.06, eyeR * 0.46 * (1 - lid), 0, 7); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex - eyeR * 0.22, eyeY - eyeR * 0.18, eyeR * 0.16 * (1 - lid), 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = '#5a2c06'; ctx.lineWidth = Math.max(2, R * 0.045); ctx.beginPath(); ctx.arc(ex, eyeY, eyeR * 0.92, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = '#8a3a10'; ctx.lineWidth = Math.max(2.4, R * 0.055); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(sx, hz - R * 0.36, R * 0.22, 0.12 * Math.PI, 0.88 * Math.PI); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,110,70,0.55)';
+  ctx.beginPath(); ctx.ellipse(sx - R * 0.5, hz - R * 0.28, R * 0.09, R * 0.055, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sx + R * 0.5, hz - R * 0.28, R * 0.09, R * 0.055, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+// ---- 3b. GOLDEN COAST PIER (surfer boss): wacky vaporwave sunset, gold pier, cartoon sun that blinks, ferris wheel, coaster, palms
 function bgPier(t) {
-  // v21: a vaporwave SUNSET. The big striped sun sets behind the side column (its panels are see-through), so on portrait
-  // phones it isn't hidden behind Sunny or the board; its glow is mirrored in the sunset-tinted water.
-  const dt = bgDt(14, t), hz = H * 0.56, sy = H * 0.8, cx = colX(), R = Math.min(W, H) * 0.19, sx = Math.min(W - R * 0.55, Math.max(R * 0.55, cx));
+  // v29: warm gold pier and sky, golden water highlights, a smiling setting sun. The disk still sits behind the
+  // see-through side column so portrait phones keep it in view. No entrance arch or lettered sign.
+  const dt = bgDt(14, t), sun = sunCenter(), hz = sun.hz, sy = H * 0.8, cx = colX(), R = sun.R, sx = sun.sx;
   ctx.drawImage(lay('piersun', W, H, (x) => {
-    const sky = () => lgx(x, 0, hz, [[0, '#160636'], [0.3, '#4a1470'], [0.55, '#b0287f'], [0.78, '#ff5a6a'], [0.92, '#ff9a3d'], [1, '#ffc95a']]);
+    const sky = () => lgx(x, 0, hz, [[0, '#241048'], [0.28, '#6a2870'], [0.5, '#e05a28'], [0.72, '#ffb01a'], [0.88, '#ffd85a'], [1, '#fff0a8']]);
     x.fillStyle = sky(); x.fillRect(0, 0, W, hz);
-    for (let i = 0; i < 36; i++) { x.fillStyle = 'rgba(255,235,255,' + (0.25 + hash(i * 2.3) * 0.5) + ')'; x.fillRect(hash(i * 7.1) * W, hash(i * 3.9) * hz * 0.3, 1.5, 1.5); } // first stars
-    x.fillStyle = rgx(x, sx, hz - R * 0.3, R * 0.6, R * 3.4, [[0, 'rgba(255,170,90,0.55)'], [1, 'rgba(255,90,150,0)']]); x.fillRect(0, 0, W, hz);
+    for (let i = 0; i < 36; i++) { x.fillStyle = 'rgba(255,244,210,' + (0.25 + hash(i * 2.3) * 0.5) + ')'; x.fillRect(hash(i * 7.1) * W, hash(i * 3.9) * hz * 0.28, 1.5, 1.5); } // first stars in the violet cap
+    x.fillStyle = rgx(x, sx, hz - R * 0.3, R * 0.5, R * 3.6, [[0, 'rgba(255,210,80,0.7)'], [1, 'rgba(255,140,40,0)']]); x.fillRect(0, 0, W, hz);
     x.save(); x.beginPath(); x.rect(0, 0, W, hz); x.clip();
-    x.fillStyle = lgx(x, hz - R, hz, [[0, '#fff27a'], [0.45, '#ffb03d'], [1, '#ff3d8a']]); x.beginPath(); x.arc(sx, hz, R, Math.PI, 0); x.fill();
-    x.fillStyle = sky(); for (let k = 0; k < 7; k++) x.fillRect(sx - R - 2, hz - R * 0.08 - k * R * 0.085, R * 2 + 4, 1.2 + (6 - k) * 0.9); x.restore(); // stripes widen toward the horizon
-    x.fillStyle = 'rgba(255,120,170,0.35)'; for (let k = 0; k < 6; k++) { const cy = hz * (0.25 + hash(k * 4.1) * 0.45), cw = W * (0.2 + hash(k * 2.7) * 0.3); x.beginPath(); x.ellipse(hash(k * 9.3) * W, cy, cw / 2, 3 + hash(k) * 4, 0, 0, 7); x.fill(); } // streaky clouds
-    // distant mountains (Santa Monica range silhouette)
-    x.fillStyle = '#5a1a5a'; x.beginPath(); x.moveTo(0, hz); for (let k = 0; k <= 10; k++) x.lineTo(k * W / 10, hz - H * (0.03 + 0.03 * hash(k * 3.3)) * (k < 4 ? 1.4 : 0.8)); x.lineTo(W, hz); x.fill();
-    // ocean
-    x.fillStyle = lgx(x, hz, sy, [[0, '#ff6a7a'], [0.15, '#b0388a'], [0.6, '#5a2088'], [1, '#c86aa0']]); x.fillRect(0, hz, W, sy - hz);
-    for (let k = 0; k < 16; k++) { const y = hz + 3 + k * k * 1.1, w2 = R * (1.7 - k * 0.09); if (w2 <= 0) break; x.fillStyle = k % 2 ? 'rgba(255,200,90,0.5)' : 'rgba(255,110,150,0.45)'; x.fillRect(sx - w2 / 2, y, w2, 1.8); } // the sun's reflection
+    x.fillStyle = lgx(x, hz - R, hz, [[0, '#fff6b0'], [0.4, '#ffc247'], [1, '#ff7a1a']]); x.beginPath(); x.arc(sx, hz, R, Math.PI, 0); x.fill();
+    // vaporwave stripes, kept off the face so the smile stays readable
+    for (let k = 0; k < 6; k++) { x.fillStyle = k % 2 ? 'rgba(255,150,30,0.55)' : 'rgba(255,236,140,0.45)'; x.fillRect(sx - R - 2, hz - R * 0.92 + k * R * 0.07, R * 2 + 4, 2 + (5 - k) * 0.45); }
+    x.fillStyle = '#ffcf4a'; x.beginPath(); x.ellipse(sx, hz - R * 0.4, R * 0.7, R * 0.48, 0, 0, 7); x.fill();
+    x.restore();
+    x.fillStyle = 'rgba(255,196,110,0.38)'; for (let k = 0; k < 6; k++) { const cy = hz * (0.22 + hash(k * 4.1) * 0.42), cw = W * (0.2 + hash(k * 2.7) * 0.3); x.beginPath(); x.ellipse(hash(k * 9.3) * W, cy, cw / 2, 3 + hash(k) * 4, 0, 0, 7); x.fill(); } // warm streaky clouds
+    // coastal hills
+    x.fillStyle = '#8a4e28'; x.beginPath(); x.moveTo(0, hz); for (let k = 0; k <= 10; k++) x.lineTo(k * W / 10, hz - H * (0.03 + 0.03 * hash(k * 3.3)) * (k < 4 ? 1.4 : 0.8)); x.lineTo(W, hz); x.fill();
+    x.fillStyle = '#c47a32'; x.beginPath(); x.moveTo(0, hz); for (let k = 0; k <= 12; k++) x.lineTo(k * W / 12, hz - H * (0.012 + 0.012 * hash(k * 1.7))); x.lineTo(W, hz); x.fill();
+    // ocean: gold at the horizon, vaporwave magenta in the deep
+    x.fillStyle = lgx(x, hz, sy, [[0, '#ffd27a'], [0.16, '#ff8a32'], [0.5, '#d23a78'], [1, '#5c2088']]); x.fillRect(0, hz, W, sy - hz);
+    for (let k = 0; k < 16; k++) { const y = hz + 3 + k * k * 1.1, w2 = R * (1.7 - k * 0.09); if (w2 <= 0) break; x.fillStyle = k % 2 ? 'rgba(255,230,140,0.7)' : 'rgba(255,186,60,0.5)'; x.fillRect(sx - w2 / 2, y, w2, 1.8); } // golden reflection
     // sand
-    x.fillStyle = lgx(x, sy, H, [[0, '#ffb98a'], [1, '#c97a7a']]); x.fillRect(0, sy, W, H - sy);
-    x.fillStyle = 'rgba(180,120,60,0.25)'; for (let i = 0; i < 90; i++) x.fillRect(hash(i * 1.3) * W, sy + hash(i * 2.9) * (H - sy), 2, 2);
-    // the pier: deck on pilings from the left, arch sign at the entrance
-    const py = hz + H * 0.01, pw = W * 0.7; x.fillStyle = '#3a1838';
-    for (let px = 6; px < pw; px += 14) x.fillRect(px, py, 3, sy - py - (px / pw) * H * 0.03);
-    x.fillRect(0, py - 5, pw, 6); x.fillRect(0, py - 14, pw, 2); for (let px = 0; px < pw; px += 10) x.fillRect(px, py - 14, 1.5, 9);
+    x.fillStyle = lgx(x, sy, H, [[0, '#ffe0a0'], [1, '#e0a05a']]); x.fillRect(0, sy, W, H - sy);
+    x.fillStyle = 'rgba(180,110,30,0.22)'; for (let i = 0; i < 90; i++) x.fillRect(hash(i * 1.3) * W, sy + hash(i * 2.9) * (H - sy), 2, 2);
+    // gold pier: pilings, planked deck, rope rail. No arch and no lettered sign.
+    const py = hz + H * 0.01, pw = W * 0.7, wood = '#e2b044', woodDk = '#a56b16';
+    x.fillStyle = woodDk; for (let px = 6; px < pw; px += 16) x.fillRect(px, py, 5, sy - py - (px / pw) * H * 0.03);
+    x.fillStyle = wood; x.fillRect(0, py - 8, pw, 11);
+    x.strokeStyle = '#8a5410'; x.lineWidth = 1; for (let px = 0; px < pw; px += 12) { x.beginPath(); x.moveTo(px, py - 8); x.lineTo(px, py + 3); x.stroke(); }
+    x.strokeStyle = '#fff1b0'; x.lineWidth = 2; x.beginPath(); x.moveTo(4, py - 18); x.lineTo(pw - 4, py - 18); x.stroke();
+    x.fillStyle = woodDk; for (let px = 8; px < pw; px += 22) x.fillRect(px, py - 20, 3, 12);
     // roller coaster track loops at the end of the pier
-    x.strokeStyle = '#3a1838'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(pw * 0.62, py - 6); x.bezierCurveTo(pw * 0.68, py - H * 0.09, pw * 0.74, py - H * 0.09, pw * 0.78, py - 20); x.bezierCurveTo(pw * 0.82, py - H * 0.05, pw * 0.88, py - H * 0.05, pw * 0.93, py - 6); x.stroke();
-    x.lineWidth = 1; for (let k = 0; k < 12; k++) { const u = pw * (0.63 + k * 0.026); x.beginPath(); x.moveTo(u, py - 6); x.lineTo(u, py - 6 - H * 0.07 * Math.sin(Math.PI * k / 11) * (k < 6 ? 1 : 0.6)); x.stroke(); }
-    // palms on the sand + lifeguard tower
-    const palm = (px, h, lean) => { x.strokeStyle = '#2a1030'; x.lineWidth = 5; x.beginPath(); x.moveTo(px, sy + 14); x.quadraticCurveTo(px + lean * 0.5, sy - h * 0.5, px + lean, sy - h); x.stroke(); x.fillStyle = '#2a1030'; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * 0.5; x.beginPath(); x.moveTo(px + lean, sy - h); x.quadraticCurveTo(px + lean + Math.cos(a) * 30, sy - h + Math.sin(a) * 30 - 6, px + lean + Math.cos(a) * 46, sy - h + Math.sin(a) * 46 + 18); x.quadraticCurveTo(px + lean + Math.cos(a) * 26, sy - h + Math.sin(a) * 26 + 2, px + lean, sy - h); x.fill(); } };
+    x.strokeStyle = '#c9922a'; x.lineWidth = 2.5; x.beginPath(); x.moveTo(pw * 0.62, py - 8); x.bezierCurveTo(pw * 0.68, py - H * 0.09, pw * 0.74, py - H * 0.09, pw * 0.78, py - 20); x.bezierCurveTo(pw * 0.82, py - H * 0.05, pw * 0.88, py - H * 0.05, pw * 0.93, py - 8); x.stroke();
+    x.lineWidth = 1; for (let k = 0; k < 12; k++) { const u = pw * (0.63 + k * 0.026); x.beginPath(); x.moveTo(u, py - 8); x.lineTo(u, py - 8 - H * 0.07 * Math.sin(Math.PI * k / 11) * (k < 6 ? 1 : 0.6)); x.stroke(); }
+    // palms on the sand + lifeguard tower (vaporwave hut, not a pier sign)
+    const palm = (px, h, lean) => { x.strokeStyle = '#5a3010'; x.lineWidth = 5; x.beginPath(); x.moveTo(px, sy + 14); x.quadraticCurveTo(px + lean * 0.5, sy - h * 0.5, px + lean, sy - h); x.stroke(); x.fillStyle = '#3a6a28'; for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * 0.5; x.beginPath(); x.moveTo(px + lean, sy - h); x.quadraticCurveTo(px + lean + Math.cos(a) * 30, sy - h + Math.sin(a) * 30 - 6, px + lean + Math.cos(a) * 46, sy - h + Math.sin(a) * 46 + 18); x.quadraticCurveTo(px + lean + Math.cos(a) * 26, sy - h + Math.sin(a) * 26 + 2, px + lean, sy - h); x.fill(); } };
     palm(W * 0.06, H * 0.26, 14); palm(W * 0.16, H * 0.2, -8); palm(W * 0.95, H * 0.24, -16);
-    const lx = W * 0.82, ly = sy + 8; x.fillStyle = '#2a1030'; x.fillRect(lx - 16, ly - 34, 3, 34); x.fillRect(lx + 13, ly - 34, 3, 34); x.fillStyle = '#4fd8ff'; x.fillRect(lx - 20, ly - 52, 40, 20); x.fillStyle = '#ff4fa3'; x.fillRect(lx - 20, ly - 44, 40, 4); x.fillStyle = '#2a1030'; x.beginPath(); x.moveTo(lx - 24, ly - 52); x.lineTo(lx, ly - 62); x.lineTo(lx + 24, ly - 52); x.fill();
+    const lx = W * 0.82, ly = sy + 8; x.fillStyle = '#6a4018'; x.fillRect(lx - 16, ly - 34, 3, 34); x.fillRect(lx + 13, ly - 34, 3, 34); x.fillStyle = '#4fd8ff'; x.fillRect(lx - 20, ly - 52, 40, 20); x.fillStyle = '#ff4fa3'; x.fillRect(lx - 20, ly - 44, 40, 4); x.fillStyle = '#6a4018'; x.beginPath(); x.moveTo(lx - 24, ly - 52); x.lineTo(lx, ly - 62); x.lineTo(lx + 24, ly - 52); x.fill();
   }), 0, 0, W, H);
+  drawSettingSun(t);
   // ferris wheel on the pier (turns slowly, lights chase)
   const fx = W * 0.7 * 0.36, fy = hz - H * 0.075, fr = Math.min(W, H) * 0.085, rot = t * 0.25;
-  ctx.strokeStyle = '#3a1838'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx - fr * 0.6, hz); ctx.lineTo(fx, fy); ctx.lineTo(fx + fr * 0.6, hz); ctx.stroke();
+  ctx.strokeStyle = '#e2b044'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx - fr * 0.6, hz); ctx.lineTo(fx, fy); ctx.lineTo(fx + fr * 0.6, hz); ctx.stroke();
   ctx.beginPath(); ctx.arc(fx, fy, fr, 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < 12; k++) { const a = rot + k * Math.PI / 6; ctx.moveTo(fx, fy); ctx.lineTo(fx + Math.cos(a) * fr, fy + Math.sin(a) * fr); } ctx.stroke();
   ctx.globalCompositeOperation = 'lighter';
   for (let k = 0; k < 12; k++) { const a = rot + k * Math.PI / 6, on = ((k + Math.floor(t * 4)) % 3) === 0; glowAt(on ? 'rgba(255,90,200,1)' : 'rgba(90,230,255,1)', fx + Math.cos(a) * fr, fy + Math.sin(a) * fr, on ? 7 : 4, on ? 0.9 : 0.5); }
@@ -3410,10 +3458,10 @@ function oceanPaint(ctx, t, hz, y1) {
     for (let j = 0; j <= M; j++) { const x = (j / M) * W; pts.push([x, y - oceanH(x * fx * 6, zz, t) * A * set]); } rows.push({ y, z, A, set, pts }); }
   ctx.save();
   for (let i = 1; i <= N; i++) { const r0 = rows[i - 1], r1 = rows[i], z = r1.z;
-    const cA = [255 - 120 * z, 106 - 70 * z, 140 - 30 * z].map(Math.round); ctx.fillStyle = `rgba(${cA[0]},${cA[1]},${cA[2]},${0.55 + 0.35 * z})`; // depth shading: sunset pink far, deep violet near
+    const cA = [255 - 28 * z, 188 - 96 * z, 64 + 56 * z].map(Math.round); ctx.fillStyle = `rgba(${cA[0]},${cA[1]},${cA[2]},${0.55 + 0.35 * z})`; // depth shading: gold far, warm rose near
     ctx.beginPath(); ctx.moveTo(r0.pts[0][0], r0.pts[0][1]); for (const q of r0.pts) ctx.lineTo(q[0], q[1]); for (let j = r1.pts.length - 1; j >= 0; j--) ctx.lineTo(r1.pts[j][0], r1.pts[j][1]); ctx.fill();
     // crest highlights where the slope faces the low sun
-    ctx.strokeStyle = `rgba(255,${190 + Math.round(40 * (1 - z))},120,${0.25 + 0.4 * (1 - z)})`; ctx.lineWidth = 0.6 + 1.6 * z; ctx.beginPath();
+    ctx.strokeStyle = `rgba(255,${214 + Math.round(30 * (1 - z))},${70 + Math.round(40 * (1 - z))},${0.35 + 0.5 * (1 - z)})`; ctx.lineWidth = 0.6 + 1.6 * z; ctx.beginPath();
     for (let j = 1; j < r1.pts.length; j++) { const a = r1.pts[j - 1], b = r1.pts[j]; if (b[1] - a[1] < -0.35 * r1.A * 0.2) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); } } ctx.stroke();
     // foam on breaking crests (more when the swell set peaks)
     ctx.fillStyle = `rgba(255,236,228,${0.35 + 0.45 * z})`; ctx.beginPath(); const thr = r1.y - r1.A * (1.25 - (r1.set - 0.65) * 1.6);
@@ -3616,12 +3664,12 @@ const DIM = 20, ICE = 30, ICE2 = 40, GEAR_I = 50, FOG_I = 51, BAT_I = 52;
 const isDim = (v) => v > DIM && v <= DIM + 5, isIce = (v) => v > ICE && v <= ICE + 5, isIce2 = (v) => v > ICE2 && v <= ICE2 + 5;
 const CONV_ROW = 19; // clockwork conveyor: 3rd row from the bottom
 const BOSS_HP = 260, WIN_BONUS = 25000; // v28 line rule rebalance: 340 -> 260
-// ---- v16: two mid-bosses before the vampire. SUNNY THE SURFER ends stage 3 (Santa Monica pier), GAZZA THE GATOR ends
+// ---- v16: two mid-bosses before the vampire. SUNNY THE SURFER ends stage 3 (Golden Coast Pier), GAZZA THE GATOR ends
 // stage 6 (outback billabong). Same structure as the vampire but easier and never harder as health drops: one gentle
 // hazard on a fixed timer, quarter-mark OUCH lines, taunts/laughs picked for the moment, a defeat line, a cash bonus,
 // then the next stage starts. Pops made during a mid-boss don't count towards stage/level progress (no skipped stages).
 const MINI = {
-  surfer: { stage: 2, hp: 150, bonus: 5000, bg: 14, track: 11, name: 'SUNNY THE SURFER', place: 'SANTA MONICA PIER', c1: '#ffb347', c2: '#5ee7ff', bar: ['#ff7a1f', '#ffb347', '#ffe9a0'], per: 20,
+  surfer: { stage: 2, hp: 150, bonus: 5000, bg: 14, track: 11, name: 'SUNNY THE SURFER', place: 'GOLDEN COAST PIER', c1: '#ffb347', c2: '#5ee7ff', bar: ['#ff7a1f', '#ffb347', '#ffe9a0'], per: 20,
     taunts: ['chill', 'stoked', 'loose'], banner: ['SURFER BOSS!', 'SUNNY IS SURFING AFTER YOU!'], warn: "SURF'S UP!", win: ['WIPEOUT!', '+$5,000 SURF BONUS!'],
     twist: { text: 'BOSS! Pop matches to wipe him out! Waves nudge, beach balls drop.', icon: 2 } },
   gator: { stage: 5, hp: 170, /* v28: 240 -> 170 */ bonus: 10000, bg: 15, track: 12, name: 'GAZZA THE GATOR', place: 'THE BILLABONG', c1: '#8dff5a', c2: '#ffd23d', bar: ['#2f9e3a', '#6fdc4a', '#d8ff9a'], per: 22,
@@ -4279,6 +4327,13 @@ const dbg = {
   gatorSink() { if (BG.gator) BG.gator.nextSink = 0; },
   setTwistT(v) { g.twistT = v; },
   twistNow() { g.twistT = 999; if (g.stage === 3) g.warn = { t: 3 }; if (g.stage === 7) g.convWarn = { t: 2 }; if (g.boss) g.boss.warn = { t: 2 }; },
+  hideBanner() { banner = null; pendBanner = null; },
+  setRM(v) { settings.rm = !!v; saveSettings(); return settings.rm; },
+  sunLid() { return sunLid(T); }, sunLidAt(t) { return sunLidAt(t); },
+  holdSun(k) { sunHold = k == null ? null : Math.max(0, Math.min(1, +k || 0)); return sunLid(T); },
+  sunGeom() { return BG.sunGeom || null; },
+  framePhase() { return framePhase(); },
+  frameAudit, frameId,
   rows() { return g.board.map((r) => [...r].map((v) => Object.keys(LETTERS).find((k) => LETTERS[k] === v) || '?').join('')); },
   sample(n) { const out = []; for (let i = 0; i < n; i++) out.push(makePiece(0).cols); return out; },
 };
@@ -4587,7 +4642,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v28';
+const VERSION = 'v29';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
@@ -4842,12 +4897,181 @@ function drawPreview(q, cx, cy, cs, alpha) {
   c.forEach(([x, y], i) => drawBlock(spr(q.cols[i]), ox + (x - mnx) * cs, oy + (y - mny) * cs, cs));
   ctx.globalAlpha = 1;
 }
+// v29 themed frames. The outer silhouette changes per stage; the 10x20 round-cell playfield is never covered
+// (the frame is clipped to the margin). Decorative motion freezes when Reduce Motion is on.
+const FRAME_STYLE = {
+  wave: { fill: 'rgba(16,198,224,0.78)', stroke: '#f3fdff', name: 'wave curl' },
+  pipe: { fill: 'rgba(96,112,58,0.9)', stroke: '#f0e2a0', name: 'sewer pipe' },
+  neon: { fill: 'rgba(0,229,255,0.28)', stroke: '#ff3df2', name: 'neon octagon' },
+  surf: { fill: 'rgba(255,168,48,0.9)', stroke: '#fff6dc', name: 'surfboard' },
+  bolt: { fill: 'rgba(92,48,176,0.72)', stroke: '#fff4a8', name: 'lightning bolt' },
+  warp: { fill: 'rgba(176,96,255,0.5)', stroke: '#ffb15a', name: 'gravity warp' },
+  port: { fill: 'rgba(198,148,52,0.92)', stroke: '#fff0c0', name: 'porthole' },
+  log: { fill: 'rgba(110,68,32,0.94)', stroke: '#d6f0a0', name: 'swamp log' },
+  gem: { fill: 'rgba(186,110,255,0.62)', stroke: '#c9fbff', name: 'crystal shard' },
+  gear: { fill: 'rgba(206,128,36,0.92)', stroke: '#ffe4ae', name: 'gear' },
+  vine: { fill: 'rgba(36,78,34,0.9)', stroke: '#e2c6ff', name: 'gnarled vine' },
+  coffin: { fill: 'rgba(54,12,26,0.94)', stroke: '#ffd56a', name: 'gothic coffin' },
+};
+const FRAME_OF = ['wave', 'pipe', 'neon', 'bolt', 'warp', 'port', 'gem', 'gear', 'vine', 'coffin'];
+function frameId() {
+  if (isMini() && g.boss.kind === 'surfer') return 'surf';
+  if (isMini() && g.boss.kind === 'gator') return 'log';
+  if (g.stage === BOSS) return 'coffin';
+  return FRAME_OF[g.stage] || 'wave';
+}
+function framePhase() { return RM() ? 0 : T; }
+function frameBox() {
+  const c = L.cell, bx = L.bx, by = L.by, bw = c * COLS, bh = c * VIS;
+  const btnTop = settings.buttons ? (L.bot - L.ctrlH / 2 - (L.ctrlH - 6) / 2) : (L.bot - 2);
+  const left = Math.max(2, bx - 1), right = Math.max(2, (L.sx || (bx + bw + 8)) - (bx + bw) - 2);
+  const top = Math.max(2, by - (L.top + L.hudH) - 1), bottom = Math.max(2, btnTop - (by + bh) - 2);
+  return { bx, by, bw, bh, l: Math.min(12, left), r: Math.min(12, right), t: Math.min(22, top), b: Math.min(26, bottom) };
+}
+function rimPoint(B, side, u, o) {
+  o = Math.max(0, Math.min(1, o));
+  const { bx, by, bw, bh } = B, m = 1.4;
+  const l = Math.max(m, B.l), r = Math.max(m, B.r), t = Math.max(m, B.t), b = Math.max(m, B.b);
+  if (side === 0) return [bx + bw * u, by - (m + (t - m) * o)];
+  if (side === 1) return [bx + bw + (m + (r - m) * o), by + bh * u];
+  if (side === 2) return [bx + bw * (1 - u), by + bh + (m + (b - m) * o)];
+  return [bx - (m + (l - m) * o), by + bh * (1 - u)];
+}
+function frameOffset(id, side, u, ph) {
+  const s = Math.sin(u * Math.PI);
+  if (id === 'wave') return 0.18 + 0.82 * (0.5 + 0.5 * Math.sin(u * Math.PI * (side % 2 ? 6.5 : 3.5) + ph * 1.3 + side));
+  if (id === 'pipe') { const f = (u * (side % 2 ? 4 : 2)) % 1; return f > 0.36 && f < 0.64 ? 1 : 0.38; }
+  if (id === 'neon') { const k = Math.min(1, Math.min(u, 1 - u) / 0.14); return k * k * (3 - 2 * k); }
+  if (id === 'surf') {
+    if (side === 2) { const notch = Math.max(0, 1 - Math.abs(u - 0.5) / 0.11); return s * (1 - 0.78 * notch); }
+    return Math.pow(s, side === 0 ? 0.72 : 0.9);
+  }
+  if (id === 'bolt') {
+    const n = side % 2 ? 8 : 4, i = Math.floor(u * n), f = u * n - i;
+    const a = hash(side * 19 + i) > 0.42 ? 1 : 0.06, b = hash(side * 19 + i + 1) > 0.42 ? 1 : 0.06;
+    return a + (b - a) * f;
+  }
+  if (id === 'warp') return 0.58 + 0.42 * Math.sin(u * Math.PI * 2 + side + ph * 0.35);
+  if (id === 'port') { const k = Math.min(1, Math.min(u, 1 - u) / 0.08); return 0.58 + 0.42 * (k * k * (3 - 2 * k)); }
+  if (id === 'log') return 0.28 + 0.72 * hash(side * 7 + Math.floor(u * (side % 2 ? 18 : 9)) * 3.17);
+  if (id === 'gem') { const f = (u * (side % 2 ? 7 : 4)) % 1; return 0.08 + 0.92 * (f < 0.5 ? f * 2 : (1 - f) * 2); }
+  if (id === 'gear') { const f = (u * (side % 2 ? 12 : 6) + ph * 0.07) % 1; return f < 0.46 ? 1 : 0.2; }
+  if (id === 'vine') {
+    const wob = 0.5 + 0.5 * Math.sin(u * Math.PI * 2.6 + ph + side * 1.7);
+    const thorn = hash(side * 13 + Math.floor(u * 8)) > 0.52;
+    return Math.min(1, 0.12 + 0.42 * wob + (thorn ? 0.58 : 0));
+  }
+  return 0.75;
+}
+function coffinPoints(B) {
+  const { bx, by, bw, bh, l, r, t, b } = B, cx = bx + bw / 2, m = 1.5, pts = [];
+  for (let i = 0; i <= 18; i++) {
+    const u = i / 18, arch = Math.pow(Math.sin(u * Math.PI), 0.65);
+    pts.push([bx + bw * u, by - (m + (Math.max(m, t) - m) * arch)]);
+  }
+  const shoulder = Math.max(m, Math.min(l, r));
+  pts.push(
+    [bx + bw + r, by + bh * 0.11], [bx + bw + shoulder * 0.4, by + bh * 0.25], [bx + bw + shoulder * 0.4, by + bh * 0.7],
+    [bx + bw + m, by + bh + m], [cx + Math.min(28, bw * 0.16), by + bh + b * 0.38], [cx, by + bh + b],
+    [cx - Math.min(28, bw * 0.16), by + bh + b * 0.38], [bx - m, by + bh + m],
+    [bx - shoulder * 0.4, by + bh * 0.7], [bx - shoulder * 0.4, by + bh * 0.25], [bx - l, by + bh * 0.11]
+  );
+  return pts;
+}
+function framePoints(id, B) {
+  if (id === 'coffin') return coffinPoints(B);
+  const ph = framePhase(), pts = [];
+  for (let s = 0; s < 4; s++) {
+    const steps = s % 2 ? 64 : 40;
+    for (let i = 0; i <= steps; i++) {
+      if (s && i === 0) continue;
+      pts.push(rimPoint(B, s, i / steps, frameOffset(id, s, i / steps, ph)));
+    }
+  }
+  return pts;
+}
+function tracePts(pts) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) { if (i) ctx.lineTo(pts[i][0], pts[i][1]); else ctx.moveTo(pts[i][0], pts[i][1]); }
+  ctx.closePath();
+}
+function frameDeco(id, B) {
+  if (id === 'wave') {
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2.2; ctx.beginPath();
+    const ox = B.bx - B.l * 0.35, oy = B.by + B.bh + Math.min(B.b * 0.25, 6);
+    for (let k = 0; k <= 18; k++) {
+      const a = 0.4 + k / 18 * 1.7 * Math.PI, rad = 1.2 + k / 18 * Math.min(B.l, B.b) * 0.7;
+      const x = ox + Math.cos(a) * rad * 0.8, y = oy + Math.sin(a) * rad;
+      if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  } else if (id === 'pipe') {
+    ctx.fillStyle = '#f4e7a8';
+    for (let i = 0; i < 4; i++) { const p = rimPoint(B, 3, (i + 0.5) / 4, 0.72); ctx.beginPath(); ctx.arc(p[0], p[1], 1.7, 0, 7); ctx.fill(); }
+  } else if (id === 'neon') {
+    ctx.fillStyle = '#00e5ff';
+    for (const [s, u] of [[0, 0.5], [1, 0.35], [1, 0.7], [2, 0.5], [3, 0.4]]) { const p = rimPoint(B, s, u, 1); ctx.beginPath(); ctx.arc(p[0], p[1], 2.1, 0, 7); ctx.fill(); }
+  } else if (id === 'surf') {
+    const cx = B.bx + B.bw / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(cx, B.by - Math.max(2, B.t * 0.85)); ctx.lineTo(cx, B.by - 1.6);
+    ctx.moveTo(cx - 7, B.by + B.bh + Math.max(3, B.b * 0.45)); ctx.lineTo(cx, B.by + B.bh + Math.max(2, B.b * 0.15)); ctx.lineTo(cx + 7, B.by + B.bh + Math.max(3, B.b * 0.45));
+    ctx.stroke();
+  } else if (id === 'warp') {
+    const ang = framePhase() * 0.7;
+    ctx.fillStyle = '#ffe1a8';
+    for (let i = 0; i < 4; i++) {
+      const p = rimPoint(B, i, 0.5 + Math.sin(ang + i) * 0.04, 0.85);
+      ctx.beginPath(); ctx.arc(p[0], p[1], 2, 0, 7); ctx.fill();
+    }
+  } else if (id === 'port') {
+    ctx.fillStyle = '#4a3010';
+    for (let i = 0; i < 6; i++) { const p = rimPoint(B, i % 2 ? 1 : 3, (i + 0.5) / 6, 0.8); ctx.beginPath(); ctx.arc(p[0], p[1], 1.5, 0, 7); ctx.fill(); }
+  } else if (id === 'log') {
+    const p = rimPoint(B, 3, 0.42, 0.8);
+    ctx.strokeStyle = '#e7c48a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(p[0], p[1], 3.2, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(p[0], p[1], 1.2, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(90,150,50,0.85)'; ctx.beginPath(); ctx.ellipse(p[0], p[1] + 8, 3, 2, 0.4, 0, 7); ctx.fill();
+  } else if (id === 'vine') {
+    ctx.fillStyle = '#f4e27a';
+    const p = rimPoint(B, 3, 0.3, 0.7);
+    ctx.beginPath(); ctx.arc(p[0], p[1], 1.6, 0, 7); ctx.fill(); ctx.fillStyle = '#1a1208'; ctx.beginPath(); ctx.arc(p[0], p[1], 0.7, 0, 7); ctx.fill();
+  } else if (id === 'coffin') {
+    const cx = B.bx + B.bw / 2, y = B.by + B.bh + Math.max(4, B.b * 0.55);
+    ctx.strokeStyle = '#ffd56a'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(cx, y - 5); ctx.lineTo(cx, y + 4); ctx.moveTo(cx - 3.5, y - 1.5); ctx.lineTo(cx + 3.5, y - 1.5); ctx.stroke();
+  }
+}
+function paintFrame(danger, pulse) {
+  if (!L.cell || !L.bx) return;
+  const B = frameBox(), id = frameId(), st = FRAME_STYLE[id], pts = framePoints(id, B);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-12, -12, W + 24, H + 24); ctx.rect(B.bx, B.by, B.bw, B.bh); ctx.clip('evenodd');
+  tracePts(pts);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (!danger) {
+    ctx.fillStyle = st.fill; ctx.fill();
+    ctx.lineWidth = 4.5; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.stroke();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = st.stroke; ctx.stroke();
+    if (id === 'neon') { ctx.lineWidth = 1.3; ctx.strokeStyle = '#7af7ff'; ctx.stroke(); }
+    frameDeco(id, B);
+  } else {
+    ctx.lineWidth = 3 + 2 * (pulse || 0);
+    ctx.strokeStyle = 'rgba(255,50,70,' + (0.5 + 0.45 * (pulse || 0)) + ')';
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function frameAudit() {
+  const B = frameBox(), id = frameId(), pts = framePoints(id, B);
+  let inside = 0;
+  for (const [x, y] of pts) if (x > B.bx + 0.8 && x < B.bx + B.bw - 0.8 && y > B.by + 0.8 && y < B.by + B.bh - 0.8) inside++;
+  return { id, name: FRAME_STYLE[id].name, inside, n: pts.length, pad: { l: B.l, r: B.r, t: B.t, b: B.b }, box: { x: B.bx, y: B.by, w: B.bw, h: B.bh } };
+}
 function drawBoard() {
-  const c = L.cell, bx = L.bx, by = L.by, bw = c * COLS, bh = c * VIS, st = STAGES[g.stage];
+  const c = L.cell, bx = L.bx, by = L.by, bw = c * COLS, bh = c * VIS;
   ctx.fillStyle = g.boss && g.boss.kind === 'surfer' ? 'rgba(5,0,20,0.56)' : 'rgba(5,0,20,0.66)'; ctx.fillRect(bx, by, bw, bh); // v28: Sunny shows through a little more
   ctx.drawImage(sockets(c), bx, by, bw, bh);
-  ctx.save(); ctx.shadowColor = st.c1; ctx.shadowBlur = 16; ctx.strokeStyle = st.c1; ctx.lineWidth = 3;
-  ctx.strokeRect(bx - 2, by - 2, bw + 4, bh + 4); ctx.restore();
+  paintFrame(false);
   if (!g.board.length) return;
   ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
   const res = g.res, fallK = res && res.phase === 'fall' ? Math.min(1, res.t / res.dur) : 1, popK = res && res.phase === 'pop' ? res.t / res.dur : -1;
@@ -5664,6 +5888,7 @@ window.__bb = {
   get start() { return { armed: ST.armed, out: ST.out, playing: !!ST.src, plays: ST.plays, taps: ST.taps, critters: ST.critters.length, decoded: !!ST.buf, version: VERSION }; },
   get v28() { return { g, findPops, ROT, collide, COLS, ROWS, HID, STAGE_POPS, ACH_S, DAILY, ADS: BB_ADS, slowT, autoLow, trails: TRAILS.length, sprites: sprites.length, startTutorial, startDaily, MATCH_MIN, nColors: nColors(), grav: gravInterval() }; },
   get layout() { return Object.assign({ W, H }, L); }, get buttons() { return UI.map((b) => Object.assign({}, b)); },
+  get frame() { return frameAudit(); },
 };
 requestAnimationFrame(frame);
 })();
