@@ -68,6 +68,9 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v32 additions
+- **Playfield wobble**: the rectangular grid, round cells, blocks and the themed frame gently sway together — a slow sine, a tiny rotation, and a soft wave along the rows and columns, only a few pixels over about 4 seconds. Cosmetic only: collision, input and the 4-in-a-line rule stay on the straight grid. Reduce Motion (Options, or the system setting) turns the wobble off.
+
 ## Wallet + STORE
 Every game's cash is **banked** into a wallet when the game ends ("Banked +$X"), saved on the device. The wallet shows on the
 title screen and in the **STORE** (title menu). Everything is bought with in-game cash only; there are no real-money purchases.

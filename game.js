@@ -7,7 +7,7 @@
 const COPYRIGHT = '\u00a9 2026 goneRogue Entertainment. All rights reserved.';
 // ---------------------------------------------------------------- setup
 const cv = document.getElementById('c');
-const ctx = cv.getContext('2d', { alpha: false });
+let ctx = cv.getContext('2d', { alpha: false }); // v32: briefly retargeted while the playfield is painted into the jelly layer
 const safeEl = document.getElementById('safe');
 let W = 0, H = 0, DPR = 1;
 const safe = { t: 0, r: 0, b: 0, l: 0 };
@@ -105,7 +105,7 @@ let userGestured = false; // v27: set by audioUnlock (runs inside every touch/cl
 const gestured = () => userGestured || !!(navigator.userActivation && navigator.userActivation.hasBeenActive);
 function vib(p) { const k = [0, 0.5, 1, 1.6][settings.hap | 0] || 0; if (k && CAN_VIB && gestured()) { try { navigator.vibrate(Array.isArray(p) ? p.map((v, i) => (i % 2 ? v : Math.round(v * k))) : Math.round(p * k)); } catch (e) { /* ignore */ } } }
 let autoLow = false; const fxLow = () => settings.fx === 'low' || autoLow; // v28: auto lower-detail when frames get slow
-const RM = () => !!settings.rm; // v28 reduce motion: no bounce / trails / shake / slow-mo
+const RM = () => !!settings.rm; // v28 reduce motion: no bounce / trails / shake / slow-mo. v32: also freezes the playfield wobble
 const saveSettings = () => store.set('bb_settings', settings);
 let scores = store.get('bb_scores_v2', []);
 if (!Array.isArray(scores)) scores = [];
@@ -5136,6 +5136,89 @@ function drawBoard() {
   drawWipe();
   ctx.restore();
 }
+// v32: cosmetic jelly on the rectangular playfield. The grid, sockets, blocks and themed frame are painted
+// together, then sliced by row and by column so a slow sway, a tiny rotation and a per-row / per-column wave
+// move them as one picture. A few px, ~4s. Collision, input and the 4-in-a-line rule keep using the straight grid.
+let osRM = false;
+try {
+  const mq = matchMedia('(prefers-reduced-motion: reduce)');
+  const syncOsRM = () => { osRM = !!mq.matches; };
+  syncOsRM();
+  if (mq.addEventListener) mq.addEventListener('change', syncOsRM);
+} catch (e) { /* ignore */ }
+const wobSlots = { a: null, b: null };
+function boardWobbleOn() {
+  return !RM() && !osRM && L.cell > 0 && (state === 'play' || state === 'dying' || state === 'over' || state === 'won' || state === 'entry');
+}
+function wobAmp() { return Math.min(2.2, Math.max(1.25, L.cell * 0.1)); }
+function wobShift(x, y) {
+  const t = performance.now() / 1000, amp = wobAmp(), c = L.cell;
+  const row = (y - L.by) / c, col = (x - L.bx) / c;
+  const cx = L.bx + c * COLS / 2, cy = L.by + c * VIS / 2;
+  const ang = Math.sin(t * (Math.PI * 2 / 4.2)) * 0.006;
+  return [
+    Math.sin(t * (Math.PI * 2 / 4) + row * 0.4) * amp + Math.sin(t * (Math.PI * 2 / 4.8)) * amp * 0.55 - (y - cy) * ang,
+    Math.sin(t * (Math.PI * 2 / 3.7) + col * 0.48 + 0.8) * amp * 0.8 + Math.sin(t * (Math.PI * 2 / 4.4) + 1.2) * amp * 0.38 + (x - cx) * ang,
+  ];
+}
+function boardWobbleAt(x, y) {
+  if (!boardWobbleOn()) return [0, 0];
+  const s = wobShift(x, y), q = (v) => Math.round(v * DPR) / DPR;
+  return [q(s[0]), q(s[1])];
+}
+function wobLayer(slot, cssW, cssH) {
+  const pw = Math.max(1, Math.ceil(cssW * DPR)), ph = Math.max(1, Math.ceil(cssH * DPR));
+  let s = wobSlots[slot];
+  if (!s || s.cv.width !== pw || s.cv.height !== ph) {
+    const cv2 = document.createElement('canvas');
+    cv2.width = pw; cv2.height = ph;
+    s = { cv: cv2, x: cv2.getContext('2d', { alpha: true }), cssW: pw / DPR, cssH: ph / DPR };
+    wobSlots[slot] = s;
+  }
+  return s;
+}
+function drawPlayfield() {
+  if (!boardWobbleOn()) { drawBoard(); drawDanger(); return; }
+  const pad = 56, reqW = L.cell * COLS + pad * 2, reqH = L.cell * VIS + pad * 2;
+  if (reqW * reqH > 2.5e6) { drawBoard(); drawDanger(); return; }
+  const A = wobLayer('a', reqW, reqH), x0 = L.bx - pad, y0 = L.by - pad;
+  const ax = A.x;
+  ax.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ax.globalAlpha = 1; ax.globalCompositeOperation = 'source-over'; ax.shadowBlur = 0;
+  try { ax.filter = 'none'; } catch (e) { /* ignore */ }
+  ax.clearRect(0, 0, A.cssW, A.cssH);
+  ax.translate(-x0, -y0);
+  const prev = ctx;
+  ctx = ax;
+  try { drawBoard(); drawDanger(); }
+  finally { ctx = prev; }
+  const B = wobLayer('b', A.cssW, A.cssH), bx = B.x;
+  bx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over'; bx.shadowBlur = 0; bx.imageSmoothingEnabled = true;
+  try { bx.filter = 'none'; } catch (e) { /* ignore */ }
+  bx.clearRect(0, 0, B.cssW, B.cssH);
+  // Sheared strips meet at the shared edge, so the wave is a smooth bend instead of a stair.
+  const stepPx = Math.max(2, Math.round(6 * DPR));
+  const snap = (v) => Math.round(v * DPR) / DPR;
+  for (let yPx = 0; yPx < A.cv.height; yPx += stepPx) {
+    const shPx = Math.min(stepPx, A.cv.height - yPx), yCss = yPx / DPR, shCss = shPx / DPR;
+    const dx0 = snap(wobShift(L.bx, y0 + yCss)[0]), dx1 = snap(wobShift(L.bx, y0 + yCss + shCss)[0]);
+    const shear = shCss ? (dx1 - dx0) / shCss : 0;
+    bx.setTransform(DPR, 0, DPR * shear, DPR, DPR * dx0, DPR * yCss);
+    bx.drawImage(A.cv, 0, yPx, A.cv.width, shPx, 0, 0, A.cssW, shCss);
+  }
+  ctx.save();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0; ctx.imageSmoothingEnabled = true;
+  try { ctx.filter = 'none'; } catch (e) { /* ignore */ }
+  for (let xPx = 0; xPx < B.cv.width; xPx += stepPx) {
+    const swPx = Math.min(stepPx, B.cv.width - xPx), xCss = xPx / DPR, swCss = swPx / DPR;
+    const dy0 = snap(wobShift(x0 + xCss, L.by)[1]), dy1 = snap(wobShift(x0 + xCss + swCss, L.by)[1]);
+    const shear = swCss ? (dy1 - dy0) / swCss : 0;
+    ctx.setTransform(DPR, DPR * shear, 0, DPR, DPR * (x0 + xCss), DPR * (y0 + dy0));
+    ctx.drawImage(B.cv, xPx, 0, swPx, B.cv.height, 0, 0, swCss, B.cssH);
+  }
+  ctx.restore();
+}
 function drawHUD() {
   const st = STAGES[g.stage], y0 = L.top, h = L.hudH;
   txt('CASH', L.bx, y0 + h * 0.18, Math.max(11, h * 0.2), 'rgba(255,255,255,0.9)', 'rgba(0,0,0,0.55)', 'left');
@@ -5734,7 +5817,7 @@ function drawTut() {
   fitTxt('TUTORIAL ' + (g.tut.step + 1) + '/' + TUT.length + ': ' + st.title, px + pw / 2, py + ph * 0.24, Math.min(18, c * 0.62), pw - 16, '#ffe23d', '#000');
   fitTxt(st.text, px + pw / 2, py + ph * 0.5, Math.min(13, c * 0.45), pw - 16, '#ffffff', null);
   button('tutSkip', px + pw - 38, py + ph * 0.79, 64, Math.max(24, ph * 0.26), 'SKIP', OFFC, { fs: 12, r: 8 });
-  if (st.lock) { const gx = L.bx + 6 * c + c / 2, gy = L.by + (18 - HID) * c + c / 2, a = 0.5 + 0.5 * Math.sin(T * 8); ctx.strokeStyle = 'rgba(125,255,176,' + a + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(gx, gy, c * 0.5, 0, 7); ctx.stroke(); }
+  if (st.lock) { let gx = L.bx + 6 * c + c / 2, gy = L.by + (18 - HID) * c + c / 2; const wob = boardWobbleAt(gx, gy); gx += wob[0]; gy += wob[1]; const a = 0.5 + 0.5 * Math.sin(T * 8); ctx.strokeStyle = 'rgba(125,255,176,' + a + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(gx, gy, c * 0.5, 0, 7); ctx.stroke(); }
 }
 // ---- daily challenge: same pieces for everyone each day (seeded), one streak counter
 const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -5857,7 +5940,7 @@ function frame(now) {
       let sx = 0, sy = 0;
       if (shakeT > 0) { const m = shakeM * (shakeT / shakeD); sx = rand(-m, m); sy = rand(-m, m); }
       ctx.save(); ctx.translate(sx, sy);
-      drawBoard(); drawDanger(); drawSide(); drawBatsInFlight(); drawFX();
+      drawPlayfield(); drawSide(); drawBatsInFlight(); drawFX();
       ctx.restore();
       if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA + ')'; ctx.fillRect(0, 0, W, H); }
       if (hurtA > 0) { ctx.fillStyle = 'rgba(255,20,50,' + hurtA + ')'; ctx.fillRect(0, 0, W, H); } // v14 OUCH! red flash
@@ -5889,6 +5972,7 @@ window.__bb = {
   get v28() { return { g, findPops, ROT, collide, COLS, ROWS, HID, STAGE_POPS, ACH_S, DAILY, ADS: BB_ADS, slowT, autoLow, trails: TRAILS.length, sprites: sprites.length, startTutorial, startDaily, MATCH_MIN, nColors: nColors(), grav: gravInterval() }; },
   get layout() { return Object.assign({ W, H }, L); }, get buttons() { return UI.map((b) => Object.assign({}, b)); },
   get frame() { return frameAudit(); },
+  get wobble() { const mid = boardWobbleAt(L.bx + L.cell * COLS / 2, L.by + L.cell * VIS / 2), corner = boardWobbleAt(L.bx, L.by); return { on: boardWobbleOn(), mid, corner, amp: L.cell ? wobAmp() : 0 }; },
 };
 requestAnimationFrame(frame);
 })();
