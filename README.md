@@ -11,7 +11,7 @@ The game opens on a wacky vaporwave sunset start screen: a striped retro sun ove
 marble bust in shades, spinning 3D blocks and googly-eyed bouncing blocks under a squash-and-stretch logo.
 The first tap turns sound on and starts the start-screen theme, **SUNSET BOING** (an original 112 BPM future-funk loop,
 `music/start-00.b64`). The second tap slides into the main menu while the theme crossfades into the menu music.
-With sound off, one tap goes straight to the menu. `?stage=N` links skip the start screen.
+With sound off, one tap goes straight to the menu. `?stage=N` (1–13) starts that stage immediately. `?unlock=all` opens every stage in the stage select for this visit only.
 
 ## Controls
 - **Tap**: rotate
@@ -111,7 +111,7 @@ with a soft wave crash each time someone catches a wave.
 
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
-Developer shortcut: `?stage=N` (1–13) starts a new game at that stage, e.g. https://alis0712.github.io/block-bonanza/?stage=13. `?boss=surfer`, `?boss=gator` and `?boss=vampire` jump straight to a boss fight.
+Playtest links (this visit only: they do not write `bb_reach`, the wallet, or scores, and they do not pay the victory bonus): `?stage=N` (1–13) starts that stage immediately, e.g. https://alis0712.github.io/block-bonanza/?stage=12. `?unlock=all` opens every stage in the stage select, e.g. https://alis0712.github.io/block-bonanza/?unlock=all. `?boss=surfer`, `?boss=gator` and `?boss=vampire` jump straight to a boss fight.
 
 Also: ghost piece, lock delay, SRS wall kicks, particles and screen shake, animated backgrounds and a procedural techno
 track per stage, top-10 best scores with initials, wallet and store items (all saved on the device).
