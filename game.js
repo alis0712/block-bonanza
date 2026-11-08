@@ -113,7 +113,13 @@ const saveSettings = () => store.set('bb_settings', settings);
 let scores = store.get('bb_scores_v2', []);
 if (!Array.isArray(scores)) scores = [];
 let reach = 0; // highest stage index the stage select may start (0 = stage 1). Filled in after stats load.
-function noteReach(i) { i = i | 0; if (i > reach && i <= LAST_STAGE) { reach = i; store.set('bb_reach', reach); } }
+// v34: ?stage=N and ?unlock=all are page-load tests. They never write bb_reach, the wallet, or scores.
+const TEST_Q = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
+const TEST_STAGE = (() => { const n = parseInt(TEST_Q.get('stage'), 10); return n >= 1 && n <= LAST_STAGE + 1 ? n : 0; })();
+const UNLOCK_ALL = TEST_Q.get('unlock') === 'all';
+const SANDBOX = TEST_STAGE > 0 || UNLOCK_ALL;
+const stageOpen = (i) => UNLOCK_ALL || i <= reach;
+function noteReach(i) { if (SANDBOX) return; i = i | 0; if (i > reach && i <= LAST_STAGE) { reach = i; store.set('bb_reach', reach); } }
 let lastInit = String(store.get('bb_init', 'AAA')).slice(0, 3).padEnd(3, 'A');
 
 // ---------------------------------------------------------------- helpers
@@ -1712,7 +1718,7 @@ function loadWallet() {
   return w;
 }
 let wallet = loadWallet();
-const saveWallet = () => store.set('bb_wallet', wallet);
+const saveWallet = () => { if (SANDBOX) return; store.set('bb_wallet', wallet); };
 // ---- edition hooks (no real payments or ads exist yet)
 // v27: editions can't be switched from the URL or the logo on the live site. DEV_HOST (localhost / 127.0.0.1 / file://) keeps
 // the old ?edition= and 5-tap test paths. Anywhere, ?preview=full previews the FULL edition for this page load only:
@@ -1769,6 +1775,7 @@ function buySkin(id) {
 const STAGE_BG = [0, 1, 2, 3, 4, 9, 10, 11, 12, 16, 17, 18, 13]; // BGS index per stage (5 = title, 6-8 = store exclusives)
 function bgFor(stageIdx) { const it = SHOP_BG.find((b) => b.id === wallet.bg); return it && it.bg >= 0 ? it.bg : STAGE_BG[stageIdx] || 0; }
 function bankRun() {
+  if (SANDBOX) { g.bank = null; return; } // test links leave the real wallet alone
   const amt = Math.max(0, Math.floor(g.score));
   const from = wallet.cash;
   wallet.cash += amt; wallet.banked += amt; wallet.games++; saveWallet();
@@ -4035,7 +4042,7 @@ function miniHit(b, d, q) {
 }
 // after the defeat line + bonus, the next stage starts
 function miniWin() {
-  const b = g.boss, MB = MINI[b.kind]; b.doneAt = g.time; g.beat[b.kind] = true; ACH_S[b.kind] = true; achCheck();
+  const b = g.boss, MB = MINI[b.kind]; b.doneAt = g.time; g.beat[b.kind] = true; if (!SANDBOX) { ACH_S[b.kind] = true; achCheck(); }
   g.score += MB.bonus; g.miniBonus = (g.miniBonus || 0) + MB.bonus; g.pop = 1;
   const vp = vampPos(); coinBurst(vp.x, vp.y, 30); confetti(70); sfx.chaching();
   floatText('+' + money(MB.bonus) + ' BONUS!', L.bx + L.cell * 5, L.by + L.cell * 5.2, '#ffd23d', L.cell * 0.95, 2);
@@ -4559,7 +4566,7 @@ function updateBats(dt) {
 function winGame() { setTimeout(() => runEnd(true), 0);
   const c = L.cell; g.won = true; g.piece = null; g.res = null; g.bats = []; g.fog = null;
   state = 'won'; overT = 0; paused = false; for (const k in holds) delete holds[k];
-  g.score += WIN_BONUS; g.winBonus = WIN_BONUS; g.pop = 1;
+  if (!SANDBOX) { g.score += WIN_BONUS; g.winBonus = WIN_BONUS; } g.pop = 1;
   for (let y = HID; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const v = g.board[y][x]; if (!v) continue; const [sx, sy] = cellXY(x, y); TUMBLE.push({ x: sx + c / 2, y: sy + c / 2, vx: rand(-260, 260), vy: rand(-700, -200), r: 0, vr: rand(-8, 8), c: spr(v), s: c }); g.board[y][x] = 0; }
   const vp = vampPos();
   for (let i = 0; i < 40; i++) { const a = rand(0, 6.28), v = rand(120, 420); part(vp.x, vp.y, Math.cos(a) * v, Math.sin(a) * v, rand(0.6, 1.2), rand(4, 8), i % 2 ? '#2a0614' : '#ff3355', -60, 0); }
@@ -4606,7 +4613,7 @@ function updateGame(dt) {
   if (grounded()) { g.lock += dt; if (g.lock >= LOCK_T || g.resets >= 15) lockPiece(false); }
   else g.lock = 0;
 }
-function qualifies(s) { return s > 0 && (scores.length < 10 || s > scores[scores.length - 1].s); }
+function qualifies(s) { return !SANDBOX && s > 0 && (scores.length < 10 || s > scores[scores.length - 1].s); }
 function gameOver() {
   g.piece = null; g.res = null; state = 'dying'; overT = 0; paused = false; g.warn = null; g.glitch = null;
   for (const k in holds) delete holds[k];
@@ -4624,6 +4631,7 @@ function gameOver() {
 }
 function submitEntry() {
   const n = ent.map((c) => String.fromCharCode(c)).join('');
+  if (SANDBOX) { if (g.won) { g.saved = true; state = 'won'; overT = 4; } else { state = 'over'; overT = 0; } return; }
   const rec = { n, s: g.score, l: g.popped, lv: g.level, d: Date.now() };
   scores.push(rec); scores.sort((a, b) => b.s - a.s); scores = scores.slice(0, 10);
   store.set('bb_scores_v2', scores); lastInit = n; store.set('bb_init', n);
@@ -4722,17 +4730,17 @@ function toggleSound() {
   settings.sound = !settings.sound; saveSettings();
   if (A.master) A.master.gain.value = settings.sound ? 0.8 : 0;
 }
-let DBG_STAGE = 0; try { DBG_STAGE = Math.max(0, Math.min(LAST_STAGE + 1, parseInt(new URLSearchParams(location.search).get('stage'), 10) || 0)); } catch (e) { /* ignore */ }
-let DBG_BOSS = null; try { DBG_BOSS = new URLSearchParams(location.search).get('boss'); } catch (e) { /* ignore */ }
+let DBG_STAGE = TEST_STAGE;
+let DBG_BOSS = null; try { DBG_BOSS = TEST_Q.get('boss'); } catch (e) { /* ignore */ }
 if (DBG_BOSS === 'vampire') { DBG_BOSS = null; DBG_STAGE = LAST_STAGE + 1; } else if (DBG_BOSS && !MINI[DBG_BOSS]) DBG_BOSS = null;
-if (DBG_STAGE > 0 || DBG_BOSS) state = 'title'; // ?stage=N / ?boss=surfer|gator|vampire debug links skip the start screen
-function startGame(daily) { if (!daily && !DBG_STAGE && !DBG_BOSS && (FORCE_TUT || (!store.get('bb_tut', 0) && !navigator.webdriver))) { startTutorial(); return; } newGame(); if (daily) startDaily(); state = 'play'; paused = false; M.step = 0; adSkip = 2; if (DBG_BOSS) dbg.startMini(DBG_BOSS); else if (DBG_STAGE > 1) dbg.setStage(DBG_STAGE - 1); }
-function startAtStage(i) { i = i | 0; if (i <= 0) { startGame(); return; } if (i > reach || i > LAST_STAGE) return; newGame(); state = 'play'; paused = false; M.step = 0; adSkip = 2; dbg.setStage(i); }
+if (DBG_BOSS) state = 'title'; // ?boss= still waits on the title. ?stage=N starts itself after layout.
+function startGame(daily) { if (!daily && !DBG_STAGE && !DBG_BOSS && !SANDBOX && (FORCE_TUT || (!store.get('bb_tut', 0) && !navigator.webdriver))) { startTutorial(); return; } newGame(); if (daily) startDaily(); state = 'play'; paused = false; M.step = 0; adSkip = 2; if (DBG_BOSS) dbg.startMini(DBG_BOSS); else if (DBG_STAGE > 1) dbg.setStage(DBG_STAGE - 1); }
+function startAtStage(i) { i = i | 0; if (i <= 0) { startGame(); return; } if (i > LAST_STAGE || !stageOpen(i)) return; newGame(); state = 'play'; paused = false; M.step = 0; adSkip = 2; dbg.setStage(i); }
 function toMenu() { opt.open = false; state = 'title'; paused = false; setBG(5); M.stage = 0; confirmReset = false; P.length = 0; TUMBLE.length = 0; banner = null; }
 function doAction(id) {
   if (typeof id === 'string' && /^stg\d+$/.test(id)) {
     const i = +id.slice(3);
-    if (i > reach) { floatText('LOCKED', W / 2, H * 0.22, '#ffd180', 22, 1.2); sfx.blip(); return; }
+    if (!stageOpen(i)) { floatText('LOCKED', W / 2, H * 0.22, '#ffd180', 22, 1.2); sfx.blip(); return; }
     startAtStage(i); return;
   }
   switch (id) {
@@ -4753,7 +4761,7 @@ function doAction(id) {
     case 'sort': sortKey = sortKey === 's' ? 'l' : sortKey === 'l' ? 'lv' : 's'; break;
     case 'reset': confirmReset = true; break;
     case 'resetNo': confirmReset = false; break;
-    case 'resetYes': scores = []; store.set('bb_scores_v2', scores); confirmReset = false; break;
+    case 'resetYes': if (SANDBOX) { confirmReset = false; floatText('TEST LINK. SCORES STAY.', W / 2, H * 0.22, '#ffd180', 18, 1.4); break; } scores = []; store.set('bb_scores_v2', scores); confirmReset = false; break;
   }
 }
 function hitUI(x, y) {
@@ -5245,12 +5253,12 @@ function drawStages() {
   const pw = Math.min(W - 16, 440), ph = Math.min(L.bot - L.top - 8, 720), px = (W - pw) / 2, py = L.top + (L.bot - L.top - ph) / 2;
   panel(px, py, pw, ph, '#ff4fd8');
   wobblyWord('STAGES', W / 2, py + 28, Math.min(30, pw / 9), T, 2, LOGO, pw * 0.8);
-  fitTxt(reach >= LAST_STAGE ? 'Every stage is open.' : 'Clear a stage to unlock the next. Saved on this device.', W / 2, py + 50, 12, pw - 20, '#E0FFF7', null);
+  fitTxt(UNLOCK_ALL ? 'Test link: every stage is open. Nothing is saved.' : reach >= LAST_STAGE ? 'Every stage is open.' : 'Clear a stage to unlock the next. Saved on this device.', W / 2, py + 50, 12, pw - 20, '#E0FFF7', null);
   const cols = 3, gap = 6, top = py + 64, bot = py + ph - 58;
   const cw = (pw - 20 - gap * (cols - 1)) / cols, rows = Math.ceil(STAGES.length / cols);
   const ch = Math.min(78, (bot - top - gap * (rows - 1)) / rows);
   STAGES.forEach((st, i) => {
-    const x = px + 10 + (i % cols) * (cw + gap), y = top + Math.floor(i / cols) * (ch + gap), open = i <= reach;
+    const x = px + 10 + (i % cols) * (cw + gap), y = top + Math.floor(i / cols) * (ch + gap), open = stageOpen(i);
     button('stg' + i, x + cw / 2, y + ch * 0.38, cw, Math.max(28, ch * 0.62), String(i + 1), open ? [st.c1, st.c2] : GREY, { fs: ch * 0.28, glow: false, r: 8 });
     fitTxt(open ? st.name : 'LOCKED', x + cw / 2, y + ch * 0.84, Math.max(9, ch * 0.16), cw - 4, open ? '#fff' : 'rgba(255,255,255,0.55)', null);
   });
@@ -5625,7 +5633,7 @@ function drawHUD() {
   }
   const rx = pxp - ps * 1.5 - 14;
   const mb = isMini() ? MINI[g.boss.kind] : null;
-  txt('STAGE ' + (g.stage + 1) + (mb ? ' BOSS' : ''), rx, y0 + h * 0.28, Math.max(11, h * 0.2), 'rgba(255,255,255,0.9)', 'rgba(0,0,0,0.55)', 'right');
+  txt('STAGE ' + (g.stage + 1) + (mb ? ' BOSS' : '') + (SANDBOX ? '  TEST' : ''), rx, y0 + h * 0.28, Math.max(11, h * 0.2), SANDBOX ? '#ffd180' : 'rgba(255,255,255,0.9)', 'rgba(0,0,0,0.55)', 'right');
   fitTxt(mb ? mb.place : st.name, rx, y0 + h * 0.66, h * 0.3, Math.max(60, rx - L.bx - h * 2.6), mb ? mb.c1 : st.c1, '#000', 'right');
 }
 function drawSide() {
@@ -5834,7 +5842,8 @@ function drawWin() {
   fitTxt('Count Blockula is toast. All thirteen stages!', W / 2, py + 98, 16, pw * 0.9, '#ffd0d8', null);
   for (let i = 0; i < 5; i++) { const bx = W / 2 + (i - 2) * 34, by = py + 128 + Math.sin(T * 4 + i) * 5; ctx.save(); ctx.translate(bx, by); batPath(ctx, 12, 0.5 + 0.5 * Math.sin(T * 16 + i)); ctx.fillStyle = '#2a0614'; ctx.fill(); ctx.restore(); }
   txt(money(g.score), W / 2, py + 172, Math.min(48, pw / 7), '#5dff9a', '#062a12', 'center', NFONT);
-  txt('INCLUDES ' + money(g.winBonus || WIN_BONUS) + ' VICTORY BONUS', W / 2, py + 208, 14, '#ffd23d', '#3a1a00', 'center', NFONT);
+  if (SANDBOX) txt('TEST PLAY. NOT SAVED.', W / 2, py + 208, 14, '#ffd180', '#3a1a00', 'center', NFONT);
+  else txt('INCLUDES ' + money(g.winBonus || WIN_BONUS) + ' VICTORY BONUS', W / 2, py + 208, 14, '#ffd23d', '#3a1a00', 'center', NFONT);
   txt('POPPED ' + g.popped + '   \u00b7   CHAIN x' + g.maxChain, W / 2, py + 232, 15, 'rgba(255,255,255,0.8)', null);
   if (rankNew) txt('#' + rankNew + ' ON THE BOARD!', W / 2, py + 260, 20, '#2bf0ff', '#000');
   ctx.restore();
@@ -6095,6 +6104,7 @@ function optToggle(id) {
   saveSettings();
 }
 function resetProgress() {
+  if (SANDBOX) { opt.msg = { t: 2.8, text: 'Test link. Real progress stays put.' }; return; }
   scores = []; store.set('bb_scores_v2', scores);
   const ed = wallet.edition, gr = wallet.grants; store.set('bb_wallet', {}); wallet = loadWallet(); wallet.edition = ed; wallet.grants = gr; if (ed === 'full' && gr.full) wallet.cash = START_CASH.full; saveWallet();
   buildSprites(); reach = 0; store.set('bb_reach', 0); opt.msg = { t: 2.5, text: 'Progress reset. Fresh start!' };
@@ -6237,21 +6247,21 @@ const ACH = [
 const ACH_S = Object.assign({ games: 0, pops: 0, lines: 0, h: 0, v: 0, d: 0, cross: 0, bestChain: 0, megas: 0, best: 0, earned: 0, dailies: 0, surfer: false, gator: false, vamp: false, got: {} }, store.get('bb_stats', {}));
 reach = (() => { // missing key: old saves keep stages 1-9 if they already beat the vampire, and never lose wallet or stats
   let r = store.get('bb_reach', null);
-  if (typeof r !== 'number' || !isFinite(r)) { r = ACH_S.vamp ? 8 : 0; store.set('bb_reach', r); }
+  if (typeof r !== 'number' || !isFinite(r)) { r = ACH_S.vamp ? 8 : 0; if (!SANDBOX) store.set('bb_reach', r); }
   return Math.max(0, Math.min(LAST_STAGE, r | 0));
 })();
 const ACHQ = [];
 function achPop(pop, count, maxG) {
-  if (g.tut) return; ACH_S.pops += count; ACH_S.lines += pop.groups.length; if (pop.cross) ACH_S.cross++;
+  if (g.tut || SANDBOX) return; ACH_S.pops += count; ACH_S.lines += pop.groups.length; if (pop.cross) ACH_S.cross++;
   for (const gr of pop.groups) { if (gr.dir === '1,0') ACH_S.h++; else if (gr.dir === '0,1') ACH_S.v++; else ACH_S.d++; }
   ACH_S.bestChain = Math.max(ACH_S.bestChain, g.chain); if (maxG >= MEGA_MIN) ACH_S.megas++; achCheck();
 }
 function achCheck() {
-  if (g.tut) return;
+  if (g.tut || SANDBOX) return;
   for (const [id, name, , cash, ok] of ACH) if (!ACH_S.got[id] && ok(ACH_S)) { ACH_S.got[id] = 1; wallet.cash += cash; ACH_S.earned += cash; saveWallet(); ACHQ.push({ name, cash, t: 0 }); }
   store.set('bb_stats', ACH_S);
 }
-function runEnd(won) { if (g.tut || g.ended) return; g.ended = true; ACH_S.games++; ACH_S.best = Math.max(ACH_S.best, g.score); if (won) ACH_S.vamp = true; if (g.daily) recordDaily(); achCheck(); }
+function runEnd(won) { if (SANDBOX || g.tut || g.ended) return; g.ended = true; ACH_S.games++; ACH_S.best = Math.max(ACH_S.best, g.score); if (won) ACH_S.vamp = true; if (g.daily) recordDaily(); achCheck(); }
 function drawAchToast(dt) {
   const a = ACHQ[0]; if (!a) return; if (a.t === 0 && aok()) sfx.chaching(); a.t += dt; if (a.t > 2.8) { ACHQ.shift(); return; }
   const k = Math.min(1, a.t / 0.3, (2.8 - a.t) / 0.3), w = Math.min(W - 24, 330), h = 46, x = (W - w) / 2, y = L.top + 4 - (1 - k) * 60;
@@ -6355,8 +6365,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 layout();
+if (TEST_STAGE > 0 && !DBG_BOSS) startGame(); // ?stage=N (1-13) drops straight into that stage
 window.__bb = {
-  get state() { return state; }, get paused() { return paused; }, get piece() { return g.piece ? Object.assign({}, g.piece) : null; },
+  get state() { return state; }, get paused() { return paused; }, get test() { return { sandbox: SANDBOX, stage: TEST_STAGE, unlock: UNLOCK_ALL }; }, get piece() { return g.piece ? Object.assign({}, g.piece) : null; },
   get score() { return g.score; }, get popped() { return g.popped; }, get stage() { return g.stage; }, get chain() { return g.maxChain; }, get resolving() { return !!g.res; }, dbg, get audio() { return A.ctx ? A.ctx.state : 'none'; },
   get danger() { return { on: !!g.danger, t: g.dangerT || 0, count: g.dangerCount || 0, comebacks: g.comebacks || 0, height: g.board ? stackHeight() : 0, banner: banner ? banner.title : null }; },
   get music() { const E = M.E; return { running: !!M.timer, track: M.track, name: TRACKS[M.track].name, bpm: TRACKS[M.track].bpm, step: M.step, section: secAt(Math.floor(M.step / 16)).name, sched: M.sched.slice(), dt: M.lastT[1] - M.lastT[0], pending: M.pending ? M.pending.track : -1, danger: M.danger, voices: E ? E.voices.length : 0, stats: E ? Object.assign({}, E.stats) : null, fanAt: M.fanAt, next: M.next, now: A.ctx ? A.ctx.currentTime : 0 }; },
