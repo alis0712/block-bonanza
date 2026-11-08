@@ -71,6 +71,11 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v38 additions
+- Sunken Sixties is a neon skyline. Restaurants and the motel are multi-story googie towers on both sides, with stacked floors, lit windows, rooftop signs, antennas, and tops that fade into the light. The playfield stays clear.
+- Solaris Keep has a new laid-back electro-funk bed at 110 BPM: slap bass, wah clav chords, a soft vocoder line, a light kick, warm pads, and a dorian harpsichord pluck. It sits under Solaris's voice. No noise bed.
+- `game.js` is cache-busted to `v=38`.
+
 ## v37 additions
 - Solaris's lines are recorded again. The previous clips were cut off and hissy because the quantized speech model wrote broken samples (not-a-number and huge spikes) into the middle of several lines, and the encoder turned those into silence plus noise. These are full takes from a stable render, denoised, with a short fade and a quiet tail. Nothing stops a line once it has started.
 - Tomorrow Park's music is high-energy electro at 128 BPM: a punchy sidechained kick, off-beat bass, supersaw hooks, vocal-style chops, and a build that drops back into the loop. No noise bed.
