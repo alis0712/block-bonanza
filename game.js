@@ -1144,7 +1144,7 @@ function fanfare(E, ti, t) {
 // across the whole file so the loop window is click-free whatever the codec priming). Lazy-loaded per stage, next stage
 // preloaded, played on the same bar grid as the sequencer (M), danger layer + comeback fanfare are matching buffers.
 // If a file can't load the old procedural engine (makeMusic) plays that track instead.
-const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 128, 122, 124, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 12, XM_MARK = 0.25;
+const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 128, 122, 110, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 13, XM_MARK = 0.25;
 const XM = { on: true, gain: 2.2, sd: null, sdT: 0, prime: null, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
 const xmKey = (kind, i) => kind + '-' + String(i).padStart(2, '0');
 const xmLoopLen = (i) => XM_BARS * 240 / XM_BPM[i];
@@ -3798,6 +3798,65 @@ function parkLife(tm, low) {
   ctx.fillStyle = '#ff4fd8'; ctx.fillRect(-8, -3, 4, 3); ctx.fillRect(2, -3, 4, 3);
   ctx.restore();
 }
+function seaTowers(tm, low) {
+  const base = H * 0.9;
+  const flick = (i) => (Math.sin(tm * 11 + i * 1.7) > -0.92 ? 1 : 0.35);
+  const tower = (x, w, top, col, win, name, i) => {
+    const floors = Math.max(5, Math.round((base - top) / (low ? 28 : 20)));
+    const fh = (base - top) / floors;
+    for (let f = 0; f < floors; f++) {
+      const y = base - (f + 1) * fh;
+      const into = y < H * 0.2 ? Math.max(0.2, y / (H * 0.2)) : 1;
+      ctx.globalAlpha = 0.72 * into;
+      const over = 3 + (f % 3 === 0 ? 5 : 1);
+      ctx.fillStyle = f % 2 ? '#241028' : '#32143a';
+      ctx.beginPath();
+      ctx.moveTo(x - over, y + fh);
+      ctx.quadraticCurveTo(x + w * 0.5, y + fh * 0.55, x + w + over, y + fh);
+      ctx.lineTo(x + w - 1, y + 3);
+      ctx.lineTo(x + 1, y + 3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = col; ctx.globalAlpha = 0.35 * into * flick(i + f);
+      ctx.fillRect(x, y + 2, w, 2);
+      const nw = Math.max(1, Math.floor(w / (low ? 14 : 9)));
+      if (!low || f % 2 === 0) for (let k = 0; k < nw; k++) {
+        ctx.globalAlpha = (0.45 + 0.55 * flick(i * 9 + f * 3 + k)) * into;
+        ctx.fillStyle = win;
+        ctx.fillRect(x + 2 + k * (w / nw), y + fh * 0.38, Math.max(2, w / nw - 3), Math.min(5, fh * 0.28));
+      }
+    }
+    ctx.globalAlpha = top < H * 0.16 ? 0.45 : 0.9;
+    ctx.strokeStyle = '#e8eef4'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x + w * 0.55, top); ctx.lineTo(x + w * 0.55, top - 16); ctx.stroke();
+    ctx.fillStyle = flick(i + 3) > 0.5 ? '#ff4d6a' : '#7cf7ff';
+    ctx.beginPath(); ctx.arc(x + w * 0.55, top - 16, 2.2, 0, 7); ctx.fill();
+    const roof = top + 8;
+    if (!(L.cell && roof > L.by + 8 && roof < L.by + L.cell * VIS - 8 && x > L.bx && x < L.bx + L.cell * COLS)) {
+      ctx.globalAlpha = flick(i);
+      ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = col; ctx.fillText(name, x + w * 0.5, roof);
+      ctx.fillStyle = '#fffef8'; ctx.globalAlpha = 0.9 * flick(i); ctx.fillText(name, x + w * 0.5, roof);
+    }
+    ctx.globalAlpha = 1;
+  };
+  tower(0, 30, H * 0.05, '#ff4fd8', '#7cf7ff', 'REEF', 1);
+  tower(24, 24, H * -0.02, '#7cf7ff', '#ffe66d', 'MOON', 2);
+  if (!low) tower(44, 16, H * 0.16, '#c9a6ff', '#ff9ad4', '', 3);
+  tower(W - 30, 30, H * 0.02, '#ffe66d', '#ff4fd8', 'TIDAL', 4);
+  tower(W - 52, 24, H * 0.1, '#7ef0e2', '#ffffff', 'ORBIT', 5);
+  if (!low) tower(W - 66, 16, H * 0.2, '#ffb347', '#7cf7ff', '', 6);
+  // distant spires only in the light above the board, drifting slowly
+  ctx.globalAlpha = 0.35;
+  const off = (tm * 6) % 50;
+  for (let i = 0; i < (low ? 4 : 7); i++) {
+    const x = ((i * 54 + off) % (W + 30)) - 10, h = 18 + (i % 3) * 14;
+    ctx.fillStyle = i % 2 ? '#3a1848' : '#2a1238';
+    ctx.fillRect(x, H * 0.12 - h, 8, h);
+    ctx.fillStyle = i % 2 ? '#ff4fd8' : '#7cf7ff';
+    ctx.fillRect(x + 2, H * 0.12 - h + 4, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+}
 function seaShops(tm) {
   const flick = (i) => (Math.sin(tm * 15 + i * 2.4) > -0.94 ? 1 : 0.42);
   const sign = (x, y, text, col, i, size) => {
@@ -3843,15 +3902,7 @@ function seaShops(tm) {
     ctx.fillStyle = '#ffd0ea'; ctx.beginPath(); ctx.ellipse(fx, fy, 6, 2.8, 0, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.moveTo(fx - 5, fy); ctx.lineTo(fx - 9, fy - 3); ctx.lineTo(fx - 9, fy + 3); ctx.fill();
   }
-  // motel tower in the left gutter, windows flickering, name stays on the street
-  ctx.fillStyle = 'rgba(36,18,64,0.9)'; ctx.fillRect(3, H * 0.32, 16, H * 0.3);
-  for (let i = 0; i < 7; i++) {
-    ctx.globalAlpha = flick(20 + i); ctx.fillStyle = i % 2 ? '#ffe66d' : '#7cf7ff';
-    ctx.fillRect(5, H * 0.34 + i * (H * 0.038), 4, 5);
-    ctx.fillRect(12, H * 0.34 + i * (H * 0.038), 4, 5);
   }
-  ctx.globalAlpha = 1;
-}
 function seaLife(tm, ddt, low, fy) {
   const fish = (x, y, dir, kind, sc) => {
     if (boardHides(x, y)) return;
@@ -4147,6 +4198,7 @@ function bgSea(t) {
     ctx.beginPath(); ctx.moveTo(bx, H); ctx.quadraticCurveTo(bx + sway, H * 0.86, bx + sway * 0.4, H * 0.72); ctx.stroke();
   }
   ctx.lineCap = 'butt';
+  seaTowers(tm, low);
   // light rays
   if (!low) { ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (let k = 0; k < 4; k++) { const x0 = W * (0.2 + k * 0.18) + Math.sin(tm * 0.2 + k) * 12; ctx.fillStyle = 'rgba(255,230,250,0.05)'; ctx.beginPath(); ctx.moveTo(x0 - 8, 0); ctx.lineTo(x0 + 8, 0); ctx.lineTo(x0 + 30, H * 0.7); ctx.lineTo(x0 - 24, H * 0.7); ctx.fill(); }
