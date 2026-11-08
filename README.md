@@ -71,6 +71,12 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v43 additions
+- Maw drifts across the Sunken Sixties skyline on a smooth path, and now and then swims closer (larger, a little brighter, out to the edges) before fading back into the distance. Where he crosses the board he turns faint, so the blocks stay readable. Reduce Motion holds him still.
+- The brass-helmet divers walk the scaffold, climb between weld points, and one rides the crane.
+- Welding is a short spark burst (orange and white sparks, a blue arc) and a quiet sine crackle, occasional, with no noise bed. It sits well under the music and the growls.
+- `game.js` is cache-busted to `v=43`.
+
 ## v42 additions
 - Stage 11, Sunken Sixties, ends in a boss: Maw, a giant tentacle with a shark's jaws, looming over the same neon metropolis. 200 HP, one gentle attack every 24 seconds (a nudge, or one dim ink block). The easy fall speed is unchanged. The city, its creatures, Reduce Motion, test links and saved progress stay.
 - Maw growls instead of talking: a deep sine growl with a mid harmonic, lowpassed, on the intro, on hits, on each attack and on defeat. No noise.

@@ -322,6 +322,7 @@ const sfx = {
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
   waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.55); return true; },
   growl(key, d) { if (!aok()) return false; mawGrowl(A.ctx, anow() + 0.02 + (d || 0), A.sfx, key || 'rumble'); return true; },
+  weld() { if (!aok()) return false; weldCrackle(A.ctx, anow() + 0.01, A.sfx); return true; },
   stalk() { if (!aok()) return false; const t0 = anow() + 0.01; for (const [dt2, f] of [[0, 46.2], [0.2, 49], [0.34, 46.2], [0.46, 49], [0.55, 46.2]]) { tone(f, 0.12, 'sawtooth', 0.05, { when: t0 + dt2 }); tone(f * 2, 0.1, 'triangle', 0.03, { when: t0 + dt2 }); } return true; }, // v22: a low two-note pulse that speeds up as he surges (the tell)
   chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   clank(v) { if (!aok()) return false; metalClank(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
@@ -3650,10 +3651,12 @@ function chaseStern(t, dt) { // the back of your boat, bitten up; anchor, outboa
   BG.teethFly = TF.filter((f) => f.t < 2.5 && f.y < H + 40);
 }
 // MAW (v42): a shark's jaws on a huge tentacle, with more tentacles waving. Neon purple and pink, over the sunken city.
-function paintMaw(X, t, F, s, cx, cy, full) {
+function paintMaw(X, t, F, s, cx, cy, full, look) {
   const wave = RM() ? 0 : t, jaw = Math.max(0, Math.min(1, F.jaw || 0)), fade = F.gone || 0;
-  X.save(); X.globalAlpha = (1 - fade) * (full ? 0.94 : 1);
+  const dim = look && look.a != null ? look.a : 1, close = look && look.close || 0;
+  X.save(); X.globalAlpha = (1 - fade) * (full ? 0.94 : 1) * dim;
   X.translate(cx + (F.hit > 0 ? Math.sin(t * 46) * s * 0.05 : 0), cy + (F.dead ? Math.min(1.2, Math.max(0, F.dw) * 0.35) * s : 0));
+  if (full && close > 0.45) { X.save(); X.globalCompositeOperation = 'lighter'; X.fillStyle = 'rgba(255,150,230,' + (0.14 * close) + ')'; X.beginPath(); X.arc(0, s * 0.2, s * 2.4, 0, 7); X.fill(); X.restore(); }
   const n = full ? 6 : 3, reach = full ? 3.5 : 1.45;
   for (let i = 0; i < n; i++) {
     const side = (i - (n - 1) / 2), sway = Math.sin(wave * 1.25 + i * 1.35) * s * 0.42;
@@ -3670,7 +3673,7 @@ function paintMaw(X, t, F, s, cx, cy, full) {
   X.strokeStyle = '#ff4fd8'; X.lineWidth = Math.max(1.5, s * 0.04); X.stroke();
   X.fillStyle = '#7cf7ff';
   for (let k = 0; k < (full ? 5 : 2); k++) { X.beginPath(); X.ellipse(-s * 0.16 + (k % 2) * s * 0.3, s * (0.45 + k * 0.38), s * 0.07, s * 0.11, 0, 0, 7); X.fill(); }
-  X.fillStyle = F.hit > 0.25 ? '#e6d4ff' : '#6d3aa6';
+  X.fillStyle = F.hit > 0.25 ? '#e6d4ff' : (close > 0.55 ? '#8654c8' : '#6d3aa6');
   X.beginPath(); X.moveTo(0, -s * 0.95); X.quadraticCurveTo(s * 0.9, -s * 0.12, s * 0.52, s * 0.32); X.quadraticCurveTo(0, s * 0.55, -s * 0.52, s * 0.32); X.quadraticCurveTo(-s * 0.9, -s * 0.12, 0, -s * 0.95); X.fill();
   X.strokeStyle = '#ff9ad5'; X.lineWidth = Math.max(1.5, s * 0.045); X.stroke();
   X.fillStyle = '#061018'; X.beginPath(); X.ellipse(-s * 0.28, -s * 0.16, s * 0.15, s * 0.09, -0.35, 0, 7); X.ellipse(s * 0.28, -s * 0.16, s * 0.15, s * 0.09, 0.35, 0, 7); X.fill();
@@ -3778,6 +3781,19 @@ const GROWL = {
   hit: { dur: 0.42, f0: 70, f1: 44, amp: 0.36, trem: 18 },
   defeat: { dur: 2.3, f0: 52, f1: 28, amp: 0.5, trem: 5 },
 };
+// v43: a short weld crackle. A few sine ticks through a bandpass, no noise bed, kept quiet.
+function weldCrackle(c, t, dest) {
+  const bus = c.createGain(); bus.gain.value = 0.045; bus.connect(dest);
+  const tick = (when, f, dur, amp) => {
+    const o = c.createOscillator(), bp = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f, when); o.frequency.exponentialRampToValueAtTime(Math.max(90, f * 0.62), when + dur);
+    bp.type = 'bandpass'; bp.frequency.value = Math.max(280, Math.min(1100, f)); bp.Q.value = 3.2;
+    g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(amp, when + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    o.connect(bp); bp.connect(g); g.connect(bus); o.start(when); o.stop(when + dur + 0.02);
+  };
+  tick(t, 210, 0.09, 0.35);
+  for (let i = 0; i < 4; i++) tick(t + 0.03 + i * 0.055, 480 + ((i * 97) % 220), 0.028 + (i % 2) * 0.012, 0.42);
+}
 function mawGrowl(c, t, dest, key) {
   const G = GROWL[key] || GROWL.rumble, end = t + G.dur;
   const lp = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
@@ -3954,6 +3970,18 @@ function boardHides(x, y) {
   const x0 = L.bx + 6, y0 = L.by + 6, x1 = L.bx + L.cell * COLS - 6, y1 = L.by + L.cell * VIS - 6;
   return x > x0 && x < x1 && y > y0 && y < y1;
 }
+function easePing(t, per) {
+  const u = ((t % per) + per) % per / per, s = u < 0.5 ? u * 2 : (1 - u) * 2;
+  return s * s * (3 - 2 * s);
+}
+function smo(u) { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); }
+// v43: Maw eases across the skyline, then in toward the camera and back out. Reduce Motion holds him still.
+function mawCruise(tm) {
+  const baseY = Math.max(H * 0.14, Math.min(H * 0.28, (L.by || H * 0.22) - 4));
+  if (RM()) return { x: W * 0.24, y: baseY, z: 0.78, a: 0.55, close: 0 };
+  const px = easePing(tm, 6.4), py = easePing(tm + 1.7, 5.2), pz = easePing(tm + 0.8, 8.5);
+  return { x: W * (0.06 + 0.88 * px), y: baseY + (py - 0.5) * H * 0.14, z: 0.58 + 0.95 * pz, a: 0.4 + 0.55 * pz, close: pz };
+}
 function parkLife(tm, low) {
   const flocks = low ? 1 : 2, per = low ? 4 : 7;
   for (let f = 0; f < flocks; f++) {
@@ -4109,21 +4137,12 @@ function seaTowers(tm, ddt, low) {
     ctx.fillStyle = '#d5dee8'; ctx.fillRect(x - 5, y - 3, 10, 6);
     ctx.fillStyle = '#7cf7ff'; ctx.fillRect(x - 2, y - 1, 3, 2);
   }
-  // crane load and welding sparks on the right-hand site
-  const hang = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tm * 0.6))) * 36;
+  // crane load. The diver who rides it, and the sparks, are drawn with the crew.
+  const hang = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin((tm || 0) * 0.6))) * 36;
   ctx.strokeStyle = '#e7eef6'; ctx.lineWidth = 1.2; ctx.beginPath();
   ctx.moveTo(W - 30, H * 0.46); ctx.lineTo(W - 30, H * 0.46 + hang); ctx.stroke();
   ctx.fillStyle = '#c9a36a'; ctx.fillRect(W - 38, H * 0.46 + hang, 16, 5);
-  if (ddt && !low) {
-    BG.weld = BG.weld || [];
-    if (BG.weld.length < 8 && Math.random() < ddt * 8) BG.weld.push({ x: W - 41, y: H * 0.7, a: Math.random() * 6, t: 0 });
-    ctx.strokeStyle = 'rgba(255,244,190,0.95)'; ctx.lineWidth = 1; ctx.beginPath();
-    for (let i = BG.weld.length - 1; i >= 0; i--) {
-      const s = BG.weld[i]; s.t += ddt; if (s.t > 0.25) { BG.weld.splice(i, 1); continue; }
-      ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + Math.cos(s.a) * 10, s.y + Math.sin(s.a) * 10);
-    }
-    ctx.stroke();
-  }
+  BG.towerHang = hang;
   // whale, far and high, so it reads as distance
   {
     const x = ((tm * 14) % (W + 220)) - 110, y = H * 0.1;
@@ -4284,25 +4303,102 @@ function seaLife(tm, ddt, low, fy) {
   ctx.strokeStyle = '#e7eef6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, fy); ctx.lineTo(cx, fy - H * 0.22); ctx.lineTo(cx - 48, fy - H * 0.2); ctx.stroke();
   ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx - 40, fy - H * 0.2); ctx.lineTo(cx - 40, fy - H * 0.2 + hang); ctx.stroke();
   ctx.fillStyle = '#c9a36a'; ctx.fillRect(cx - 50, fy - H * 0.2 + hang, 20, 7);
-  const diver = (x, y, weld) => {
-    const s = 16;
-    ctx.fillStyle = '#7d5a32'; ctx.fillRect(x - 6, y, 12, 16);
-    ctx.fillStyle = '#e6c36a'; ctx.beginPath(); ctx.arc(x, y - 6, 7, 0, 7); ctx.fill();
-    ctx.fillStyle = '#14202c'; ctx.beginPath(); ctx.arc(x, y - 6, 3.4, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#f3dd9a'; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.strokeStyle = '#7d5a32'; ctx.lineWidth = 3; ctx.beginPath();
-    ctx.moveTo(x - 6, y + 6); ctx.lineTo(x - 12, y + 12); ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + 11, y + (weld ? -2 : 8)); ctx.stroke();
-    if (weld && ddt) {
-      ctx.strokeStyle = 'rgba(255,244,190,0.95)'; ctx.lineWidth = 1; ctx.beginPath();
-      for (let k = 0; k < 4; k++) { const a = tm * 11 + k * 1.4; ctx.moveTo(x + 12, y + 2); ctx.lineTo(x + 12 + Math.cos(a) * 8, y + 2 + Math.sin(a) * 8); }
-      ctx.stroke();
-      BG.seaBub = BG.seaBub || [];
-      if (BG.seaBub.length < 40 && Math.random() < ddt * 2) BG.seaBub.push({ x: x + 2, y: y - 12, r: rand(1.2, 2.6), v: rand(18, 32), p: rand(0, 6) });
+  BG.yard = { yard, fy, cx, hang };
+}
+// v43: brass-helmet divers move between weld points. One walks the girders, one climbs the tower, one rides the crane.
+function seaCrew(tm, low) {
+  const Y = BG.yard || { yard: W * 0.8, fy: H * 0.78, cx: W * 0.95, hang: 20 };
+  const still = RM();
+  const sky = Math.max(52, (L.by || H * 0.2) - 22);
+  const jobs = [];
+  if (still) {
+    jobs.push({ x: W * 0.32, y: sky, weld: false });
+    jobs.push({ x: W - 36, y: sky - 28, weld: false, climb: true });
+    jobs.push({ x: W - 78, y: sky - 40, weld: false, ride: true });
+    jobs.push({ x: Y.yard + 20, y: Y.fy - 40, weld: false });
+  } else {
+    const e0 = easePing(tm, 5.2);
+    jobs.push({ x: 18 + e0 * (W - 52), y: sky, weld: e0 < 0.14 || e0 > 0.86 });
+    const e1 = easePing(tm + 0.8, 6.4);
+    jobs.push({ x: W - 32 + Math.sin(e1 * Math.PI) * 10, y: sky + 6 - e1 * 56, weld: e1 > 0.84, climb: true });
+    const per = 8.5, u = (tm % per) / per, jx = W - 26, jy = sky - 46, reach = Math.min(78, W * 0.22);
+    let x, y, weld = false;
+    if (u < 0.3) { const k = smo(u / 0.3); x = jx - k * reach; y = jy; }
+    else if (u < 0.55) { const k = smo((u - 0.3) / 0.25); x = jx - reach; y = jy + k * 30; }
+    else if (u < 0.72) { x = jx - reach; y = jy + 30; weld = true; }
+    else { const k = smo((u - 0.72) / 0.28); x = jx - reach * (1 - k); y = jy + 30 * (1 - k); }
+    jobs.push({ x, y, weld, ride: true });
+    if (!low) {
+      const e2 = easePing(tm + 1.4, 6.8);
+      jobs.push({ x: Y.yard + 4 + e2 * 46, y: Y.fy - 40, weld: e2 < 0.16 || e2 > 0.84 });
+      const u2 = (tm % 9) / 9, jibY = Y.fy - H * 0.2, drop = Y.hang * 0.85;
+      let x2, y2, w2 = false;
+      if (u2 < 0.3) { const k = smo(u2 / 0.3); x2 = Y.cx - k * 40; y2 = jibY + 6; }
+      else if (u2 < 0.6) { const k = smo((u2 - 0.3) / 0.3); x2 = Y.cx - 40; y2 = jibY + 6 + k * drop; w2 = k > 0.82; }
+      else { const k = smo((u2 - 0.6) / 0.4); x2 = Y.cx - 40 + k * 36; y2 = jibY + 6 + drop * (1 - k); }
+      jobs.push({ x: x2, y: y2, weld: w2, ride: true });
     }
-  };
-  diver(18, fy - 36, false);
-  diver(yard + 22, fy - 28, true);
-  if (!low) diver(yard + 40, fy - 8, false);
+  }
+  if (!still) {
+    const jx = W - 26, jy = sky - 46, reach = Math.min(78, W * 0.22);
+    ctx.strokeStyle = 'rgba(231,238,246,0.9)'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(jx, jy + 16); ctx.lineTo(jx, jy); ctx.lineTo(jx - reach, jy); ctx.stroke();
+    ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(jx - reach, jy); ctx.lineTo(jx - reach, jy + 32); ctx.stroke();
+  }
+  for (const p of jobs) {
+    if (boardHides(p.x, p.y + 4)) continue;
+    const step = still ? 0 : Math.sin(tm * (p.climb ? 5 : 8) + p.x * 0.05);
+    ctx.fillStyle = '#7d5a32'; ctx.fillRect(p.x - 6, p.y, 12, 16);
+    ctx.fillStyle = '#e6c36a'; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 7, 0, 7); ctx.fill();
+    ctx.fillStyle = '#14202c'; ctx.beginPath(); ctx.arc(p.x, p.y - 6, 3.4, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#f3dd9a'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = '#7d5a32'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath();
+    ctx.moveTo(p.x - 4, p.y + 16); ctx.lineTo(p.x - 4 + step * 4, p.y + 24);
+    ctx.moveTo(p.x + 4, p.y + 16); ctx.lineTo(p.x + 4 - step * 4, p.y + 24);
+    ctx.moveTo(p.x - 6, p.y + 6); ctx.lineTo(p.x - 12, p.y + 12 + step * 2);
+    ctx.moveTo(p.x + 6, p.y + 6); ctx.lineTo(p.x + 12, p.y + (p.weld ? -1 : 8));
+    ctx.stroke(); ctx.lineCap = 'butt';
+  }
+  BG.jobs = jobs;
+}
+function seaWeld(ddt) {
+  const list = BG.sparks || (BG.sparks = []);
+  if (ddt && state === 'play' && !paused && bgCur === 17) {
+    BG.weldT = (BG.weldT || 0) + ddt;
+    if (BG.weldT >= (BG.weldN || 1.6)) {
+      const hot = (BG.jobs || []).filter((p) => p.weld && !boardHides(p.x, p.y));
+      BG.weldT = 0; BG.weldN = 1.7 + Math.random() * 2.3;
+      if (hot.length) {
+        const p = hot[(Math.random() * hot.length) | 0], n = fxLow() ? 5 : 9;
+        for (let i = 0; i < n; i++) {
+          if (list.length > 26) list.shift();
+          const a = -0.4 + Math.random() * 2.2, sp = 36 + Math.random() * 80;
+          list.push({ x: p.x + 12, y: p.y + 1, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6 - 16, t: 0, life: 0.32 + Math.random() * 0.4, hot: Math.random() < 0.4 });
+        }
+        BG.arc = { x: p.x + 12, y: p.y + 1, t: 0 };
+        BG.seaBub = BG.seaBub || [];
+        if (BG.seaBub.length < 36) BG.seaBub.push({ x: p.x + 10, y: p.y - 6, r: 1.6, v: 24, p: Math.random() * 6 });
+        sfx.weld();
+      }
+    }
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    const s = list[i]; s.t += ddt; if (s.t > s.life) { list.splice(i, 1); continue; }
+    if (!ddt) continue;
+    s.vy += 28 * ddt; s.x += s.vx * ddt; s.y += s.vy * ddt; s.vx *= 0.99;
+  }
+  if (!list.length && !(BG.arc && BG.arc.t < 0.14)) return;
+  ctx.save();
+  for (const s of list) {
+    if (boardHides(s.x, s.y)) continue;
+    const k = 1 - s.t / s.life; ctx.globalAlpha = k;
+    ctx.fillStyle = s.hot ? '#fff7e4' : '#ff9a28'; ctx.fillRect(s.x, s.y, 2.2, 2.2);
+  }
+  if (BG.arc && BG.arc.t < 0.14) {
+    BG.arc.t += ddt; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - BG.arc.t / 0.14;
+    ctx.strokeStyle = '#8fd4ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(BG.arc.x, BG.arc.y, 8, 0.2, 2.6); ctx.stroke();
+  }
+  ctx.restore();
 }
 function keepLife(tm, low, hz) {
   ctx.strokeStyle = '#2a1420'; ctx.lineWidth = 1.6; ctx.beginPath();
@@ -4545,7 +4641,25 @@ function bgSea(t) {
   ctx.stroke();
   seaLife(tm, ddt, low, fy);
   seaShops(tm);
-  if (g.boss && g.boss.kind === 'maw') { const F = miniAnim('maw', dt); if (F.gone < 1) paintMaw(ctx, tm, F, Math.min(W, H) * 0.15, W * 0.38, Math.max(H * 0.16, Math.min(H * 0.3, (L.by || H * 0.24) - 6)), true); }
+  seaCrew(tm, low);
+  seaWeld(ddt);
+  if (g.boss && g.boss.kind === 'maw') {
+    const F = miniAnim('maw', dt);
+    if (F.gone < 1) {
+      const c = mawCruise(tm), s = Math.min(W, H) * 0.15 * c.z;
+      const bx = L.bx, by = L.by, bw = L.cell * COLS, bh = L.cell * VIS;
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H);
+      if (L.cell) ctx.rect(bx, by, bw, bh);
+      ctx.clip('evenodd');
+      paintMaw(ctx, tm, F, s, c.x, c.y, true, { a: c.a, close: c.close });
+      ctx.restore();
+      if (L.cell) {
+        ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+        paintMaw(ctx, tm, F, s, c.x, c.y, true, { a: c.a * 0.22, close: 0 });
+        ctx.restore();
+      }
+    }
+  }
 }
 function bgCastle(t) {
   const dt = bgDt(18, t), hz = H * 0.58, wy = H * 0.8, tm = RM() ? 0 : t, ddt = RM() ? 0 : dt, low = fxLow();
