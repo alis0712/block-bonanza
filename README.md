@@ -24,7 +24,7 @@ With sound off, one tap goes straight to the menu. `?stage=N` links skip the sta
 Each falling piece is one of the 7 classic shapes, but every block has its own color
 (blue circle, yellow triangle, pink diamond, teal plus, plus orange star from stage 9, so colors stay readable for colorblind players). Cells and blocks are round bubbles (v28).
 Rows never clear. After a piece lands, **4 or more blocks of one color in a straight line pop**: across, up-and-down, or either diagonal, anywhere on the board (v28; before v28 any touching group of 4 popped). Rainbow blocks are wild inside a line.
-Blocks above fall down (and bounce as they land), and new lines set off **CHAIN x2, x3...** combos. A line of 6 or more is a **MEGA POP!** (with a brief slow-mo). Crossing lines (a cross, L or X) pop together and each shared block adds a $30 bonus.
+The well is the stage's silhouette (v30): masked cells are not drawn, never hold a block, and a line breaks when it hits one. The top of the well stays fully open so pieces can spawn and slide. Blocks above fall down (and bounce as they land) until they hit another block or the mask, and new lines set off **CHAIN x2, x3...** combos. A line of 6 or more is a **MEGA POP!** (with a brief slow-mo). Crossing lines (a cross, L or X) pop together and each shared block adds a $30 bonus.
 Only pops pay: pairs and 3s do nothing, and dropping a piece (soft or hard) adds no cash. Hard drops and very fast soft drops leave a fire trail.
 
 Scoring is shown in dollars ($10 per popped block plus $20 for each block past 4 in a line, plus the crossing bonus, times chain multiplier, times level). Big gains rain coins and MEGA POP / COMEBACK ring the cash register.
@@ -66,7 +66,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 
 ## v29 additions
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
-- **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
+- **Themed board frames**: Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on. v30 cuts the grid to the same silhouette (see below).
+
+## v30 additions
+- **Shaped wells.** Masked cells match the v29 frame for every stage and for Sunny and Gazza. They are not drawn as sockets, they never hold a block, and pieces cannot move into them. The hidden spawn rows and the top two visible rows stay completely open. Gravity and hard drops stop at the mask, so there is no hole a block can fall into and never reach. Matching is unchanged: 4 or more of one color in a straight line, and a masked cell ends the line. The frame (color, rivets, foam curl, coffin cross, and the rest) is drawn around that outline.
 
 ## Wallet + STORE
 Every game's cash is **banked** into a wallet when the game ends ("Banked +$X"), saved on the device. The wallet shows on the

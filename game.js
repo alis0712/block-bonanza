@@ -1481,8 +1481,9 @@ function updatePending() {
 }
 function drawDanger() {
   if (!g.danger || state !== 'play') return;
-  const c = L.cell, x = L.bx, y = L.by, w = c * COLS, h = c * VIS, k = 0.5 + 0.5 * Math.sin(T * 9);
+  const c = L.cell, x = L.bx, y = L.by, w = c * COLS, k = 0.5 + 0.5 * Math.sin(T * 9);
   ctx.save();
+  traceWell(); ctx.clip();
   const gr = ctx.createLinearGradient(0, y, 0, y + c * 5);
   gr.addColorStop(0, 'rgba(255,40,60,' + (0.18 + 0.22 * k) + ')'); gr.addColorStop(1, 'rgba(255,40,60,0)');
   ctx.fillStyle = gr; ctx.fillRect(x, y, w, c * 5);
@@ -1520,11 +1521,12 @@ function roundSet(set, s) { // v28 circular look: every cell sprite becomes a ro
     const gr = x.createRadialGradient(m - r * 0.38, m - r * 0.42, r * 0.04, m, m, r); gr.addColorStop(0, 'rgba(255,255,255,0.6)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.1)'); gr.addColorStop(0.78, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.38)');
     x.fillStyle = gr; x.fillRect(0, 0, s, s); x.restore();
     x.lineWidth = Math.max(1, s * 0.045); x.strokeStyle = 'rgba(0,0,0,0.5)'; x.beginPath(); x.arc(m, m, r, 0, 7); x.stroke(); return c; }); }
-function sockets(c) { // cached circular cell sockets for the board
-  if (cache.sock && cache.sock.c === c) return cache.sock.cv; const cv2 = document.createElement('canvas'), d = DPR; cv2.width = Math.ceil(c * COLS * d); cv2.height = Math.ceil(c * VIS * d);
+function sockets(c) { // cached circular cell sockets, only on open cells of the current silhouette
+  const id = frameId();
+  if (cache.sock && cache.sock.c === c && cache.sock.id === id) return cache.sock.cv; const cv2 = document.createElement('canvas'), d = DPR; cv2.width = Math.ceil(c * COLS * d); cv2.height = Math.ceil(c * VIS * d);
   const x = cv2.getContext('2d'); x.scale(d, d); x.lineWidth = 1;
-  for (let yy = 0; yy < VIS; yy++) for (let xx = 0; xx < COLS; xx++) { x.beginPath(); x.arc(xx * c + c / 2, yy * c + c / 2, c * 0.43, 0, 7); x.fillStyle = 'rgba(0,0,0,0.28)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,0.08)'; x.stroke(); }
-  cache.sock = { c, cv: cv2 }; return cv2; }
+  for (let yy = 0; yy < VIS; yy++) for (let xx = 0; xx < COLS; xx++) if (cellOpen(xx, yy + HID)) { x.beginPath(); x.arc(xx * c + c / 2, yy * c + c / 2, c * 0.43, 0, 7); x.fillStyle = 'rgba(0,0,0,0.28)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,0.08)'; x.stroke(); }
+  cache.sock = { c, id, cv: cv2 }; return cv2; }
 function makeSpriteSet(skin, s) {
   const base = ['#3D8BFF', '#FFD23F', '#FF4FA3', '#2EE6A6', '#FF8A1F', 'RAINBOW', '#8d99a6', '#2a2140', '#ffffff'];
   const set = base.map((c, idx) => {
@@ -3685,6 +3687,7 @@ function startMini(kind) {
   g.boss = { kind, hp: MB.hp, max: MB.hp, disp: MB.hp, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0,
     lastLaugh: g.time, nextLaugh: g.time + rand(8, 11), laughs: 0, why: {}, cries: 0, kinds: {}, lv: null, talk: null, said: [], hz: 0, nudges: 0, drops: 0, murks: 0, deadT: 0, doneAt: 0, start: g.time };
   setBG(MB.bg);
+  reconcileMask();
   const show = () => { showBanner(MB.banner[0], MB.banner[1], MB.c1, MB.twist); setTimeout(() => { if (isMini() && g.boss.kind === kind && g.boss.hp > 0) { bossTalk('intro'); floatText(BOSS_LINES[kind].intro.text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.7, 1.6); } }, 1100); };
   if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
@@ -3859,6 +3862,7 @@ function collide(t, r, x, y) {
   for (let i = 0; i < c.length; i++) {
     const cx = x + c[i][0], cy = y + c[i][1];
     if (cx < 0 || cx >= COLS || cy >= ROWS) return true;
+    if (cy >= 0 && !cellOpen(cx, cy)) return true; // v30: the silhouette is solid
     if (cy >= 0 && g.board[cy][cx]) return true;
   }
   return false;
@@ -3927,7 +3931,7 @@ function lockPiece(hard) {
   if (p.t === 7) { g.piece = null; explodeBomb(p.x, p.y); return; }
   ROT[p.t][p.r].forEach(([cx, cy], i) => {
     const x = p.x + cx, y = p.y + cy;
-    if (y >= 0) { g.board[y][x] = p.cols[i]; g.anim[y * COLS + x] = g.time; }
+    if (y >= 0 && cellOpen(x, y)) { g.board[y][x] = p.cols[i]; g.anim[y * COLS + x] = g.time; }
     if (y >= HID) allHidden = false;
   });
   g.piece = null;
@@ -3947,13 +3951,16 @@ function resolveNext(doGravity) {
 }
 function applyGravity() {
   let maxD = 0; g.fallOff.fill(0);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (g.board[y][x] && !cellOpen(x, y)) g.board[y][x] = 0;
   for (let x = 0; x < COLS; x++) {
-    let w = ROWS - 1;
-    for (let y = ROWS - 1; y >= 0; y--) {
-      const v = g.board[y][x];
-      if (!v) continue;
-      if (w !== y) { g.board[w][x] = v; g.board[y][x] = 0; g.fallOff[w * COLS + x] = w - y; maxD = Math.max(maxD, w - y); }
-      w--;
+    for (const [top, bot] of colSpans(x)) { // each open run is its own well; blocks never cross a mask
+      let w = bot;
+      for (let y = bot; y >= top; y--) {
+        const v = g.board[y][x];
+        if (!v) continue;
+        if (w !== y) { g.board[w][x] = v; g.board[y][x] = 0; g.fallOff[w * COLS + x] = w - y; maxD = Math.max(maxD, w - y); }
+        w--;
+      }
     }
   }
   if (!maxD) return false;
@@ -3968,9 +3975,10 @@ function findPops() { // v28: 4+ same-color blocks in a STRAIGHT LINE (horizonta
     for (const [dx, dy] of LINE_DIRS) {
       for (let y0 = 0; y0 < ROWS; y0++) for (let x0 = 0; x0 < COLS; x0++) {
         const px = x0 - dx, py = y0 - dy; // only start at the first cell of a run
-        if (px >= 0 && px < COLS && py >= 0 && py < ROWS) { const pv = g.board[py][px]; if (pv === c || pv === RAINBOW) continue; }
+        if (px >= 0 && px < COLS && py >= 0 && py < ROWS && cellOpen(px, py)) { const pv = g.board[py][px]; if (pv === c || pv === RAINBOW) continue; }
+        if (!cellOpen(x0, y0)) continue;
         const run = []; let x = x0, y = y0, real = 0;
-        while (x >= 0 && x < COLS && y >= 0 && y < ROWS) { const v = g.board[y][x]; if (v !== c && v !== RAINBOW) break; if (v === c) real++; run.push(y * COLS + x); x += dx; y += dy; }
+        while (x >= 0 && x < COLS && y >= 0 && y < ROWS && cellOpen(x, y)) { const v = g.board[y][x]; if (v !== c && v !== RAINBOW) break; if (v === c) real++; run.push(y * COLS + x); x += dx; y += dy; }
         if (run.length >= MATCH_MIN && real > 0) { groups.push({ c, size: run.length, cells: run, dir: dx + ',' + dy }); for (const k of run) { pm[k] = 1; hits[k]++; } }
       }
     }
@@ -4047,6 +4055,7 @@ function enterStage(ns, queued) {
   g.stage = ns; M.stage = ns; setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
   g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 } : null;
   stageBanner(ns, queued);
+  reconcileMask();
 }
 // v14: the vampire laughs (sound + background + portrait). Throttled: at most once every 7 s, never during an OUCH
 function bossLaugh(why) {
@@ -4093,13 +4102,20 @@ function updateResolve(dt) {
 // --- stage twists
 function riseRow(kind) {
   if (g.board[0].some((v) => v)) { gameOver(); return; }
-  g.board.shift();
-  const row = new Int8Array(COLS), n = nColors(), garbage = kind === 'lava' ? 5 : 4;
-  const idx = [...Array(COLS).keys()].sort(() => Math.random() - 0.5);
-  for (let i = 0; i < COLS; i++) row[idx[i]] = i < garbage ? (kind === 'lava' ? LAVA : VINE) : 1 + (Math.random() * n | 0);
-  g.board.push(row);
+  const n = nColors(), garbage = kind === 'lava' ? 5 : 4;
+  const order = [];
+  for (let x = 0; x < COLS; x++) if (cellOpen(x, ROWS - 1)) order.push(x);
+  order.sort(() => Math.random() - 0.5);
+  const neu = new Int8Array(COLS);
+  for (let i = 0; i < order.length; i++) neu[order[i]] = i < Math.min(garbage, order.length) ? (kind === 'lava' ? LAVA : VINE) : 1 + (Math.random() * n | 0);
+  for (let x = 0; x < COLS; x++) {
+    for (const [top, bot] of colSpans(x)) { // surge each open run; a mask is a ceiling, garbage lands on the real floor
+      for (let y = top; y < bot; y++) g.board[y][x] = g.board[y + 1][x];
+      g.board[bot][x] = bot === ROWS - 1 ? neu[x] : 0;
+    }
+  }
   g.anim.fill(-9);
-  for (let x = 0; x < COLS; x++) g.anim[(ROWS - 1) * COLS + x] = g.time;
+  for (let x = 0; x < COLS; x++) if (cellOpen(x, ROWS - 1)) g.anim[(ROWS - 1) * COLS + x] = g.time;
   const p = g.piece;
   if (p && collide(p.t, p.r, p.x, p.y)) { if (!collide(p.t, p.r, p.x, p.y - 1)) p.y--; else if (!collide(p.t, p.r, p.x, p.y - 2)) p.y -= 2; else { gameOver(); return; } }
   if (p) g.lowY = p.y;
@@ -4168,8 +4184,14 @@ function updateTwists(dt) {
 function shiftConveyor() {
   const p = g.piece, row = CONV_ROW;
   if (p && ROT[p.t][p.r].some(([cx, cy]) => p.y + cy >= row - 1)) return false; // never shove blocks into the falling piece
-  const r = g.board[row], old = Array.from(r), d = g.convDir;
-  for (let x = 0; x < COLS; x++) r[(x + d + COLS) % COLS] = old[x];
+  const old = Array.from(g.board[row]), d = g.convDir;
+  let x = 0;
+  while (x < COLS) {
+    if (!cellOpen(x, row)) { x++; continue; }
+    const a = x; while (x < COLS && cellOpen(x, row)) x++;
+    const len = x - a; if (len < 2) continue;
+    for (let i = 0; i < len; i++) g.board[row][a + i] = old[a + ((i - d) % len + len) % len];
+  }
   g.convAt = g.time; g.convLast = d; g.convN++; if (g.convN % 3 === 0) g.convDir = -g.convDir;
   sfx.clunk(); shake(0.15, 3);
   const [bx, by] = cellXY(d > 0 ? 0 : COLS - 1, row);
@@ -4207,7 +4229,7 @@ function updateBats(dt) {
     const bt = g.bats[i]; bt.t += dt;
     if (bt.t < bt.d || g.res) continue;
     g.bats.splice(i, 1);
-    let y = ROWS - 1; while (y >= 0 && g.board[y][bt.col]) y--;
+    let y = ROWS - 1; while (y >= 0 && (!cellOpen(bt.col, y) || g.board[y][bt.col])) y--;
     const p = g.piece, blocked = p && ROT[p.t][p.r].some(([cx, cy]) => p.x + cx === bt.col && p.y + cy >= y - 1);
     const [px, py] = cellXY(bt.col, Math.max(HID, y));
     if (y > HID + 3 && !blocked) { g.board[y][bt.col] = bt.v || WEB; g.anim[y * COLS + bt.col] = g.time; if (bt.kind === 'ball') tone(300, 0.1, 'triangle', 0.1, { to: 180 }); else if (bt.kind === 'splash') sfx.splash(0.45); else sfx.web(); }
@@ -4300,7 +4322,7 @@ const dbg = {
   get beat() { return Object.assign({}, g.beat); }, get bossPops() { return g.bossPops; }, get handoff() { return { pending: g.handoff ? Object.assign({}, g.handoff) : null, last: g.lastHandoff ? Object.assign({}, g.lastHandoff) : null, n: g.handoffs || 0 }; }, effPop() { return effPop(); }, // offline rendering of the boss voices (preview export)
   setup(rows, piece) {
     for (let y = 0; y < ROWS; y++) g.board[y].fill(0);
-    rows.forEach((s, i) => { const y = ROWS - rows.length + i; [...s].forEach((ch, x) => { g.board[y][x] = LETTERS[ch] || 0; }); });
+    rows.forEach((s, i) => { const y = ROWS - rows.length + i; [...s].forEach((ch, x) => { g.board[y][x] = cellOpen(x, y) ? (LETTERS[ch] || 0) : 0; }); });
     g.res = null; g.glitch = null; g.warn = null; g.twistT = 0;
     if (piece) { g.piece = { t: piece.t, r: piece.r || 0, x: piece.x, y: piece.y == null ? 2 : piece.y, cols: [...piece.cols].map((ch) => LETTERS[ch]) }; g.lock = 0; g.resets = 0; g.lowY = g.piece.y; }
   },
@@ -4333,7 +4355,7 @@ const dbg = {
   holdSun(k) { sunHold = k == null ? null : Math.max(0, Math.min(1, +k || 0)); return sunLid(T); },
   sunGeom() { return BG.sunGeom || null; },
   framePhase() { return framePhase(); },
-  frameAudit, frameId,
+  frameAudit, frameId, cellOpen(x, y) { return cellOpen(x, y); }, maskAudit, ruleCheck, maskId() { return frameId(); },
   rows() { return g.board.map((r) => [...r].map((v) => Object.keys(LETTERS).find((k) => LETTERS[k] === v) || '?').join('')); },
   sample(n) { const out = []; for (let i = 0; i < n; i++) out.push(makePiece(0).cols); return out; },
 };
@@ -4642,7 +4664,7 @@ function drawRain() {
 // ---------------------------------------------------------------- START SCREEN (v13): wacky vaporwave sunset, tap to start
 // First tap unlocks audio (iOS) and starts the "Sunset Boing" theme right here on the start screen; the next tap (or
 // right away when sound is off) slides into the main menu while the theme crossfades into the title music.
-const VERSION = 'v29';
+const VERSION = 'v30';
 const ST_BPM = 112, ST_BARS = 16, ST_KEY = 'start-00', ST_LEN = ST_BARS * 240 / ST_BPM;
 const ST = { t: 0, armed: false, out: -1, hit: -9, src: null, g: null, buf: null, plays: 0, critters: [], cubes: [], L: null, lw: 0, lh: 0, sun: null, taps: 0, wantTune: false };
 const VAPOR = ['#ff71ce', '#01cdfe', '#05ffa1', '#b967ff', '#fffb96'];
@@ -4897,8 +4919,9 @@ function drawPreview(q, cx, cy, cs, alpha) {
   c.forEach(([x, y], i) => drawBlock(spr(q.cols[i]), ox + (x - mnx) * cs, oy + (y - mny) * cs, cs));
   ctx.globalAlpha = 1;
 }
-// v29 themed frames. The outer silhouette changes per stage; the 10x20 round-cell playfield is never covered
-// (the frame is clipped to the margin). Decorative motion freezes when Reduce Motion is on.
+// v30: the playfield itself is the v29 silhouette. Masked cells are not drawn, never hold a block,
+// and pieces cannot enter them. Hidden rows plus the top two visible rows stay fully open (spawn and slide).
+// A straight 4-line breaks on a masked cell. Gravity stops at the mask; every open cell is reachable by falling and sliding.
 const FRAME_STYLE = {
   wave: { fill: 'rgba(16,198,224,0.78)', stroke: '#f3fdff', name: 'wave curl' },
   pipe: { fill: 'rgba(96,112,58,0.9)', stroke: '#f0e2a0', name: 'sewer pipe' },
@@ -4914,6 +4937,21 @@ const FRAME_STYLE = {
   coffin: { fill: 'rgba(54,12,26,0.94)', stroke: '#ffd56a', name: 'gothic coffin' },
 };
 const FRAME_OF = ['wave', 'pipe', 'neon', 'bolt', 'warp', 'port', 'gem', 'gear', 'vine', 'coffin'];
+// '#' open, '.' masked. Rows are the 20 visible rows (board y = row + HID). Top two rows are the open mouth.
+const MASKS = {
+  wave: ['##########','##########','##########','##########','#########.','########..','.#######..','..######..','...#####..','...#####..','..######..','..######..','.#######..','########..','########..','########..','########..','########..','########..','########..'],
+  pipe: ['##########','##########','.########.','.########.','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','.########.','.########.','.########.','.########.'],
+  neon: ['##########','##########','.########.','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','..######..','...####...','...####...','...####...','...####...'],
+  surf: ['##########','##########','.########.','.########.','.########.','.########.','.########.','.########.','.########.','.########.','..######..','..######..','..######..','...####...','...####...','...####...','...####...','....##....','....##....','....##....'],
+  bolt: ['##########','##########','.########.','..######..','..######..','..######..','....######','....######','....######','######....','######....','######....','....######','....######','....######','.######...','.######...','.######...','..######..','..######..'],
+  warp: ['##########','##########','.#########','.#########','.#########','.#########','.#########','.#########','.########.','.#######..','#######...','######....','.#####....','.#####....','.#####....','.#####....','.#####....','..#####...','..######..','..######..'],
+  port: ['##########','##########','.########.','..######..','..######..','.########.','.########.','.########.','.########.','.########.','.########.','.########.','.########.','.########.','.########.','..######..','..######..','..######..','..######..','..######..'],
+  log: ['##########','##########','.########.','.########.','.########.','.########.','.########.','.########.','##########','##########','##########','#########.','#########.','#########.','#########.','########..','.#######..','.#######..','.#######..','..######..'],
+  gem: ['##########','##########','.########.','.########.','.########.','.########.','##########','##########','##########','.########.','.########.','..######..','..######..','...####...','...####...','...####...','....##....','....##....','....##....','....##....'],
+  gear: ['##########','##########','.########.','..######..','.########.','.########.','..######..','..######..','.########.','.########.','..######..','..######..','.########.','.########.','..######..','..######..','.########.','.########.','..######..','...####...'],
+  vine: ['##########','##########','.########.','..#######.','..######..','.#######..','.########.','..#######.','...######.','..######..','.#######..','.########.','..#######.','.######...','.#######..','..######..','..######..','.#######..','.#######..','..######..'],
+  coffin: ['##########','##########','.########.','.########.','.########.','##########','##########','##########','##########','##########','##########','.########.','.########.','.########.','..######..','..######..','...####...','...####...','...####...','....##....'],
+};
 function frameId() {
   if (isMini() && g.boss.kind === 'surfer') return 'surf';
   if (isMini() && g.boss.kind === 'gator') return 'log';
@@ -4921,159 +4959,270 @@ function frameId() {
   return FRAME_OF[g.stage] || 'wave';
 }
 function framePhase() { return RM() ? 0 : T; }
-function frameBox() {
-  const c = L.cell, bx = L.bx, by = L.by, bw = c * COLS, bh = c * VIS;
-  const btnTop = settings.buttons ? (L.bot - L.ctrlH / 2 - (L.ctrlH - 6) / 2) : (L.bot - 2);
-  const left = Math.max(2, bx - 1), right = Math.max(2, (L.sx || (bx + bw + 8)) - (bx + bw) - 2);
-  const top = Math.max(2, by - (L.top + L.hudH) - 1), bottom = Math.max(2, btnTop - (by + bh) - 2);
-  return { bx, by, bw, bh, l: Math.min(12, left), r: Math.min(12, right), t: Math.min(22, top), b: Math.min(26, bottom) };
+function cellOpen(x, y) {
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return false;
+  if (y < HID) return true; // spawn rows above the silhouette stay open so every piece can appear and slide
+  const rows = MASKS[frameId()];
+  return !rows || rows[y - HID].charAt(x) === '#';
 }
-function rimPoint(B, side, u, o) {
-  o = Math.max(0, Math.min(1, o));
-  const { bx, by, bw, bh } = B, m = 1.4;
-  const l = Math.max(m, B.l), r = Math.max(m, B.r), t = Math.max(m, B.t), b = Math.max(m, B.b);
-  if (side === 0) return [bx + bw * u, by - (m + (t - m) * o)];
-  if (side === 1) return [bx + bw + (m + (r - m) * o), by + bh * u];
-  if (side === 2) return [bx + bw * (1 - u), by + bh + (m + (b - m) * o)];
-  return [bx - (m + (l - m) * o), by + bh * (1 - u)];
+function colSpans(x) {
+  const spans = [];
+  let y = 0;
+  while (y < ROWS) {
+    if (!cellOpen(x, y)) { y++; continue; }
+    const top = y;
+    while (y < ROWS && cellOpen(x, y)) y++;
+    spans.push([top, y - 1]);
+  }
+  return spans;
 }
-function frameOffset(id, side, u, ph) {
-  const s = Math.sin(u * Math.PI);
-  if (id === 'wave') return 0.18 + 0.82 * (0.5 + 0.5 * Math.sin(u * Math.PI * (side % 2 ? 6.5 : 3.5) + ph * 1.3 + side));
-  if (id === 'pipe') { const f = (u * (side % 2 ? 4 : 2)) % 1; return f > 0.36 && f < 0.64 ? 1 : 0.38; }
-  if (id === 'neon') { const k = Math.min(1, Math.min(u, 1 - u) / 0.14); return k * k * (3 - 2 * k); }
-  if (id === 'surf') {
-    if (side === 2) { const notch = Math.max(0, 1 - Math.abs(u - 0.5) / 0.11); return s * (1 - 0.78 * notch); }
-    return Math.pow(s, side === 0 ? 0.72 : 0.9);
-  }
-  if (id === 'bolt') {
-    const n = side % 2 ? 8 : 4, i = Math.floor(u * n), f = u * n - i;
-    const a = hash(side * 19 + i) > 0.42 ? 1 : 0.06, b = hash(side * 19 + i + 1) > 0.42 ? 1 : 0.06;
-    return a + (b - a) * f;
-  }
-  if (id === 'warp') return 0.58 + 0.42 * Math.sin(u * Math.PI * 2 + side + ph * 0.35);
-  if (id === 'port') { const k = Math.min(1, Math.min(u, 1 - u) / 0.08); return 0.58 + 0.42 * (k * k * (3 - 2 * k)); }
-  if (id === 'log') return 0.28 + 0.72 * hash(side * 7 + Math.floor(u * (side % 2 ? 18 : 9)) * 3.17);
-  if (id === 'gem') { const f = (u * (side % 2 ? 7 : 4)) % 1; return 0.08 + 0.92 * (f < 0.5 ? f * 2 : (1 - f) * 2); }
-  if (id === 'gear') { const f = (u * (side % 2 ? 12 : 6) + ph * 0.07) % 1; return f < 0.46 ? 1 : 0.2; }
-  if (id === 'vine') {
-    const wob = 0.5 + 0.5 * Math.sin(u * Math.PI * 2.6 + ph + side * 1.7);
-    const thorn = hash(side * 13 + Math.floor(u * 8)) > 0.52;
-    return Math.min(1, 0.12 + 0.42 * wob + (thorn ? 0.58 : 0));
-  }
-  return 0.75;
-}
-function coffinPoints(B) {
-  const { bx, by, bw, bh, l, r, t, b } = B, cx = bx + bw / 2, m = 1.5, pts = [];
-  for (let i = 0; i <= 18; i++) {
-    const u = i / 18, arch = Math.pow(Math.sin(u * Math.PI), 0.65);
-    pts.push([bx + bw * u, by - (m + (Math.max(m, t) - m) * arch)]);
-  }
-  const shoulder = Math.max(m, Math.min(l, r));
-  pts.push(
-    [bx + bw + r, by + bh * 0.11], [bx + bw + shoulder * 0.4, by + bh * 0.25], [bx + bw + shoulder * 0.4, by + bh * 0.7],
-    [bx + bw + m, by + bh + m], [cx + Math.min(28, bw * 0.16), by + bh + b * 0.38], [cx, by + bh + b],
-    [cx - Math.min(28, bw * 0.16), by + bh + b * 0.38], [bx - m, by + bh + m],
-    [bx - shoulder * 0.4, by + bh * 0.7], [bx - shoulder * 0.4, by + bh * 0.25], [bx - l, by + bh * 0.11]
-  );
-  return pts;
-}
-function framePoints(id, B) {
-  if (id === 'coffin') return coffinPoints(B);
-  const ph = framePhase(), pts = [];
-  for (let s = 0; s < 4; s++) {
-    const steps = s % 2 ? 64 : 40;
-    for (let i = 0; i <= steps; i++) {
-      if (s && i === 0) continue;
-      pts.push(rimPoint(B, s, i / steps, frameOffset(id, s, i / steps, ph)));
+function maskAudit() {
+  const id = frameId(), problems = [];
+  let open = 0;
+  const seen = [];
+  for (let y = 0; y < ROWS; y++) seen.push(new Uint8Array(COLS));
+  const q = [];
+  for (let x = 0; x < COLS; x++) if (cellOpen(x, 0)) { seen[0][x] = 1; q.push([x, 0]); }
+  while (q.length) {
+    const [x, y] = q.pop();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || seen[ny][nx] || !cellOpen(nx, ny)) continue;
+      seen[ny][nx] = 1; q.push([nx, ny]);
     }
   }
+  for (let y = 0; y < ROWS; y++) {
+    let w = 0, runs = 0, inr = false;
+    for (let x = 0; x < COLS; x++) {
+      if (!cellOpen(x, y)) { inr = false; continue; }
+      w++; open++;
+      if (!inr) { runs++; inr = true; }
+      if (!seen[y][x]) problems.push('unreachable ' + x + ',' + y);
+    }
+    if (runs > 1) problems.push('split ' + y);
+    const vis = y - HID;
+    if (vis >= 0 && vis < 16 && w < 4) problems.push('narrow ' + y);
+    if (y < HID + 2 && w < COLS) problems.push('mouth ' + y);
+  }
+  for (let x = 0; x < COLS; x++) for (const [top, bot] of colSpans(x)) if (bot - top < 1 && top >= HID) problems.push('tiny ' + x + '@' + top);
+  for (let y = 0; y < 5; y++) for (let x = 3; x <= 6; x++) if (!cellOpen(x, y)) problems.push('throat ' + x + ',' + y);
+  for (const [t, sx] of [[0, 3], [1, 4], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3]]) {
+    for (const [cx, cy] of ROT[t][0]) if (!cellOpen(sx + cx, 1 + cy)) problems.push('spawn ' + t);
+  }
+  for (const [cx, cy] of ROT[0][1]) if (!cellOpen(3 + cx, 1 + cy)) problems.push('spawnI');
+  if (id === 'wave') {
+    for (const [x, y] of [[0, 21], [1, 21], [2, 21], [3, 21], [4, 21], [4, 20], [5, 21], [5, 20], [5, 19], [6, 21], [6, 20], [6, 19]]) if (!cellOpen(x, y)) problems.push('tut ' + x + ',' + y);
+    for (let y = 0; y < ROWS; y++) if (!cellOpen(6, y) || !cellOpen(7, y)) problems.push('tut-fall ' + y);
+  }
+  return { id, name: FRAME_STYLE[id].name, open, problems };
+}
+function reconcileMask() {
+  if (!g.board || !g.board.length) return;
+  let n = 0;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if (!g.board[y][x] || cellOpen(x, y)) continue;
+    if (!(g.popMask && g.popMask[y * COLS + x]) && L.cell) {
+      const [px, py] = cellXY(x, Math.max(HID, y));
+      TUMBLE.push({ x: px + L.cell / 2, y: py + L.cell / 2, vx: rand(-90, 90), vy: rand(-220, -30), r: 0, vr: rand(-6, 6), c: spr(g.board[y][x]), s: L.cell });
+    }
+    if (!(g.popMask && g.popMask[y * COLS + x])) { g.board[y][x] = 0; n++; }
+  }
+  const p = g.piece;
+  if (p) {
+    for (let k = 0; k < 6 && collide(p.t, p.r, p.x, p.y); k++) p.y--;
+    if (collide(p.t, p.r, p.x, p.y)) gameOver();
+  }
+  if (n && !g.res && state === 'play') applyGravity();
+}
+function ruleCheck() { // logic self-check for the current silhouette (does not leave the board changed)
+  const errors = maskAudit().problems.slice();
+  const snap = g.board.map((r) => Int8Array.from(r)), piece = g.piece, res = g.res, fall = Float32Array.from(g.fallOff);
+  const wipe = () => { for (let y = 0; y < ROWS; y++) g.board[y].fill(0); };
+  try {
+    g.piece = null; g.res = null; wipe();
+    let placed = false;
+    for (let y = HID; y < ROWS && !placed; y++) for (let x = 0; x <= COLS - 4 && !placed; x++) if ([0, 1, 2, 3].every((k) => cellOpen(x + k, y))) {
+      for (let k = 0; k < 4; k++) g.board[y][x + k] = 1;
+      const pop = findPops();
+      if (!pop || !pop.groups.some((gr) => gr.dir === '1,0' && gr.size >= 4)) errors.push('no-h4');
+      placed = true;
+    }
+    if (!placed) errors.push('no-h-room');
+    wipe(); placed = false;
+    for (let x = 0; x < COLS && !placed; x++) for (let y = HID; y <= ROWS - 4 && !placed; y++) if ([0, 1, 2, 3].every((k) => cellOpen(x, y + k))) {
+      for (let k = 0; k < 4; k++) g.board[y + k][x] = 2;
+      const pop = findPops();
+      if (!pop || !pop.groups.some((gr) => gr.dir === '0,1' && gr.size >= 4)) errors.push('no-v4');
+      placed = true;
+    }
+    if (!placed) errors.push('no-v-room');
+    wipe(); placed = false;
+    for (let y = HID; y <= ROWS - 4 && !placed; y++) for (let x = 0; x <= COLS - 4 && !placed; x++) if ([0, 1, 2, 3].every((k) => cellOpen(x + k, y + k))) {
+      for (let k = 0; k < 4; k++) g.board[y + k][x + k] = 3;
+      const pop = findPops();
+      if (!pop || !pop.groups.some((gr) => gr.dir === '1,1' && gr.size >= 4)) errors.push('no-d4');
+      placed = true;
+    }
+    if (!placed) errors.push('no-d-room');
+    wipe();
+    let broke = false;
+    for (let y = HID; y < ROWS && !broke; y++) {
+      let x = 0;
+      while (x < COLS && !broke) {
+        if (!cellOpen(x, y)) { x++; continue; }
+        const a = x; while (x < COLS && cellOpen(x, y)) x++;
+        if (x - a >= 4 && x < COLS && !cellOpen(x, y)) {
+          for (let k = a; k < x; k++) g.board[y][k] = 4;
+          const pop = findPops();
+          const hit = pop ? pop.groups.filter((gr) => gr.dir === '1,0' && gr.cells.some((c) => ((c / COLS) | 0) === y)) : [];
+          const max = hit.reduce((m, gr) => Math.max(m, gr.size), 0);
+          if (max !== x - a) errors.push('break ' + max + '!=' + (x - a));
+          broke = true;
+        }
+      }
+    }
+    wipe(); g.res = null;
+    let floored = false;
+    for (let x = 0; x < COLS && !floored; x++) {
+      let y = ROWS - 1; while (y >= HID && !cellOpen(x, y)) y--;
+      if (y < HID) continue;
+      let top = y; while (top > HID && cellOpen(x, top - 1)) top--;
+      g.board[top][x] = 5; applyGravity();
+      if (g.board[y][x] !== 5) errors.push('floor ' + x);
+      for (let yy = 0; yy < ROWS; yy++) if (!cellOpen(x, yy) && g.board[yy][x]) errors.push('in-mask');
+      g.res = null; g.fallOff.fill(0); wipe(); floored = true;
+    }
+    if (!floored) errors.push('no-floor');
+    for (let y = HID; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const hit = collide(7, 0, x, y);
+      if (!cellOpen(x, y) && !hit) errors.push('enter ' + x + ',' + y);
+      if (cellOpen(x, y) && hit) errors.push('walled ' + x + ',' + y);
+    }
+  } finally {
+    for (let y = 0; y < ROWS; y++) g.board[y].set(snap[y]);
+    g.piece = piece; g.res = res; g.fallOff.set(fall);
+  }
+  return errors;
+}
+function addWell() {
+  const c = L.cell, bx = L.bx, by = L.by;
+  for (let r = 0; r < VIS; r++) for (let x = 0; x < COLS; x++) if (cellOpen(x, r + HID)) ctx.rect(bx + x * c, by + r * c, c, c);
+}
+function traceWell() { ctx.beginPath(); addWell(); }
+function eachRim(fn) {
+  const c = L.cell, bx = L.bx, by = L.by;
+  const O = (x, r) => r >= 0 && r < VIS && x >= 0 && x < COLS && cellOpen(x, r + HID);
+  for (let r = 0; r < VIS; r++) for (let x = 0; x < COLS; x++) if (O(x, r)) {
+    const x0 = bx + x * c, y0 = by + r * c, x1 = x0 + c, y1 = y0 + c;
+    if (!O(x, r - 1)) fn(x0, y0, x1, y0, 0, -1);
+    if (!O(x, r + 1)) fn(x0, y1, x1, y1, 0, 1);
+    if (!O(x - 1, r)) fn(x0, y0, x0, y1, -1, 0);
+    if (!O(x + 1, r)) fn(x1, y0, x1, y1, 1, 0);
+  }
+}
+function rimPts() {
+  const pts = [];
+  eachRim((x0, y0, x1, y1, ox, oy) => pts.push({ x: (x0 + x1) / 2 + ox * 9, y: (y0 + y1) / 2 + oy * 9, mx: (x0 + x1) / 2, my: (y0 + y1) / 2, ox, oy }));
   return pts;
 }
-function tracePts(pts) {
-  ctx.beginPath();
-  for (let i = 0; i < pts.length; i++) { if (i) ctx.lineTo(pts[i][0], pts[i][1]); else ctx.moveTo(pts[i][0], pts[i][1]); }
-  ctx.closePath();
-}
-function frameDeco(id, B) {
+function frameDeco(id) {
+  const pts = rimPts(); if (!pts.length) return;
+  const byDir = (ox, oy) => pts.filter((p) => p.ox === ox && p.oy === oy);
   if (id === 'wave') {
+    const side = byDir(-1, 0).sort((a, b) => b.my - a.my);
+    const p = side[Math.min(2, side.length - 1)] || pts[0];
     ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2.2; ctx.beginPath();
-    const ox = B.bx - B.l * 0.35, oy = B.by + B.bh + Math.min(B.b * 0.25, 6);
-    for (let k = 0; k <= 18; k++) {
-      const a = 0.4 + k / 18 * 1.7 * Math.PI, rad = 1.2 + k / 18 * Math.min(B.l, B.b) * 0.7;
-      const x = ox + Math.cos(a) * rad * 0.8, y = oy + Math.sin(a) * rad;
+    for (let k = 0; k <= 16; k++) {
+      const a = 0.4 + k / 16 * 1.55 * Math.PI, rad = 1.5 + k / 16 * 10;
+      const x = p.x + Math.cos(a) * rad * 0.75, y = p.y + Math.sin(a) * rad * 0.42;
       if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y);
     }
     ctx.stroke();
   } else if (id === 'pipe') {
     ctx.fillStyle = '#f4e7a8';
-    for (let i = 0; i < 4; i++) { const p = rimPoint(B, 3, (i + 0.5) / 4, 0.72); ctx.beginPath(); ctx.arc(p[0], p[1], 1.7, 0, 7); ctx.fill(); }
+    byDir(-1, 0).filter((_, i) => i % 7 === 3).forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, 7); ctx.fill(); });
   } else if (id === 'neon') {
     ctx.fillStyle = '#00e5ff';
-    for (const [s, u] of [[0, 0.5], [1, 0.35], [1, 0.7], [2, 0.5], [3, 0.4]]) { const p = rimPoint(B, s, u, 1); ctx.beginPath(); ctx.arc(p[0], p[1], 2.1, 0, 7); ctx.fill(); }
+    [pts.reduce((a, b) => a.my < b.my ? a : b), pts.reduce((a, b) => a.my > b.my ? a : b), pts.reduce((a, b) => a.mx < b.mx ? a : b), pts.reduce((a, b) => a.mx > b.mx ? a : b)].forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, 7); ctx.fill(); });
   } else if (id === 'surf') {
-    const cx = B.bx + B.bw / 2;
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath();
-    ctx.moveTo(cx, B.by - Math.max(2, B.t * 0.85)); ctx.lineTo(cx, B.by - 1.6);
-    ctx.moveTo(cx - 7, B.by + B.bh + Math.max(3, B.b * 0.45)); ctx.lineTo(cx, B.by + B.bh + Math.max(2, B.b * 0.15)); ctx.lineTo(cx + 7, B.by + B.bh + Math.max(3, B.b * 0.45));
+    const top = pts.reduce((a, b) => a.my < b.my ? a : b), bot = pts.reduce((a, b) => a.my > b.my ? a : b);
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(top.mx, top.my - 8); ctx.lineTo(top.mx, top.my - 1);
+    ctx.moveTo(bot.mx - 7, bot.my + 7); ctx.lineTo(bot.mx, bot.my + 1); ctx.lineTo(bot.mx + 7, bot.my + 7);
     ctx.stroke();
+  } else if (id === 'bolt') {
+    ctx.fillStyle = '#fff4a8';
+    pts.filter((p) => (p.ox !== 0) && ((p.mx + p.my) % 37 < 18)).slice(0, 5).forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, 7); ctx.fill(); });
   } else if (id === 'warp') {
     const ang = framePhase() * 0.7;
     ctx.fillStyle = '#ffe1a8';
     for (let i = 0; i < 4; i++) {
-      const p = rimPoint(B, i, 0.5 + Math.sin(ang + i) * 0.04, 0.85);
-      ctx.beginPath(); ctx.arc(p[0], p[1], 2, 0, 7); ctx.fill();
+      const pool = pts.filter((p) => p.ox === (i % 2 ? 1 : -1) || p.oy === (i < 2 ? -1 : 1));
+      if (!pool.length) continue;
+      const p = pool[Math.abs(Math.floor(framePhase() * 2 + i * 3)) % pool.length];
+      ctx.beginPath(); ctx.arc(p.x + Math.sin(ang + i) * 1.5, p.y, 2, 0, 7); ctx.fill();
     }
   } else if (id === 'port') {
     ctx.fillStyle = '#4a3010';
-    for (let i = 0; i < 6; i++) { const p = rimPoint(B, i % 2 ? 1 : 3, (i + 0.5) / 6, 0.8); ctx.beginPath(); ctx.arc(p[0], p[1], 1.5, 0, 7); ctx.fill(); }
+    pts.filter((_, i) => i % 11 === 4).forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, 7); ctx.fill(); });
   } else if (id === 'log') {
-    const p = rimPoint(B, 3, 0.42, 0.8);
-    ctx.strokeStyle = '#e7c48a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(p[0], p[1], 3.2, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(p[0], p[1], 1.2, 0, 7); ctx.stroke();
-    ctx.fillStyle = 'rgba(90,150,50,0.85)'; ctx.beginPath(); ctx.ellipse(p[0], p[1] + 8, 3, 2, 0.4, 0, 7); ctx.fill();
+    const side = byDir(-1, 0); const p = side[side.length >> 1] || pts[0];
+    ctx.strokeStyle = '#e7c48a'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(p.x, p.y, 3.4, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(p.x, p.y, 1.3, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(90,150,50,0.9)'; ctx.beginPath(); ctx.ellipse(p.x - 2, p.y + 8, 3.2, 1.8, 0.5, 0, 7); ctx.fill();
+  } else if (id === 'gem') {
+    const p = pts.reduce((a, b) => a.my < b.my ? a : b);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(p.x, p.y, 1.7, 0, 7); ctx.fill();
   } else if (id === 'vine') {
-    ctx.fillStyle = '#f4e27a';
-    const p = rimPoint(B, 3, 0.3, 0.7);
-    ctx.beginPath(); ctx.arc(p[0], p[1], 1.6, 0, 7); ctx.fill(); ctx.fillStyle = '#1a1208'; ctx.beginPath(); ctx.arc(p[0], p[1], 0.7, 0, 7); ctx.fill();
+    const side = byDir(-1, 0); const p = side[Math.max(0, side.length - 4)] || pts[0];
+    ctx.fillStyle = '#f4e27a'; ctx.beginPath(); ctx.arc(p.x, p.y, 1.7, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1a1208'; ctx.beginPath(); ctx.arc(p.x, p.y, 0.7, 0, 7); ctx.fill();
   } else if (id === 'coffin') {
-    const cx = B.bx + B.bw / 2, y = B.by + B.bh + Math.max(4, B.b * 0.55);
+    const p = pts.reduce((a, b) => a.my > b.my ? a : b);
     ctx.strokeStyle = '#ffd56a'; ctx.lineWidth = 2; ctx.beginPath();
-    ctx.moveTo(cx, y - 5); ctx.lineTo(cx, y + 4); ctx.moveTo(cx - 3.5, y - 1.5); ctx.lineTo(cx + 3.5, y - 1.5); ctx.stroke();
+    ctx.moveTo(p.mx, p.my + 2); ctx.lineTo(p.mx, p.my + 11); ctx.moveTo(p.mx - 4, p.my + 6); ctx.lineTo(p.mx + 4, p.my + 6); ctx.stroke();
   }
 }
 function paintFrame(danger, pulse) {
   if (!L.cell || !L.bx) return;
-  const B = frameBox(), id = frameId(), st = FRAME_STYLE[id], pts = framePoints(id, B);
+  const id = frameId(), st = FRAME_STYLE[id];
   ctx.save();
-  ctx.beginPath(); ctx.rect(-12, -12, W + 24, H + 24); ctx.rect(B.bx, B.by, B.bw, B.bh); ctx.clip('evenodd');
-  tracePts(pts);
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.rect(-20, -20, W + 40, H + 40); addWell(); ctx.clip('evenodd');
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  eachRim((x0, y0, x1, y1) => { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); });
   if (!danger) {
-    ctx.fillStyle = st.fill; ctx.fill();
-    ctx.lineWidth = 4.5; ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.stroke();
+    ctx.lineWidth = 16; ctx.strokeStyle = st.fill; ctx.stroke();
+    ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.stroke();
     ctx.lineWidth = 2.4; ctx.strokeStyle = st.stroke; ctx.stroke();
     if (id === 'neon') { ctx.lineWidth = 1.3; ctx.strokeStyle = '#7af7ff'; ctx.stroke(); }
-    frameDeco(id, B);
+    frameDeco(id);
   } else {
-    ctx.lineWidth = 3 + 2 * (pulse || 0);
-    ctx.strokeStyle = 'rgba(255,50,70,' + (0.5 + 0.45 * (pulse || 0)) + ')';
-    ctx.stroke();
+    ctx.lineWidth = 8 + 4 * (pulse || 0);
+    ctx.strokeStyle = 'rgba(255,50,70,' + (0.55 + 0.4 * (pulse || 0)) + ')';
+    ctx.shadowColor = '#ff2040'; ctx.shadowBlur = 12; ctx.stroke();
   }
   ctx.restore();
 }
 function frameAudit() {
-  const B = frameBox(), id = frameId(), pts = framePoints(id, B);
+  const id = frameId(), a = maskAudit();
   let inside = 0;
-  for (const [x, y] of pts) if (x > B.bx + 0.8 && x < B.bx + B.bw - 0.8 && y > B.by + 0.8 && y < B.by + B.bh - 0.8) inside++;
-  return { id, name: FRAME_STYLE[id].name, inside, n: pts.length, pad: { l: B.l, r: B.r, t: B.t, b: B.b }, box: { x: B.bx, y: B.by, w: B.bw, h: B.bh } };
+  if (L.cell) eachRim((x0, y0, x1, y1, ox, oy) => {
+    const mx = (x0 + x1) / 2 + ox * 3, my = (y0 + y1) / 2 + oy * 3;
+    const cx = Math.floor((mx - L.bx) / L.cell), cy = Math.floor((my - L.by) / L.cell);
+    if (cx >= 0 && cx < COLS && cy >= 0 && cy < VIS && cellOpen(cx, cy + HID)) inside++;
+  });
+  return { id, name: FRAME_STYLE[id].name, inside, open: a.open, problems: a.problems, n: a.open };
 }
 function drawBoard() {
   const c = L.cell, bx = L.bx, by = L.by, bw = c * COLS, bh = c * VIS;
-  ctx.fillStyle = g.boss && g.boss.kind === 'surfer' ? 'rgba(5,0,20,0.56)' : 'rgba(5,0,20,0.66)'; ctx.fillRect(bx, by, bw, bh); // v28: Sunny shows through a little more
+  ctx.save();
+  traceWell(); ctx.fillStyle = g.boss && g.boss.kind === 'surfer' ? 'rgba(5,0,20,0.56)' : 'rgba(5,0,20,0.66)'; ctx.fill(); // v30: only the open silhouette; Sunny still shows through
+  ctx.restore();
   ctx.drawImage(sockets(c), bx, by, bw, bh);
   paintFrame(false);
   if (!g.board.length) return;
-  ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+  ctx.save();
+  traceWell(); ctx.clip();
   const res = g.res, fallK = res && res.phase === 'fall' ? Math.min(1, res.t / res.dur) : 1, popK = res && res.phase === 'pop' ? res.t / res.dur : -1;
   const gl = g.glitch;
   if (g.stage === 7 && state === 'play') drawConveyor(bx, by, c, bw);
@@ -5525,6 +5674,7 @@ function usePU(id) {
 function applyWipe() {
   const y = ROWS - 1, c = L.cell; let n = 0;
   for (let x = 0; x < COLS; x++) {
+    if (!cellOpen(x, y)) continue;
     const v = g.board[y][x]; if (!v) continue; n++;
     const [px, py] = cellXY(x, y);
     for (let i = 0; i < 6; i++) part(px + c / 2, py + c / 2, rand(-160, 160), rand(-380, -60), rand(0.4, 0.8), rand(3, 6), cellColor(v), 700, 0);
