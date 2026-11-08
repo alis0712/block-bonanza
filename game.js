@@ -320,7 +320,7 @@ const sfx = {
   laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
   surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
-  waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.22); return true; },
+  waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.55); return true; },
   stalk() { if (!aok()) return false; const t0 = anow() + 0.01; for (const [dt2, f] of [[0, 46.2], [0.2, 49], [0.34, 46.2], [0.46, 49], [0.55, 46.2]]) { tone(f, 0.12, 'sawtooth', 0.05, { when: t0 + dt2 }); tone(f * 2, 0.1, 'triangle', 0.03, { when: t0 + dt2 }); } return true; }, // v22: a low two-note pulse that speeds up as he surges (the tell)
   chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   clank(v) { if (!aok()) return false; metalClank(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
@@ -964,32 +964,38 @@ function surfCrash(c, t, dest, nb, v) {
   g3.gain.setValueAtTime(0.0001, t + 0.2); g3.gain.exponentialRampToValueAtTime(0.38 * v, t + 0.23); g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); o.connect(g3); g3.connect(dest); o.start(t + 0.2); o.stop(t + 0.85);
   return t + 1.75;
 }
-// v40: a wave rolling in and washing out. Sines only, lowpassed, so there is no hiss.
+// v41: louder wave (+8 dB vs v40) with mid body so a phone speaker can carry it. Sines only, cut off at 1.6 kHz.
 function waveWhoosh(c, t, dest, v) {
-  v = v || 0.22;
+  v = v || 0.55;
   const dur = 5.6;
+  const bus = c.createGain(); bus.gain.value = 1;
+  const clip = c.createWaveShaper(), n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * 1.15) * 0.8; }
+  clip.curve = curve; bus.connect(clip); clip.connect(dest);
   const layer = (f0, f1, amp, lpHz) => {
     const o = c.createOscillator(), o2 = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
     o.type = 'sine'; o2.type = 'sine';
     o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     o2.frequency.setValueAtTime(f0 * 1.01, t); o2.frequency.exponentialRampToValueAtTime(f1 * 0.99, t + dur);
-    lp.type = 'lowpass'; lp.frequency.value = lpHz; lp.Q.value = 0.6;
+    lp.type = 'lowpass'; lp.frequency.value = lpHz; lp.Q.value = 0.7;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(amp * v, t + 0.9);
     g.gain.setValueAtTime(amp * v * 0.85, t + 3.4);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(dest);
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(bus);
     o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
   };
-  layer(78, 46, 0.9, 280);
-  layer(42, 30, 0.55, 160);
-  const roll = c.createOscillator(), rg = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
-  roll.type = 'sine'; roll.frequency.setValueAtTime(118, t); roll.frequency.exponentialRampToValueAtTime(64, t + dur);
-  lfo.frequency.value = 0.55; lg.gain.value = 0.05 * v;
-  rg.gain.setValueAtTime(0.0001, t); rg.gain.exponentialRampToValueAtTime(0.28 * v, t + 1.1); rg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  layer(78, 46, 0.9, 320);
+  layer(42, 30, 0.5, 180);
+  layer(260, 160, 0.55, 1400);
+  layer(480, 310, 0.32, 1600);
+  const roll = c.createOscillator(), rg = c.createGain(), lfo = c.createOscillator(), lg = c.createGain(), lp = c.createBiquadFilter();
+  roll.type = 'sine'; roll.frequency.setValueAtTime(180, t); roll.frequency.exponentialRampToValueAtTime(96, t + dur);
+  lfo.frequency.value = 0.7; lg.gain.value = 0.08 * v;
+  rg.gain.setValueAtTime(0.0001, t); rg.gain.exponentialRampToValueAtTime(0.36 * v, t + 1.0); rg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   lfo.connect(lg); lg.connect(rg.gain);
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
-  roll.connect(lp); lp.connect(rg); rg.connect(dest);
+  lp.type = 'lowpass'; lp.frequency.value = 700;
+  roll.connect(lp); lp.connect(rg); rg.connect(bus);
   roll.start(t); lfo.start(t); roll.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
   return t + dur;
 }
@@ -4710,7 +4716,7 @@ function miniLaugh(why) {
 function miniHit(b, d, q) {
   const MB = MINI[b.kind], c = L.cell;
   if (b.hp <= 0 && b.kind === 'surfer') { // v40: a wave rolls in under his last line and washes out. No sad trombone.
-    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.waveWhoosh(0.22); bossTalk('defeat', 0.3);
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.waveWhoosh(0.55); bossTalk('defeat', 0.3);
     b.crashes = (b.crashes || 0) + 1;
     shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);

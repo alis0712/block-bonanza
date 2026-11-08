@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v41 additions
+- Sunny's defeat wave is about 8 dB louder than in v40, with extra mid sines (about 160–700 Hz, cut off at 1.6 kHz) so a phone speaker can carry it. A soft clip keeps the stack under 0.8. His spoken line still plays on top. No noise.
+- `game.js` is cache-busted to `v=41`.
+
 ## v40 additions
 - One notch easier, about 7% slower fall. Level 1 is 1.07 s per row instead of 1.00 s. The ramp (6% then 8% per level, and 6% from stage 8) is unchanged. The floor is 0.17 s through stage 7, 0.15 s from stage 8, 0.14 s on stages 10–12, and 0.15 s for the vampire. Boss health and attack timers are unchanged.
 - When Sunny goes down, the sad-trombone sting is a wave rolling in and washing out, synthesized from low sines with no noise. His spoken “Wipeout! Glub… glub…” still plays on top.
