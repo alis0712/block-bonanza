@@ -65,11 +65,16 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Options**: VOICES slider (boss voices), REDUCE MOTION (no bounce, trails, shake or slow-mo), HAPTICS OFF/LOW/MED/HIGH, COLORBLIND patterns, REPLAY TUTORIAL, RESTORE PURCHASES.
 - **Ads**: FREE edition shows one skippable "Go FULL" card at game over, never during play or bosses. FULL has no ads.
 - **Auto low detail**: if frames get slow during play, particles drop to LOW automatically.
-- **Difficulty (rebalanced for the line rule)**: 3 colors in stages 1-3, 4 in stages 4-8, 5 from stage 9 on. Gravity starts at 1.0 s per row (6% faster per level for the first 5 levels, then 8%), 6% faster from stage 8, never faster than 0.16 s (0.14 s from stage 8, 0.13 s on stages 10-12). The vampire fight keeps the 0.14 s floor. Boss fights keep a flat speed. Boss HP: Sunny 150, Gazza 170 (was 240), Vampire 260 (was 340).
+- **Difficulty (rebalanced for the line rule)**: 3 colors in stages 1-3, 4 in stages 4-8, 5 from stage 9 on. Gravity starts at 1.07 s per row (6% faster per level for the first 5 levels, then 8%), 6% faster from stage 8, never faster than 0.17 s (0.15 s from stage 8, 0.14 s on stages 10-12). The vampire fight keeps a 0.15 s floor. Boss fights keep a flat speed. Boss HP: Sunny 150, Gazza 170, Vampire 260.
 
 ## v29 additions
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
+
+## v40 additions
+- One notch easier, about 7% slower fall. Level 1 is 1.07 s per row instead of 1.00 s. The ramp (6% then 8% per level, and 6% from stage 8) is unchanged. The floor is 0.17 s through stage 7, 0.15 s from stage 8, 0.14 s on stages 10–12, and 0.15 s for the vampire. Boss health and attack timers are unchanged.
+- When Sunny goes down, the sad-trombone sting is a wave rolling in and washing out, synthesized from low sines with no noise. His spoken “Wipeout! Glub… glub…” still plays on top.
+- `game.js` is cache-busted to `v=40`.
 
 ## v39 additions
 - Sunken Sixties is an underwater metropolis: a far skyline, a mid city of googie towers, domes and bubble habitats, glass tubes, a bubble-dome food court, construction with welding divers, and traffic (mini-subs, bubble-cars, a cargo sub, a tube pod, drones, a manta hover). A whale crosses the distance, an eel peeks from a tower, and starfish sit on the floor. The street of made-up neon names stays. The middle of the board stays clear. Reduce Motion holds the city still.
