@@ -320,6 +320,7 @@ const sfx = {
   laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
   surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
+  waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.22); return true; },
   stalk() { if (!aok()) return false; const t0 = anow() + 0.01; for (const [dt2, f] of [[0, 46.2], [0.2, 49], [0.34, 46.2], [0.46, 49], [0.55, 46.2]]) { tone(f, 0.12, 'sawtooth', 0.05, { when: t0 + dt2 }); tone(f * 2, 0.1, 'triangle', 0.03, { when: t0 + dt2 }); } return true; }, // v22: a low two-note pulse that speeds up as he surges (the tell)
   chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   clank(v) { if (!aok()) return false; metalClank(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
@@ -962,6 +963,35 @@ function surfCrash(c, t, dest, nb, v) {
   const o = c.createOscillator(), g3 = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(85, t + 0.2); o.frequency.exponentialRampToValueAtTime(38, t + 0.75);
   g3.gain.setValueAtTime(0.0001, t + 0.2); g3.gain.exponentialRampToValueAtTime(0.38 * v, t + 0.23); g3.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); o.connect(g3); g3.connect(dest); o.start(t + 0.2); o.stop(t + 0.85);
   return t + 1.75;
+}
+// v40: a wave rolling in and washing out. Sines only, lowpassed, so there is no hiss.
+function waveWhoosh(c, t, dest, v) {
+  v = v || 0.22;
+  const dur = 5.6;
+  const layer = (f0, f1, amp, lpHz) => {
+    const o = c.createOscillator(), o2 = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sine'; o2.type = 'sine';
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    o2.frequency.setValueAtTime(f0 * 1.01, t); o2.frequency.exponentialRampToValueAtTime(f1 * 0.99, t + dur);
+    lp.type = 'lowpass'; lp.frequency.value = lpHz; lp.Q.value = 0.6;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(amp * v, t + 0.9);
+    g.gain.setValueAtTime(amp * v * 0.85, t + 3.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(dest);
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  };
+  layer(78, 46, 0.9, 280);
+  layer(42, 30, 0.55, 160);
+  const roll = c.createOscillator(), rg = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+  roll.type = 'sine'; roll.frequency.setValueAtTime(118, t); roll.frequency.exponentialRampToValueAtTime(64, t + dur);
+  lfo.frequency.value = 0.55; lg.gain.value = 0.05 * v;
+  rg.gain.setValueAtTime(0.0001, t); rg.gain.exponentialRampToValueAtTime(0.28 * v, t + 1.1); rg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  lfo.connect(lg); lg.connect(rg.gain);
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+  roll.connect(lp); lp.connect(rg); rg.connect(dest);
+  roll.start(t); lfo.start(t); roll.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  return t + dur;
 }
 // v18: sad-trombone "womp womp (womp wommmp)": four falling notes from a brassy saw pair through a wah filter,
 // the last one long with a wobbly vibrato. Original synthesis (a generic chromatic fall, no samples).
@@ -4679,9 +4709,9 @@ function miniLaugh(why) {
 }
 function miniHit(b, d, q) {
   const MB = MINI[b.kind], c = L.cell;
-  if (b.hp <= 0 && b.kind === 'surfer') { // v18: a final wave knocks him off, he sinks (silly), then the sad trombone
-    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.surfCrash(1.15); bossTalk('defeat', 0.3);
-    const wd = 0.3 + voxDur(b.kind, 'defeat') + 0.1; sfx.womp(wd); b.womps = (b.womps || 0) + 1; b.wompAt = g.time + wd; b.crashes = (b.crashes || 0) + 1;
+  if (b.hp <= 0 && b.kind === 'surfer') { // v40: a wave rolls in under his last line and washes out. No sad trombone.
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.waveWhoosh(0.22); bossTalk('defeat', 0.3);
+    b.crashes = (b.crashes || 0) + 1;
     shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0 && b.kind === 'gator') { // v21: one last greedy bite on the outboard - there go the rest of his teeth
@@ -5249,11 +5279,11 @@ function winGame() { setTimeout(() => runEnd(true), 0);
 }
 // speed ramps per level but flattens out. Stages 10-12 sit a hair under the late-game floor.
 // The vampire fight keeps the old stage-10 floor so he is not suddenly meaner. Boss speed stays flat.
-function gravFloor() { return g.stage === BOSS ? 0.14 : g.stage >= 9 ? 0.13 : g.stage >= 7 ? 0.14 : 0.16; }
-function gravCurve(lv, st) { // gentle start, a bit tougher mid, a touch faster on stages 10-12, never below the floor
-  const l = lv - 1, v = 1.0 * Math.pow(0.94, Math.min(l, 4)) * Math.pow(0.92, Math.max(0, l - 4)) * (st >= 7 ? 0.94 : 1);
+function gravFloor() { return gravFloorAt(g.stage); }
+function gravCurve(lv, st) { // v40: one notch slower (7%). Same ramp shape, same boss fights.
+  const l = lv - 1, v = 1.07 * Math.pow(0.94, Math.min(l, 4)) * Math.pow(0.92, Math.max(0, l - 4)) * (st >= 7 ? 0.94 : 1);
   return Math.max(gravFloorAt(st), v); }
-function gravFloorAt(st) { return st === BOSS ? 0.14 : st >= 9 ? 0.13 : st >= 7 ? 0.14 : 0.16; }
+function gravFloorAt(st) { return st === BOSS ? 0.15 : st >= 9 ? 0.14 : st >= 7 ? 0.15 : 0.17; }
 function gravInterval() { if (g.tut) return 1.1; if (g.boss) { if (g.boss.grav == null) g.boss.grav = gravCurve(g.level, g.stage); return g.boss.grav; } return gravCurve(g.level, g.stage); } // bosses: flat speed
 function updateGame(dt) {
   g.time += dt;
