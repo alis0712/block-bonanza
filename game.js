@@ -905,35 +905,34 @@ const BOSS_LINES = {
     ouch3: { t: [['o', 0.16, 1.5, 1.6, 1], ['i', 0.14, 1.6, 1.4, 0.9], ['_', 0.08], ...ME, ['t', 0.03, 1.45], ['sh', 0.08, 1.45], ['o', 0.18, 1.5, 1.4, 1, 1.65], ['m', 0.06, 1.35], ['p', 0.04, 1.3], ['er', 0.14, 1.3, 1.25], ['z', 0.1, 1.2], ['_', 0.06], ...MATE.map((x) => [x[0], x[1], (x[2] || 1) * 1.25, (x[3] || x[2] || 1) * 1.3, x[4], x[5] ? x[5] * 1.3 : 0])], text: 'OI! ME CHOMPERS, MATE!' },
     defeat: { t: [...STREWTH.map((x) => [x[0], x[1] * 1.2, (x[2] || 1) * 1.1, (x[3] || x[2] || 1) * 0.95, x[4], x[5] || 0]), ['_', 0.28], ['n', 0.07, 1.0], ['o', 0.22, 1.0, 0.9, 0.85], ['_', 0.05], ['t', 0.04, 0.95], ['i', 0.3, 0.95, 0.85, 0.85], ['th', 0.14, 0.85], ['_', 0.3], ['a', 0.14, 0.9], ['i', 0.06, 0.88], ['g', 0.04, 0.88], ['ih', 0.1, 0.88], ['v', 0.06, 0.85], ['uh', 0.14, 0.85, 0.8, 0.8], ['p', 0.06, 0.8], ['_', 0.08], ['m', 0.08, 0.82], ['a', 0.2, 0.82, 0.74, 0.75], ['i', 0.26, 0.74, 0.56, 0.6], ['t', 0.08, 0.55]], text: 'STREWTH... NO TEETH... I GIVE UP, MATE!' },
   },
-  // v33: Solaris, a friendly knight. Not a boss. British-leaning: non-rhotic vowels, a falling cadence, no rasp.
+  // v36: Solaris's lines are pre-rendered. The formant synth no longer speaks for him.
   solaris: {
-    a1: { t: [['p', 0.05, 1], ['a', 0.14, 1.02, 0.98, 1], ['sh', 0.09, 1], ['uh', 0.1, 0.97], ['n', 0.06, 0.95], ['s', 0.07, 0.94], ['_', 0.1], ['f', 0.06, 1], ['r', 0.05, 1.02], ['e', 0.12, 1.04, 0.98, 1], ['n', 0.06, 0.96], ['d', 0.05, 0.94], ['_', 0.16], ['i', 0.1, 1], ['v', 0.05, 0.98], ['uh', 0.09, 0.96], ['n', 0.05, 0.94], ['_', 0.05], ['k', 0.05, 1.02], ['a', 0.12, 1.04, 1, 1], ['s', 0.07, 1], ['uh', 0.08, 0.98], ['l', 0.05, 0.96], ['z', 0.07, 0.94], ['_', 0.06], ['w', 0.05, 0.98], ['uh', 0.12, 0.96, 0.9], ['_', 0.06], ['b', 0.04, 1], ['i', 0.09, 1.02, 0.98], ['l', 0.05, 0.96], ['t', 0.05, 0.94], ['_', 0.06], ['w', 0.05, 1], ['uh', 0.07, 1], ['n', 0.05, 0.98], ['_', 0.04], ['s', 0.07, 1.02], ['t', 0.04, 1.02], ['o', 0.14, 1.04, 0.96, 1], ['n', 0.07, 0.94], ['_', 0.05], ['ae', 0.09, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['uh', 0.07, 0.96], ['_', 0.04], ['t', 0.04, 1], ['a', 0.14, 1.02, 0.9, 1], ['i', 0.14, 0.9, 0.78], ['m', 0.1, 0.78]], text: 'Patience, friend. Even castles were built one stone at a time.' },
-    a2: { t: [['uh', 0.08, 1], ['_', 0.04], ['s', 0.08, 1.02], ['t', 0.04, 1.02], ['e', 0.12, 1.04, 1], ['d', 0.04, 1], ['i', 0.12, 1, 0.96], ['_', 0.05], ['h', 0.05, 1], ['ae', 0.12, 1.02, 0.98, 1], ['n', 0.06, 0.96], ['d', 0.05, 0.94], ['_', 0.05], ['b', 0.04, 1.02], ['i', 0.1, 1.04, 1], ['t', 0.04, 0.98], ['s', 0.08, 0.96], ['_', 0.05], ['uh', 0.07, 0.98], ['_', 0.04], ['h', 0.05, 1], ['uh', 0.08, 1], ['r', 0.05, 0.98], ['i', 0.1, 0.98, 0.94], ['d', 0.04, 0.94], ['_', 0.04], ['w', 0.05, 0.96], ['uh', 0.12, 0.94, 0.86], ['n', 0.07, 0.86], ['_', 0.18], ['m', 0.08, 1.05], ['o', 0.16, 1.08, 1.16, 0.9, 1.2], ['s', 0.08, 1.12], ['t', 0.04, 1.1], ['l', 0.05, 1.08], ['i', 0.18, 1.06, 0.9]], text: 'A steady hand beats a hurried one. Mostly.' },
-    a3: { t: [['m', 0.06, 1], ['a', 0.12, 1.02, 1], ['i', 0.1, 1], ['n', 0.06, 0.98], ['d', 0.05, 0.96], ['_', 0.05], ['th', 0.06, 1], ['uh', 0.08, 0.98], ['_', 0.04], ['g', 0.04, 1.02], ['ae', 0.12, 1.04, 1], ['p', 0.05, 0.98], ['_', 0.06], ['b', 0.04, 1], ['i', 0.08, 1.02], ['t', 0.04, 1], ['w', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['n', 0.06, 0.96], ['_', 0.05], ['th', 0.05, 0.98], ['uh', 0.07, 0.96], ['_', 0.04], ['p', 0.04, 1], ['l', 0.05, 1.02], ['ae', 0.12, 1.02, 0.98], ['n', 0.06, 0.96], ['_', 0.05], ['ae', 0.08, 0.98], ['n', 0.05, 0.96], ['d', 0.04, 0.96], ['_', 0.04], ['th', 0.05, 0.98], ['uh', 0.07, 0.96], ['_', 0.04], ['d', 0.04, 1], ['r', 0.05, 1.02], ['o', 0.16, 1.02, 0.86, 1], ['p', 0.06, 0.86]], text: 'Mind the gap between the plan and the drop.' },
-    a4: { t: [['k', 0.05, 1], ['uh', 0.08, 1.02], ['r', 0.05, 1.02], ['i', 0.12, 1.04, 1], ['d', 0.04, 0.98], ['zh', 0.08, 0.96], ['_', 0.05], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['j', 0.05, 1.02], ['uh', 0.08, 1.02], ['s', 0.07, 1], ['t', 0.04, 0.98], ['_', 0.05], ['k', 0.05, 1.02], ['a', 0.12, 1.04, 1], ['i', 0.1, 1], ['n', 0.05, 0.98], ['d', 0.04, 0.96], ['n', 0.05, 0.96], ['uh', 0.08, 0.94], ['s', 0.08, 0.94], ['_', 0.06], ['th', 0.05, 0.98], ['ae', 0.1, 1], ['t', 0.04, 0.98], ['_', 0.04], ['r', 0.05, 1], ['i', 0.08, 1.02], ['f', 0.06, 1], ['y', 0.05, 1.02], ['u', 0.1, 1.02, 0.98], ['z', 0.06, 0.96], ['d', 0.04, 0.96], ['_', 0.05], ['t', 0.04, 1], ['uh', 0.06, 1], ['_', 0.03], ['s', 0.07, 1.02], ['i', 0.1, 1.02, 0.96], ['t', 0.04, 0.96], ['_', 0.04], ['d', 0.04, 0.98], ['a', 0.14, 1, 0.88, 1], ['u', 0.12, 0.88, 0.8], ['n', 0.08, 0.8]], text: 'Courage is just kindness that refused to sit down.' },
-    a5: { t: [['i', 0.08, 1], ['f', 0.06, 1], ['_', 0.04], ['th', 0.05, 1.02], ['uh', 0.07, 1], ['_', 0.03], ['s', 0.07, 1.02], ['t', 0.04, 1.02], ['ae', 0.1, 1.02, 1], ['k', 0.05, 0.98], ['_', 0.04], ['l', 0.05, 1], ['u', 0.1, 1.02, 0.98], ['k', 0.05, 0.96], ['s', 0.07, 0.96], ['_', 0.04], ['g', 0.04, 1], ['r', 0.05, 1.02], ['i', 0.12, 1.02, 0.94], ['m', 0.08, 0.94], ['_', 0.12], ['f', 0.06, 1.02], ['a', 0.1, 1.04, 1], ['i', 0.08, 1], ['n', 0.05, 0.98], ['d', 0.04, 0.98], ['_', 0.04], ['th', 0.05, 1], ['uh', 0.06, 0.98], ['_', 0.03], ['l', 0.05, 1.02], ['a', 0.12, 1.04, 1], ['i', 0.1, 1], ['n', 0.06, 0.98], ['_', 0.05], ['y', 0.05, 1], ['u', 0.1, 1, 0.96], ['_', 0.04], ['h', 0.04, 0.98], ['ae', 0.1, 1], ['v', 0.05, 0.98], ['_', 0.04], ['n', 0.06, 0.98], ['o', 0.1, 0.98, 0.92], ['t', 0.04, 0.92], ['_', 0.04], ['s', 0.07, 0.96], ['i', 0.12, 0.96, 0.84], ['n', 0.08, 0.84]], text: 'If the stack looks grim, find the line you have not seen.' },
-    a6: { t: [['t', 0.05, 1.05], ['i', 0.22, 1.08, 0.98, 1, 1.16], ['_', 0.1], ['w', 0.06, 1], ['u', 0.1, 1.02, 0.98], ['d', 0.05, 0.96], ['_', 0.04], ['h', 0.05, 1], ['e', 0.12, 1.02, 0.96], ['l', 0.05, 0.96], ['p', 0.06, 0.94], ['_', 0.16], ['w', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['_', 0.04], ['a', 0.1, 1], ['r', 0.04, 0.98], ['_', 0.04], ['f', 0.06, 1.02], ['r', 0.05, 1.02], ['e', 0.1, 1.02, 1], ['sh', 0.08, 0.98], ['_', 0.04], ['a', 0.12, 1, 0.92], ['u', 0.1, 0.92, 0.86], ['t', 0.05, 0.86], ['_', 0.14], ['k', 0.05, 1.04], ['ae', 0.12, 1.06, 1.02, 1], ['r', 0.05, 1], ['i', 0.12, 1.02, 0.96], ['_', 0.04], ['o', 0.14, 1, 0.88, 1], ['n', 0.08, 0.88]], text: 'Tea would help. We are fresh out. Carry on.' },
-    a7: { t: [['y', 0.05, 1], ['u', 0.1, 1.02, 1], ['_', 0.04], ['k', 0.05, 1.02], ['ae', 0.1, 1.04, 1], ['n', 0.05, 1], ['o', 0.1, 1, 0.96], ['t', 0.04, 0.96], ['_', 0.05], ['s', 0.07, 1.02], ['t', 0.04, 1.02], ['ae', 0.1, 1.02, 1], ['k', 0.05, 0.98], ['_', 0.04], ['w', 0.05, 1], ['uh', 0.08, 1.02], ['r', 0.05, 1], ['i', 0.16, 1.02, 0.9, 1], ['_', 0.14], ['i', 0.08, 1], ['t', 0.04, 0.98], ['_', 0.04], ['d', 0.04, 1], ['uh', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['n', 0.06, 1], ['o', 0.1, 1.02, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['f', 0.06, 1], ['i', 0.1, 1.02, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['th', 0.05, 0.98], ['uh', 0.07, 0.96], ['_', 0.03], ['g', 0.04, 1], ['r', 0.05, 1.02], ['i', 0.12, 1.02, 0.86], ['d', 0.06, 0.86]], text: 'You cannot stack worry. It does not fit the grid.' },
-    a8: { t: [['f', 0.06, 1.04], ['o', 0.16, 1.06, 1, 1.14], ['r', 0.06, 1], ['_', 0.04], ['i', 0.08, 1], ['n', 0.05, 0.98], ['_', 0.03], ['uh', 0.07, 0.98], ['_', 0.03], ['l', 0.05, 1.02], ['a', 0.12, 1.04, 1], ['i', 0.12, 1.02, 0.94], ['n', 0.07, 0.94], ['_', 0.14], ['th', 0.05, 1], ['ae', 0.1, 1.02, 1], ['t', 0.04, 0.98], ['_', 0.04], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.03], ['th', 0.05, 1], ['uh', 0.07, 0.98], ['_', 0.03], ['t', 0.04, 1.02], ['r', 0.05, 1.02], ['i', 0.1, 1.02, 0.98], ['k', 0.05, 0.96], ['_', 0.08], ['ae', 0.08, 1], ['n', 0.05, 0.98], ['d', 0.04, 0.98], ['_', 0.04], ['o', 0.12, 1.04, 1.1, 0.9, 1.16], ['l', 0.05, 1.08], ['s', 0.06, 1.06], ['o', 0.12, 1.06, 0.96], ['_', 0.06], ['n', 0.06, 0.98], ['o', 0.14, 0.96, 0.84], ['t', 0.06, 0.84]], text: 'Four in a line. That is the trick, and also not.' },
-    a9: { t: [['a', 0.1, 1], ['i', 0.1, 1.02, 0.98], ['_', 0.04], ['w', 0.05, 1], ['uh', 0.08, 1], ['n', 0.05, 0.98], ['s', 0.07, 0.98], ['_', 0.04], ['t', 0.04, 1.04], ['sh', 0.08, 1.04], ['a', 0.12, 1.06, 1.02, 1], ['r', 0.05, 1], ['j', 0.05, 1], ['d', 0.04, 0.98], ['_', 0.04], ['uh', 0.07, 1], ['_', 0.03], ['d', 0.04, 1.02], ['r', 0.05, 1.02], ['ae', 0.12, 1.04, 1], ['g', 0.04, 0.98], ['uh', 0.08, 0.96], ['n', 0.07, 0.94], ['_', 0.16], ['i', 0.08, 1.02], ['t', 0.04, 1], ['_', 0.03], ['w', 0.05, 1], ['o', 0.12, 1.02, 0.98], ['z', 0.06, 0.96], ['_', 0.04], ['uh', 0.07, 1], ['_', 0.03], ['g', 0.04, 1.06], ['u', 0.18, 1.1, 1.18, 1, 1.24], ['s', 0.1, 1.12], ['_', 0.12], ['s', 0.08, 1.02], ['t', 0.04, 1.02], ['i', 0.1, 1.04, 1], ['l', 0.05, 1], ['_', 0.04], ['k', 0.05, 1.02], ['a', 0.12, 1.04, 1], ['u', 0.1, 1], ['n', 0.05, 0.98], ['t', 0.04, 0.96], ['s', 0.08, 0.94]], text: 'I once charged a dragon. It was a goose. Still counts.' },
-    a10: { t: [['r', 0.05, 1], ['e', 0.12, 1.02, 1], ['s', 0.08, 0.98], ['t', 0.05, 0.96], ['_', 0.05], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['n', 0.06, 1], ['o', 0.1, 1.02, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['r', 0.05, 1], ['i', 0.08, 1.02], ['t', 0.04, 1], ['r', 0.05, 1], ['i', 0.12, 1.02, 0.94], ['t', 0.05, 0.94], ['_', 0.14], ['i', 0.08, 1], ['v', 0.05, 1], ['uh', 0.08, 0.98], ['n', 0.06, 0.96], ['_', 0.04], ['n', 0.06, 1.02], ['a', 0.1, 1.04, 1], ['i', 0.08, 1], ['t', 0.04, 0.98], ['s', 0.07, 0.96], ['_', 0.05], ['o', 0.12, 1.02, 1], ['i', 0.1, 1], ['l', 0.06, 0.98], ['_', 0.04], ['th', 0.05, 1], ['e', 0.1, 1.02, 0.98], ['r', 0.04, 0.96], ['_', 0.04], ['h', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['n', 0.05, 0.96], ['j', 0.05, 0.96], ['uh', 0.08, 0.94], ['z', 0.08, 0.9]], text: 'Rest is not retreat. Even knights oil their hinges.' },
-    a11: { t: [['th', 0.06, 1], ['uh', 0.08, 1], ['_', 0.03], ['m', 0.06, 1.02], ['o', 0.16, 1.04, 0.98, 1], ['t', 0.05, 0.96], ['_', 0.05], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['o', 0.12, 1.02, 1], ['n', 0.05, 0.98], ['l', 0.05, 0.98], ['i', 0.12, 0.98, 0.94], ['_', 0.05], ['w', 0.06, 1], ['aw', 0.16, 1.02, 0.96, 1], ['t', 0.04, 0.96], ['uh', 0.1, 0.94], ['_', 0.05], ['w', 0.05, 1], ['i', 0.08, 1.02], ['th', 0.06, 1], ['_', 0.04], ['uh', 0.08, 1.02], ['p', 0.04, 1.02], ['i', 0.1, 1.04, 1], ['n', 0.05, 1], ['y', 0.05, 1], ['uh', 0.1, 1.02, 0.96], ['n', 0.06, 0.94], ['z', 0.08, 0.9]], text: 'The moat is only water with opinions.' },
-    a12: { t: [['b', 0.04, 1.02], ['i', 0.12, 1.04, 1], ['_', 0.04], ['j', 0.05, 1.02], ['e', 0.12, 1.04, 1], ['n', 0.05, 0.98], ['t', 0.04, 0.98], ['uh', 0.08, 0.96], ['l', 0.06, 0.94], ['_', 0.05], ['w', 0.05, 1], ['i', 0.08, 1.02], ['th', 0.06, 1], ['_', 0.03], ['y', 0.05, 1.02], ['o', 0.1, 1.04, 1], ['r', 0.04, 1], ['s', 0.07, 0.98], ['e', 0.1, 0.98, 0.94], ['l', 0.05, 0.94], ['f', 0.07, 0.92], ['_', 0.16], ['th', 0.05, 1], ['uh', 0.07, 1], ['_', 0.03], ['b', 0.04, 1.02], ['l', 0.05, 1.02], ['o', 0.12, 1.04, 1], ['k', 0.05, 0.98], ['s', 0.08, 0.98], ['_', 0.04], ['w', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['l', 0.05, 0.96], ['_', 0.04], ['n', 0.06, 0.98], ['o', 0.16, 0.98, 0.84], ['t', 0.07, 0.84]], text: 'Be gentle with yourself. The blocks will not.' },
-    a13: { t: [['w', 0.05, 1], ['uh', 0.08, 1], ['n', 0.06, 0.98], ['_', 0.04], ['g', 0.04, 1.02], ['u', 0.12, 1.04, 1], ['d', 0.05, 0.98], ['_', 0.04], ['m', 0.06, 1.02], ['ae', 0.12, 1.04, 1], ['t', 0.04, 0.98], ['sh', 0.08, 0.98], ['_', 0.05], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['w', 0.05, 1.02], ['er', 0.12, 1.04, 1], ['th', 0.07, 0.98], ['_', 0.05], ['th', 0.05, 1.04], ['r', 0.05, 1.04], ['i', 0.12, 1.06, 1.02, 1], ['_', 0.04], ['p', 0.04, 1.02], ['ae', 0.1, 1.04, 1], ['n', 0.05, 1], ['i', 0.08, 1], ['k', 0.05, 0.98], ['t', 0.04, 0.98], ['_', 0.04], ['s', 0.07, 1], ['p', 0.04, 1.02], ['i', 0.1, 1.02, 0.96], ['n', 0.06, 0.94], ['z', 0.08, 0.9]], text: 'One good match is worth three panicked spins.' },
-    a14: { t: [['a', 0.08, 1], ['i', 0.1, 1.02, 1], ['_', 0.04], ['l', 0.05, 1], ['o', 0.12, 1.02, 0.98], ['s', 0.07, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['m', 0.06, 1], ['a', 0.1, 1.02, 1], ['i', 0.1, 1], ['_', 0.03], ['h', 0.05, 1], ['e', 0.1, 1.02, 0.98], ['l', 0.05, 0.98], ['m', 0.06, 0.96], ['uh', 0.08, 0.94], ['t', 0.05, 0.94], ['_', 0.05], ['w', 0.05, 1], ['uh', 0.08, 1], ['n', 0.05, 0.98], ['s', 0.08, 0.96], ['_', 0.14], ['uh', 0.08, 1.02], ['_', 0.03], ['b', 0.04, 1.02], ['e', 0.1, 1.04, 1], ['t', 0.04, 1], ['uh', 0.08, 0.98], ['_', 0.03], ['th', 0.05, 1], ['aw', 0.14, 1.02, 0.98, 1], ['t', 0.05, 0.96], ['_', 0.04], ['w', 0.05, 1], ['o', 0.1, 1.02, 0.98], ['z', 0.06, 0.96], ['_', 0.04], ['uh', 0.08, 1], ['n', 0.05, 0.98], ['d', 0.04, 0.98], ['uh', 0.08, 0.96], ['_', 0.03], ['r', 0.04, 0.98], ['i', 0.1, 0.98, 0.9], ['t', 0.06, 0.9]], text: 'I lost my helmet once. A better thought was under it.' },
-    a15: { t: [['s', 0.08, 1.02], ['uh', 0.08, 1.02], ['n', 0.05, 1], ['s', 0.07, 1], ['e', 0.12, 1.02, 0.98], ['t', 0.05, 0.96], ['_', 0.08], ['t', 0.04, 1.02], ['o', 0.12, 1.04, 1], ['r', 0.05, 1], ['t', 0.04, 0.98], ['sh', 0.08, 0.98], ['uh', 0.08, 0.96], ['z', 0.07, 0.94], ['_', 0.08], ['ae', 0.08, 1], ['n', 0.05, 1], ['d', 0.04, 0.98], ['_', 0.04], ['y', 0.05, 1.04], ['u', 0.18, 1.06, 0.96, 1], ['_', 0.16], ['n', 0.06, 1], ['o', 0.1, 1.02, 0.98], ['t', 0.04, 0.96], ['_', 0.04], ['uh', 0.07, 1], ['_', 0.03], ['b', 0.04, 1.02], ['ae', 0.1, 1.04, 1], ['d', 0.04, 0.98], ['_', 0.04], ['l', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['t', 0.04, 0.98], ['uh', 0.08, 0.96], ['l', 0.05, 0.96], ['_', 0.04], ['k', 0.05, 1], ['i', 0.1, 1.02, 1], ['n', 0.05, 0.98], ['d', 0.04, 0.96], ['uh', 0.1, 0.94], ['m', 0.1, 0.88]], text: 'Sunset, torches, and you. Not a bad little kingdom.' },
-    a16: { t: [['i', 0.08, 1], ['f', 0.06, 1], ['_', 0.04], ['y', 0.05, 1.02], ['u', 0.1, 1.02, 1], ['_', 0.03], ['m', 0.06, 1], ['uh', 0.08, 1], ['s', 0.07, 0.98], ['t', 0.04, 0.96], ['_', 0.05], ['r', 0.05, 1.04], ['uh', 0.1, 1.06, 1.02], ['sh', 0.1, 1], ['_', 0.1], ['r', 0.05, 1.04], ['uh', 0.12, 1.06, 1.02], ['sh', 0.1, 1], ['_', 0.05], ['t', 0.04, 1.02], ['uh', 0.08, 1.02], ['w', 0.05, 1.02], ['aw', 0.12, 1.04, 1], ['d', 0.05, 0.98], ['_', 0.04], ['th', 0.05, 1], ['i', 0.1, 1.02, 1], ['_', 0.03], ['o', 0.1, 1.02, 1], ['b', 0.04, 1], ['v', 0.05, 1], ['i', 0.1, 1.02, 0.98], ['uh', 0.08, 0.96], ['s', 0.07, 0.96], ['_', 0.04], ['l', 0.05, 1], ['a', 0.14, 1.02, 0.88, 1], ['i', 0.12, 0.88, 0.8], ['n', 0.08, 0.8]], text: 'If you must rush, rush toward the obvious line.' },
-    a17: { t: [['uh', 0.08, 1], ['_', 0.03], ['b', 0.04, 1.02], ['ae', 0.12, 1.04, 1], ['n', 0.05, 1], ['uh', 0.1, 0.98], ['_', 0.04], ['i', 0.08, 1], ['z', 0.06, 0.98], ['_', 0.04], ['j', 0.05, 1.02], ['uh', 0.08, 1.02], ['s', 0.07, 1], ['t', 0.04, 0.98], ['_', 0.04], ['uh', 0.07, 1], ['_', 0.03], ['b', 0.04, 1.02], ['r', 0.05, 1.04], ['a', 0.14, 1.06, 1.02, 1, 1.12], ['v', 0.06, 1], ['_', 0.04], ['r', 0.05, 1], ['e', 0.1, 1.02, 1], ['k', 0.04, 1], ['t', 0.04, 0.98], ['ae', 0.1, 1], ['n', 0.05, 0.98], ['g', 0.04, 0.96], ['uh', 0.1, 0.94], ['l', 0.06, 0.92], ['_', 0.14], ['y', 0.05, 1.02], ['u', 0.1, 1.04, 1], ['_', 0.03], ['h', 0.04, 1], ['ae', 0.1, 1.02, 1], ['v', 0.05, 0.98], ['_', 0.04], ['s', 0.07, 1], ['e', 0.1, 1.02, 0.98], ['v', 0.05, 0.98], ['r', 0.04, 0.98], ['uh', 0.1, 0.96], ['l', 0.07, 0.9]], text: 'A banner is just a brave rectangle. You have several.' },
-    a18: { t: [['n', 0.06, 1.02], ['i', 0.12, 1.04, 1], ['l', 0.05, 1], ['i', 0.12, 1.02, 0.98], ['_', 0.04], ['th', 0.05, 1], ['e', 0.12, 1.02, 0.98], ['r', 0.04, 0.96], ['_', 0.06], ['f', 0.06, 1.02], ['r', 0.05, 1.04], ['e', 0.12, 1.04, 1], ['n', 0.06, 0.98], ['d', 0.05, 0.96], ['_', 0.16], ['n', 0.06, 1.04], ['i', 0.12, 1.06, 1.12, 0.95, 1.18], ['l', 0.05, 1.1], ['i', 0.14, 1.1, 1], ['_', 0.06], ['k', 0.05, 1.02], ['uh', 0.08, 1.02], ['m', 0.06, 1], ['z', 0.07, 0.98], ['_', 0.04], ['w', 0.05, 1], ['i', 0.08, 1.02], ['th', 0.06, 1], ['_', 0.03], ['uh', 0.07, 1], ['_', 0.03], ['k', 0.05, 1.02], ['e', 0.12, 1.04, 1], ['t', 0.04, 0.98], ['uh', 0.1, 0.96], ['l', 0.08, 0.9]], text: 'Nearly there, friend. Nearly comes with a kettle.' },
+    a1: { text: 'Patience, friend. Even castles were built one stone at a time.' },
+    a2: { text: 'A steady hand beats a hurried one. Mostly.' },
+    a3: { text: 'Mind the gap between the plan and the drop.' },
+    a4: { text: 'Courage is just kindness that refused to sit down.' },
+    a5: { text: 'If the stack looks grim, find the line you have not seen.' },
+    a6: { text: 'Tea would help. We are fresh out. Carry on.' },
+    a7: { text: 'You cannot stack worry. It does not fit the grid.' },
+    a8: { text: 'Four in a line. That is the trick, and also not.' },
+    a9: { text: 'I once charged a dragon. It was a goose. Still counts.' },
+    a10: { text: 'Rest is not retreat. Even knights oil their hinges.' },
+    a11: { text: 'The moat is only water with opinions.' },
+    a12: { text: 'Be gentle with yourself. The blocks will not.' },
+    a13: { text: 'One good match is worth three panicked spins.' },
+    a14: { text: 'I lost my helmet once. A better thought was under it.' },
+    a15: { text: 'Sunset, torches, and you. Not a bad little kingdom.' },
+    a16: { text: 'If you must rush, rush toward the obvious line.' },
+    a17: { text: 'A banner is just a brave rectangle. You have several.' },
+    a18: { text: 'Nearly there, friend. Nearly comes with a kettle.' },
   },
 };
 const SOL_ORDER = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18'];
-const SOL_V = { base: 114, fs: 0.96, br: 0.035, vib: 8, vibHz: 4.6, sub: 0.15, lp: 3600, echo: [0.22, 0.3, 0.2] }; // warm baritone, non-raspy, hall-ish, hiss kept down
-const BOSS_VOX = { surfer: SURF_V, gator: GATOR_V, solaris: SOL_V };
-const LINE_V = { surfer: 0.62, gator: 0.6, solaris: 0.58 };
+const BOSS_VOX = { surfer: SURF_V, gator: GATOR_V };
+const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
-function bossLineSpec(kind, key) { const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
-function bossSay(c, t, dest, kind, key, v, nb) { const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
+function bossLineSpec(kind, key) { if (kind === 'solaris') return null; const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
+function bossSay(c, t, dest, kind, key, v, nb) { if (kind === 'solaris') return solPlay(key); const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
 // v21 gator chase: a woody CHOMP (jaw snap + crunchy splinter crackle + thump) and a metallic CLANK with a tooth pinging
 // off (inharmonic struck-metal partials). Original synthesis.
 function gatorChomp(c, t, dest, nb, v) {
@@ -1145,7 +1144,7 @@ function fanfare(E, ti, t) {
 // across the whole file so the loop window is click-free whatever the codec priming). Lazy-loaded per stage, next stage
 // preloaded, played on the same bar grid as the sequencer (M), danger layer + comeback fanfare are matching buffers.
 // If a file can't load the old procedural engine (makeMusic) plays that track instead.
-const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 100, 94, 98, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 10, XM_MARK = 0.25;
+const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 126, 122, 124, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 11, XM_MARK = 0.25;
 const XM = { on: true, gain: 2.2, sd: null, sdT: 0, prime: null, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
 const xmKey = (kind, i) => kind + '-' + String(i).padStart(2, '0');
 const xmLoopLen = (i) => XM_BARS * 240 / XM_BPM[i];
@@ -3624,10 +3623,54 @@ function drawBeachBall(x, y, r, rot) {
   for (let k = 0; k < 6; k++) { ctx.fillStyle = cols[k]; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, k * Math.PI / 3, (k + 1) * Math.PI / 3); ctx.closePath(); ctx.fill(); }
   ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); ctx.restore();
 }
+
+const SOL_LEN = { a1: 5.51, a2: 4.91, a3: 4.31, a4: 4.41, a5: 4.61, a6: 3.91, a7: 4.21, a8: 4.51, a9: 4.91, a10: 4.81, a11: 4.01, a12: 4.11, a13: 4.11, a14: 4.71, a15: 4.91, a16: 4.31, a17: 4.61, a18: 4.31 };
+const SOL_AV = 36;
+const SOL = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, warm: false, mp3: {} };
+function solWarm() { if (SOL.warm) return; SOL.warm = true; for (const k of SOL_ORDER) solFetch(k); }
+function solFetch(key) {
+  if (SOL.buf[key] || SOL.pend[key] || SOL.raw[key]) return SOL.pend[key] || Promise.resolve(SOL.buf[key] || null);
+  const grab = (ext) => fetch('voice/sol/' + key + '.' + ext + '?v=' + SOL_AV).then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  SOL.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => { SOL.raw[key] = ab; delete SOL.pend[key]; solDecode(key); return ab; }).catch(() => { delete SOL.pend[key]; return null; });
+  return SOL.pend[key];
+}
+function solDecode(key) {
+  if (SOL.buf[key] || !A.ctx || !SOL.raw[key] || SOL.decoding === key) return;
+  SOL.decoding = key;
+  A.ctx.decodeAudioData(SOL.raw[key].slice(0), (b) => { SOL.buf[key] = b; SOL.jaw[key] = solEnv(b); SOL.decoding = null; }, () => {
+    SOL.decoding = null;
+    if (SOL.mp3[key]) return; SOL.mp3[key] = 1;
+    fetch('voice/sol/' + key + '.mp3?v=' + SOL_AV).then((r) => r.ok ? r.arrayBuffer() : Promise.reject()).then((ab) => { SOL.raw[key] = ab; solDecode(key); }).catch(() => {});
+  });
+}
+function solPump() { if (!A.ctx) return; for (const k of SOL_ORDER) if (SOL.raw[k] && !SOL.buf[k]) solDecode(k); }
+function solEnv(b) {
+  const d = b.getChannelData(0), n = 64, hop = Math.max(1, (d.length / n) | 0), env = new Float32Array(n);
+  let m = 0.0001;
+  for (let i = 0; i < n; i++) {
+    let ss = 0; const a0 = i * hop, z = Math.min(d.length, a0 + hop);
+    for (let k = a0; k < z; k += 2) ss += d[k] * d[k];
+    env[i] = Math.sqrt(ss / Math.max(1, (z - a0) / 2)); if (env[i] > m) m = env[i];
+  }
+  for (let i = 0; i < n; i++) env[i] = Math.min(1, env[i] / m);
+  return env;
+}
+function solPlay(key) {
+  if (!aok()) return 0;
+  if (!SOL.buf[key]) { solDecode(key); return 0; }
+  if (SOL.src) { try { SOL.src.stop(); } catch (e) { /* ended */ } SOL.src = null; }
+  const c = A.ctx, src = c.createBufferSource(), g = c.createGain();
+  src.buffer = SOL.buf[key]; g.gain.value = 1.05; src.connect(g); g.connect(A.vox || A.sfx);
+  src.start(c.currentTime + 0.03); SOL.src = src; return SOL.buf[key].duration;
+}
+function solDur(key) { const b = SOL.buf[key]; return (b ? b.duration : (SOL_LEN[key] || 4.2)) + 0.35; }
 function solJaw() {
   const S = g.sol && g.sol.cur;
   if (!S || g.stage !== 11) return 0.08;
-  return specJaw(bossLineSpec('solaris', S.key), g.time - S.t0);
+  const age = g.time - S.t0, env = SOL.jaw[S.key], buf = SOL.buf[S.key];
+  if (env && buf && age >= 0 && age <= buf.duration) return env[Math.min(env.length - 1, (age / buf.duration * env.length) | 0)];
+  if (age < 0 || age > S.dur - 0.25) return 0.08;
+  return 0.2 + 0.16 * Math.max(0, Math.sin(age * 11));
 }
 // Friendly knight. s is the head radius. Jaw 0..1 opens the mouth with the current syllable.
 function paintSolaris(X, cx, cy, s, jaw, t) {
@@ -3710,6 +3753,206 @@ function drawSolBubble() {
   lines.forEach((ln, i) => fitTxt(ln, x + bw / 2, y + 8 + lh * (i + 0.5), size, bw - 16, '#fff6e4', null));
   ctx.restore();
 }
+// v36: more life around the board. Small creatures stay in the gutters, the sky and the floor.
+// Big shapes may cross the glass. Reduce Motion freezes poses because callers pass tm = 0.
+function boardHides(x, y) {
+  if (!L.cell) return false;
+  const x0 = L.bx + 6, y0 = L.by + 6, x1 = L.bx + L.cell * COLS - 6, y1 = L.by + L.cell * VIS - 6;
+  return x > x0 && x < x1 && y > y0 && y < y1;
+}
+function parkLife(tm, low) {
+  const flocks = low ? 1 : 2, per = low ? 4 : 7;
+  for (let f = 0; f < flocks; f++) {
+    const fx = ((tm * (32 + f * 14) + f * W * 0.5) % (W + 90)) - 40;
+    const fy = H * (0.055 + f * 0.07) + Math.sin(tm * 0.8 + f) * 7;
+    ctx.strokeStyle = f ? 'rgba(255,255,255,0.9)' : 'rgba(170,255,250,0.95)';
+    ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < per; i++) {
+      const bx = fx + (i - per / 2) * 16, by = fy + (i % 2) * 7 + Math.sin(tm * 2 + i) * 2;
+      const wing = 3 + Math.sin(tm * 10 + i) * 3.5;
+      ctx.moveTo(bx - 6, by + wing); ctx.quadraticCurveTo(bx - 2, by - 3, bx, by); ctx.quadraticCurveTo(bx + 2, by - 3, bx + 6, by + wing);
+    }
+    ctx.stroke();
+  }
+  for (let i = 0; i < (low ? 1 : 2); i++) {
+    const bx = ((tm * (40 + i * 12) + 180 + i * 140) % (W + 70)) - 30;
+    const by = H * (0.14 + i * 0.06) + Math.sin(tm * 1.6 + i) * 8;
+    const flap = Math.sin(tm * 12 + i);
+    ctx.save(); ctx.translate(bx, by);
+    ctx.fillStyle = '#d7e2ee'; ctx.fillRect(-6, -3, 12, 7);
+    ctx.fillStyle = '#7cf7ff'; ctx.fillRect(-3, -2, 4, 3);
+    ctx.fillStyle = '#ff4fd8'; ctx.fillRect(3, -1, 3, 3);
+    ctx.strokeStyle = i ? '#ffe66d' : '#ff4fd8'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-14, -7 * flap); ctx.moveTo(5, 0); ctx.lineTo(14, 7 * flap); ctx.stroke();
+    ctx.restore();
+  }
+  // swing ship in the left gutter, under the rocket mast
+  const sang = Math.sin(tm * 0.85) * 0.55, px = 26;
+  ctx.strokeStyle = '#f4fbff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, H * 0.62); ctx.lineTo(px, H * 0.74); ctx.stroke();
+  ctx.save(); ctx.translate(px, H * 0.74); ctx.rotate(sang);
+  ctx.fillStyle = '#ffe66d'; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.quadraticCurveTo(0, 12, 16, 0); ctx.lineTo(12, -4); ctx.lineTo(-12, -4); ctx.fill();
+  ctx.fillStyle = '#ff4fd8'; ctx.fillRect(-8, -3, 4, 3); ctx.fillRect(2, -3, 4, 3);
+  ctx.restore();
+}
+function seaLife(tm, ddt, low, fy) {
+  const fish = (x, y, dir, kind, sc) => {
+    if (boardHides(x, y)) return;
+    ctx.save(); ctx.translate(x, y); ctx.scale((dir < 0 ? -1 : 1) * sc, sc);
+    if (kind === 1) {
+      ctx.fillStyle = '#7ef0e2'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 10, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ff8ad4'; ctx.fillRect(-1.2, -7, 2.4, 14);
+    } else if (kind === 2) {
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.ellipse(0, 0, 10, 4.2, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a3f88'; ctx.fillRect(-5, -3.2, 2, 6.4); ctx.fillRect(1, -3.2, 2, 6.4);
+    } else if (kind === 3) {
+      ctx.fillStyle = '#fff6ea'; ctx.beginPath(); ctx.ellipse(0, 0, 4, 1.6, 0, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = '#ffd0ea'; ctx.beginPath(); ctx.ellipse(0, 0, 8, 3.4, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-12, -3); ctx.lineTo(-12, 3); ctx.fill();
+    }
+    ctx.fillStyle = '#1a1030'; ctx.fillRect(5, -1.2, 1.4, 1.4);
+    ctx.restore();
+  };
+  const kinds = low ? 8 : 16;
+  for (let i = 0; i < kinds; i++) {
+    const dir = i % 2 ? 1 : -1;
+    const span = W + 80;
+    const x = ((tm * (18 + (i % 5) * 7) * dir + hash(i * 4.1) * span) % span + span) % span - 40;
+    const lane = i % 4;
+    const y = lane === 0 ? H * (0.08 + (i % 3) * 0.025) : lane === 1 ? H * (0.9 + (i % 2) * 0.02) : H * (0.3 + (i % 5) * 0.08) + Math.sin(tm * 1.4 + i) * 6;
+    fish(x, y + Math.sin(tm * 3 + i) * 2, dir, i % 4, 0.75 + (i % 3) * 0.35);
+  }
+  // seahorses in the side water
+  for (let i = 0; i < (low ? 1 : 3); i++) {
+    const x = i === 2 ? W * 0.93 : 14 + i * 10, y = H * (0.42 + i * 0.12) + Math.sin(tm * 1.2 + i) * 8;
+    if (boardHides(x, y)) continue;
+    ctx.strokeStyle = ['#ff9ad4', '#7ef0e2', '#ffe08a'][i]; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.bezierCurveTo(x + 8, y, x - 8, y - 12, x + 2, y - 22); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + 3, y - 24, 3.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x - 1, y + 10, 4, 0.2, Math.PI); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  // crabs along the seafloor
+  for (let i = 0; i < (low ? 2 : 4); i++) {
+    const x = ((tm * (14 + i * 4) + i * W * 0.27) % (W + 20)) - 10, y = H * 0.95;
+    if (boardHides(x, y - 4)) continue;
+    const leg = Math.sin(tm * 8 + i) * 2.5;
+    ctx.fillStyle = '#e07a55'; ctx.beginPath(); ctx.ellipse(x, y, 7, 4, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e07a55'; ctx.lineWidth = 1.4; ctx.beginPath();
+    ctx.moveTo(x - 4, y); ctx.lineTo(x - 9, y + 4 + leg); ctx.moveTo(x + 4, y); ctx.lineTo(x + 9, y + 4 - leg);
+    ctx.moveTo(x - 2, y - 2); ctx.lineTo(x - 6, y - 7); ctx.moveTo(x + 2, y - 2); ctx.lineTo(x + 6, y - 7); ctx.stroke();
+  }
+  // puffer, pulsing, up in the open water
+  {
+    const px = W * 0.08 + Math.sin(tm * 0.6) * 10, py = H * 0.2;
+    if (!boardHides(px, py)) {
+      const puff = 1 + 0.4 * (0.5 + 0.5 * Math.sin(tm * 1.5));
+      ctx.fillStyle = '#f7d48a'; ctx.beginPath(); ctx.arc(px, py, 7 * puff, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a1030'; ctx.fillRect(px + 3, py - 1, 1.5, 1.5);
+      if (puff > 1.15) {
+        ctx.strokeStyle = '#fff1c0'; ctx.lineWidth = 1; ctx.beginPath();
+        for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; ctx.moveTo(px + Math.cos(a) * 7 * puff, py + Math.sin(a) * 7 * puff); ctx.lineTo(px + Math.cos(a) * 11 * puff, py + Math.sin(a) * 11 * puff); }
+        ctx.stroke();
+      }
+    }
+  }
+  // octopus, color drifts, tentacles curl
+  {
+    const ox = W * 0.14, oy = H * 0.5, hue = (tm * 28) % 360;
+    ctx.fillStyle = 'hsl(' + hue + ',72%,58%)';
+    ctx.beginPath(); ctx.ellipse(ox, oy, 16, 18, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1a1030'; ctx.beginPath(); ctx.arc(ox - 5, oy - 4, 2.2, 0, 7); ctx.arc(ox + 5, oy - 4, 2.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'hsl(' + ((hue + 20) % 360) + ',70%,52%)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI * 0.15 + i / 7 * Math.PI * 0.7;
+      const curl = Math.sin(tm * 2.2 + i) * 16;
+      ctx.beginPath(); ctx.moveTo(ox + Math.cos(a) * 10, oy + 8);
+      ctx.quadraticCurveTo(ox + Math.cos(a) * 28 + curl, oy + 20, ox + Math.cos(a) * 18 - curl, oy + 36 + (i % 3) * 6);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
+  // construction: scaffolding, a crane, and divers in brass helmets
+  const yard = W * 0.8;
+  ctx.strokeStyle = 'rgba(230,240,248,0.85)'; ctx.lineWidth = 2;
+  ctx.strokeRect(yard, fy - 78, 56, 78);
+  ctx.beginPath(); ctx.moveTo(yard, fy - 40); ctx.lineTo(yard + 56, fy - 40);
+  ctx.moveTo(yard, fy - 78); ctx.lineTo(yard + 56, fy); ctx.moveTo(yard + 56, fy - 78); ctx.lineTo(yard, fy); ctx.stroke();
+  ctx.fillStyle = '#d9c4a0'; ctx.fillRect(yard + 16, fy - 92, 28, 8);
+  const cx = W * 0.95, hang = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(tm * 0.45))) * 46;
+  ctx.strokeStyle = '#e7eef6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, fy); ctx.lineTo(cx, fy - H * 0.22); ctx.lineTo(cx - 48, fy - H * 0.2); ctx.stroke();
+  ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx - 40, fy - H * 0.2); ctx.lineTo(cx - 40, fy - H * 0.2 + hang); ctx.stroke();
+  ctx.fillStyle = '#c9a36a'; ctx.fillRect(cx - 50, fy - H * 0.2 + hang, 20, 7);
+  const diver = (x, y, weld) => {
+    const s = 16;
+    ctx.fillStyle = '#7d5a32'; ctx.fillRect(x - 6, y, 12, 16);
+    ctx.fillStyle = '#e6c36a'; ctx.beginPath(); ctx.arc(x, y - 6, 7, 0, 7); ctx.fill();
+    ctx.fillStyle = '#14202c'; ctx.beginPath(); ctx.arc(x, y - 6, 3.4, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#f3dd9a'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = '#7d5a32'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.moveTo(x - 6, y + 6); ctx.lineTo(x - 12, y + 12); ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + 11, y + (weld ? -2 : 8)); ctx.stroke();
+    if (weld && ddt) {
+      ctx.strokeStyle = 'rgba(255,244,190,0.95)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 0; k < 4; k++) { const a = tm * 11 + k * 1.4; ctx.moveTo(x + 12, y + 2); ctx.lineTo(x + 12 + Math.cos(a) * 8, y + 2 + Math.sin(a) * 8); }
+      ctx.stroke();
+      BG.seaBub = BG.seaBub || [];
+      if (BG.seaBub.length < 40 && Math.random() < ddt * 2) BG.seaBub.push({ x: x + 2, y: y - 12, r: rand(1.2, 2.6), v: rand(18, 32), p: rand(0, 6) });
+    }
+  };
+  diver(18, fy - 36, false);
+  diver(yard + 22, fy - 28, true);
+  if (!low) diver(yard + 40, fy - 8, false);
+}
+function keepLife(tm, low, hz) {
+  ctx.strokeStyle = '#2a1420'; ctx.lineWidth = 1.6; ctx.beginPath();
+  const nb = low ? 4 : 9;
+  for (let i = 0; i < nb; i++) {
+    const bx = ((tm * (18 + (i % 4) * 6) + i * 48) % (W + 50)) - 20;
+    const by = H * (0.05 + (i % 4) * 0.035);
+    const f = Math.sin(tm * 7 + i) * 4;
+    ctx.moveTo(bx - 7, by + f); ctx.quadraticCurveTo(bx - 2, by - 4, bx, by); ctx.quadraticCurveTo(bx + 2, by - 4, bx + 7, by + f);
+  }
+  ctx.stroke();
+  const knight = (x, y, s, ang) => {
+    ctx.fillStyle = '#c5ced8'; ctx.fillRect(x - s * 0.28, y - s, s * 0.56, s * 0.72);
+    ctx.beginPath(); ctx.arc(x, y - s * 1.15, s * 0.26, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e7b04a'; ctx.fillRect(x - s * 0.3, y - s * 1.28, s * 0.6, s * 0.07);
+    ctx.save(); ctx.translate(x + s * 0.15, y - s * 0.55); ctx.rotate(ang);
+    ctx.fillStyle = '#eef3f8'; ctx.fillRect(-1, -s * 0.85, 2.2, s * 0.85);
+    ctx.restore();
+  };
+  const gy = hz + H * 0.02;
+  // sparring pair on the left of the yard
+  const sw = Math.sin(tm * 3.1) * 1.05;
+  knight(W * 0.08, gy, 16, -0.5 + sw);
+  knight(W * 0.08 + 30, gy, 16, Math.PI + 0.5 - sw);
+  // pell
+  const dx = W * 0.7, dy = gy;
+  ctx.fillStyle = '#6a4228'; ctx.fillRect(dx, dy - 28, 4, 28);
+  ctx.fillStyle = '#e6d2a8'; ctx.beginPath(); ctx.arc(dx + 2, dy - 32, 6, 0, 7); ctx.fill();
+  knight(dx - 24, dy, 16, -0.3 - Math.abs(Math.sin(tm * 2.6)) * 1.15);
+  // archery
+  const ax = W * 0.9, ay = gy - 4;
+  knight(ax, ay, 15, -1.15);
+  ctx.strokeStyle = '#6a4228'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(ax + 8, ay - 18, 9, -1.1, 1.1); ctx.stroke();
+  ctx.fillStyle = '#f4efe4'; ctx.beginPath(); ctx.arc(ax - 36, ay - 20, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c4323c'; ctx.beginPath(); ctx.arc(ax - 36, ay - 20, 3, 0, 7); ctx.fill();
+  const u = (tm * 0.45) % 1;
+  ctx.strokeStyle = '#f4f7fb'; ctx.lineWidth = 1.2; ctx.beginPath();
+  ctx.moveTo(ax + 6 - u * 34, ay - 18); ctx.lineTo(ax + 14 - u * 34, ay - 18); ctx.stroke();
+  // distant joust along the hill
+  const jp = (tm * 0.035) % 1, jx = -20 + jp * (W + 40), jy = hz - H * 0.07;
+  const mount = (x, dir) => {
+    ctx.fillStyle = 'rgba(40,18,28,0.92)';
+    ctx.fillRect(x, jy, 18, 6);
+    ctx.fillRect(x + (dir > 0 ? 14 : -2), jy - 8, 4, 10);
+    const g = Math.sin(tm * 9) * 2;
+    ctx.fillRect(x + 2, jy + 5, 2, 5 + g); ctx.fillRect(x + 12, jy + 5, 2, 5 - g);
+    ctx.fillRect(x + (dir > 0 ? 6 : 4), jy - 12, 5, 5);
+  };
+  mount(jx, 1); mount(jx + 26, -1);
+}
+
 // ---- 10. TOMORROW PARK (retrofuturist 1950s/60s theme park)
 // v35: rich parallax backdrops. Big shapes read through the board glass. No words, so cells never slice a title.
 // Reduce Motion freezes the moving parts. Low detail drops the small crowds.
@@ -3758,7 +4001,7 @@ function bgPark(t) {
   ctx.restore();
   for (let i = 0; i < 8; i++) { const a = wang + i / 8 * Math.PI * 2, gx = wcx + Math.cos(a) * wr, gy = wcy + Math.sin(a) * wr; ctx.fillStyle = i % 2 ? '#ff4fd8' : '#7cf7ff'; ctx.fillRect(gx - 7, gy - 2, 14, 9); ctx.fillStyle = '#1a1030'; ctx.fillRect(gx - 5, gy, 4, 4); }
   // spinning rocket ride
-  const rang = tm * (low ? 0.6 : 1.1), pxv = W * 0.08, pyv = hz - 10;
+  const rang = tm * (low ? 0.9 : 1.7), pxv = W * 0.08, pyv = hz - 10;
   ctx.strokeStyle = '#e8eef4'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(pxv, pyv); ctx.lineTo(pxv + Math.cos(rang) * 54, pyv + Math.sin(rang) * 26); ctx.stroke();
   ctx.save(); ctx.translate(pxv + Math.cos(rang) * 54, pyv + Math.sin(rang) * 26); ctx.rotate(rang + Math.PI / 2);
   ctx.fillStyle = '#f4fbff'; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.fill();
@@ -3766,21 +4009,21 @@ function bgPark(t) {
   ctx.fillStyle = '#7cf7ff'; ctx.beginPath(); ctx.arc(0, -4, 3, 0, 7); ctx.fill(); ctx.restore();
   // flying saucers in the upper sky
   for (let i = 0; i < (low ? 1 : 2); i++) {
-    const sx = ((tm * (18 + i * 10) + i * W * 0.4) % (W + 80)) - 40, sy = H * (0.1 + i * 0.08) + Math.sin(tm * 1.4 + i) * 6;
+    const sx = ((tm * (28 + i * 14) + i * W * 0.4) % (W + 80)) - 40, sy = H * (0.1 + i * 0.08) + Math.sin(tm * 1.4 + i) * 6;
     ctx.fillStyle = 'rgba(180,255,250,0.85)'; ctx.beginPath(); ctx.ellipse(sx, sy, 22, 7, 0, 0, 7); ctx.fill();
     ctx.fillStyle = '#dff'; ctx.beginPath(); ctx.ellipse(sx, sy - 4, 10, 6, 0, Math.PI, 0); ctx.fill();
     ctx.fillStyle = i ? '#ff4fd8' : '#ffe66d'; ctx.beginPath(); ctx.arc(sx - 8, sy + 1, 2, 0, 7); ctx.arc(sx, sy + 2, 2, 0, 7); ctx.arc(sx + 8, sy + 1, 2, 0, 7); ctx.fill();
   }
   // coaster cars
   for (let c = 0; c < (low ? 2 : 4); c++) {
-    const u = (tm * 0.08 + c * 0.22) % 1, cx = u * W, cy = H * 0.2 + Math.sin(cx * 0.018) * 22;
+    const u = (tm * 0.14 + c * 0.22) % 1, cx = u * W, cy = H * 0.2 + Math.sin(cx * 0.018) * 22;
     ctx.fillStyle = ['#ff4fd8', '#7cf7ff', '#ffe66d', '#ff8a3d'][c]; ctx.fillRect(cx - 8, cy - 10, 16, 8);
     ctx.fillStyle = '#1a1030'; ctx.fillRect(cx - 5, cy - 8, 3, 3); ctx.fillRect(cx + 1, cy - 8, 3, 3);
   }
   // monorail
   ctx.strokeStyle = '#f4fbff'; ctx.lineWidth = 4; ctx.beginPath();
   for (let x = 0; x <= W; x += 14) { const y = H * 0.34 + Math.sin(x * 0.01) * 8; if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.stroke();
-  const mu = (tm * 0.07) % 1, mx = mu * (W + 60) - 30, my = H * 0.34 + Math.sin(mx * 0.01) * 8;
+  const mu = (tm * 0.12) % 1, mx = mu * (W + 60) - 30, my = H * 0.34 + Math.sin(mx * 0.01) * 8;
   ctx.fillStyle = '#7cf7ff'; ctx.fillRect(mx - 20, my - 12, 40, 10); ctx.fillStyle = '#ff4fd8'; ctx.fillRect(mx - 12, my - 10, 8, 5); ctx.fillStyle = '#ffe66d'; ctx.fillRect(mx + 2, my - 10, 8, 5);
   // balloons along the left edge, where the board does not cover them
   for (let i = 0; i < 5; i++) {
@@ -3789,11 +4032,11 @@ function bgPark(t) {
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, by + 9); ctx.lineTo(bx, by + 22); ctx.stroke();
   }
   // crowds and robots on the plaza
-  const nC = low ? 4 : 9;
+  const nC = low ? 6 : 14;
   if (!BG.crowd || BG.crowd.length !== nC) BG.crowd = Array.from({ length: nC }, (_, i) => ({ x: hash(i * 3.3) * W, v: 12 + hash(i * 1.7) * 18, k: i % 5, bob: hash(i) * 6 }));
   for (const p of BG.crowd) {
     p.x += p.v * ddt; if (p.x > W + 16) p.x = -16;
-    const y = H * 0.9 + Math.sin(tm * 3 + p.bob) * 1, leg = RM() ? 0 : Math.sin(tm * 6 + p.x * 0.05) * 3;
+    const y = H * (0.86 + (p.k % 2) * 0.045) + Math.sin(tm * 3 + p.bob) * 1, leg = RM() ? 0 : Math.sin(tm * 6 + p.x * 0.05) * 3;
     if (p.k === 0) { // robot
       ctx.fillStyle = '#d5dee8'; ctx.fillRect(p.x - 5, y - 16, 10, 10); ctx.fillStyle = '#7cf7ff'; ctx.fillRect(p.x - 3, y - 14, 6, 3);
       ctx.fillStyle = '#b7c3d0'; ctx.fillRect(p.x - 4, y - 6, 3, 6 + leg); ctx.fillRect(p.x + 1, y - 6, 3, 6 - leg);
@@ -3802,6 +4045,7 @@ function bgPark(t) {
       ctx.fillRect(p.x - 3, y - 12, 6, 8); ctx.fillRect(p.x - 3, y - 4, 2, 6 + leg); ctx.fillRect(p.x + 1, y - 4, 2, 6 - leg);
     }
   }
+  parkLife(tm, low);
   // fireworks, sky only, one or two at a time
   BG.fw = BG.fw || [];
   if (!RM() && !low && BG.fw.length < 2 && Math.random() < ddt * 0.25) BG.fw.push({ x: rand(0.15, 0.8) * W, y: rand(0.06, 0.22) * H, t: 0, c: ['#ff4fd8', '#7cf7ff', '#ffe66d'][(Math.random() * 3) | 0] });
@@ -3897,6 +4141,7 @@ function bgSea(t) {
   ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.1; ctx.beginPath();
   for (let i = (BG.seaBub || []).length - 1; i >= 0; i--) { const b = BG.seaBub[i]; b.y -= b.v * ddt; b.x += Math.sin(tm * 2 + b.p) * 10 * ddt; if (b.y < -8) { BG.seaBub.splice(i, 1); continue; } ctx.moveTo(b.x + b.r, b.y); ctx.arc(b.x, b.y, b.r, 0, 7); }
   ctx.stroke();
+  seaLife(tm, ddt, low, fy);
 }
 function bgCastle(t) {
   const dt = bgDt(18, t), hz = H * 0.58, wy = H * 0.8, tm = RM() ? 0 : t, ddt = RM() ? 0 : dt, low = fxLow();
@@ -3979,6 +4224,7 @@ function bgCastle(t) {
   ctx.strokeStyle = 'rgba(255,220,170,0.35)'; ctx.lineWidth = 1.2; ctx.beginPath();
   for (let x = 0; x <= W; x += 12) { const y = wy + 6 + Math.sin(x * 0.04 + tm * 1.4) * 2; if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
   ctx.stroke();
+  keepLife(tm, low, hz);
   paintSolaris(ctx, W * 0.34, hz + H * 0.02, Math.min(W, H) * 0.072, solJaw(), tm || t);
 }
 
@@ -4649,15 +4895,17 @@ function dropStone() {
 }
 function updateSolaris() {
   if (g.stage !== 11 || state !== 'play' || g.tut) return;
+  solWarm(); solPump();
   const S = g.sol || (g.sol = { next: (g.time || 0) + 14, i: -1, cur: null });
-  if (S.cur) { if (g.time - S.cur.t0 <= S.cur.dur) return; S.cur = null; }
-  if (g.time < S.next) return;
+  if (S.cur && g.time - S.cur.t0 > S.cur.dur) S.cur = null;
+  if (S.cur && !S.cur.played && aok() && g.time - S.cur.t0 < 0.45 && solPlay(S.cur.key)) S.cur.played = true;
+  if (S.cur || g.time < S.next) return;
   const key = SOL_ORDER[(S.i = (S.i + 1) % SOL_ORDER.length)];
-  const spec = bossLineSpec('solaris', key);
-  S.cur = { key, t0: g.time, dur: spec.dur + 0.85, text: BOSS_LINES.solaris[key].text };
-  S.next = g.time + S.cur.dur + rand(20, 28);
+  const dur = solDur(key);
+  S.cur = { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false };
+  S.next = g.time + dur + rand(20, 28);
   S.said = (S.said || 0) + 1;
-  if (aok()) bossSay(A.ctx, anow() + 0.02, A.sfx, 'solaris', key, 0, A.noise);
+  if (solPlay(key)) S.cur.played = true;
 }
 function shiftConveyor() {
   const p = g.piece, row = CONV_ROW;
@@ -4802,7 +5050,7 @@ const dbg = {
     if (piece) { g.piece = { t: piece.t, r: piece.r || 0, x: piece.x, y: piece.y == null ? 2 : piece.y, cols: [...piece.cols].map((ch) => LETTERS[ch]) }; g.lock = 0; g.resets = 0; g.lowY = g.piece.y; }
   },
   setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
-  solSay(i) { if (g.stage !== 11) return 0; const key = SOL_ORDER[((i | 0) % SOL_ORDER.length + SOL_ORDER.length) % SOL_ORDER.length]; const spec = bossLineSpec('solaris', key); g.sol = { next: g.time + spec.dur + 24, i: SOL_ORDER.indexOf(key), cur: { key, t0: g.time, dur: spec.dur + 0.85, text: BOSS_LINES.solaris[key].text }, said: ((g.sol && g.sol.said) || 0) + 1 }; if (aok()) bossSay(A.ctx, anow() + 0.02, A.sfx, 'solaris', key, 0, A.noise); return spec.dur; },
+  solSay(i) { if (g.stage !== 11) return 0; solWarm(); const key = SOL_ORDER[((i | 0) % SOL_ORDER.length + SOL_ORDER.length) % SOL_ORDER.length]; const dur = solDur(key); g.sol = { next: g.time + dur + 24, i: SOL_ORDER.indexOf(key), cur: { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false }, said: ((g.sol && g.sol.said) || 0) + 1 }; if (solPlay(key)) g.sol.cur.played = true; return dur; }, solReady(k) { return !!(SOL.buf[k || 'a1']); }, warmSol() { solWarm(); solPump(); },
   get reach() { return reach; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; if (g.boss.lunge && g.boss.lunge.done) g.boss.lunge = null; } return bossLaugh(w || 'test'); },
