@@ -176,12 +176,12 @@ function audioUnlock() {
       A.master = c.createGain(); A.master.gain.value = settings.sound ? 0.8 : 0;
       A.mus = c.createGain(); A.mus.gain.value = BUS.mus;
       A.sfx = c.createGain(); A.sfx.gain.value = BUS.sfx;
-      A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.vox = c.createGain(); A.vox.gain.value = 1; A.vox.connect(A.sfx); A.musHs = c.createBiquadFilter(); A.musHs.type = 'highshelf'; A.musHs.frequency.value = 7000; A.musHs.gain.value = -7; A.musLp = c.createBiquadFilter(); A.musLp.type = 'lowpass'; A.musLp.frequency.value = 13000; A.musLp.Q.value = 0.5; A.mus.connect(A.musHs); A.musHs.connect(A.musLp); A.musLp.connect(A.master); /* v24 de-hiss: the music loops carry a steady 6-16 kHz floor; shelve it down, keep hat attack */ A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
+      A.amb = c.createGain(); A.amb.gain.value = BUS.amb; A.vox = c.createGain(); A.vox.gain.value = 1; A.musHs = c.createBiquadFilter(); A.musHs.type = 'highshelf'; A.musHs.frequency.value = 7000; A.musHs.gain.value = -7; A.musLp = c.createBiquadFilter(); A.musLp.type = 'lowpass'; A.musLp.frequency.value = 13000; A.musLp.Q.value = 0.5; A.mus.connect(A.musHs); A.musHs.connect(A.musLp); A.musLp.connect(A.master); /* v24 de-hiss: the music loops carry a steady 6-16 kHz floor; shelve it down, keep hat attack */ A.sfx.connect(A.master); A.amb.connect(A.master); A.master.connect(comp);
       const lim = c.createDynamicsCompressor(); // brick-wall-ish safety limiter so nothing clips
       lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
       const clip = c.createWaveShaper(), cn = 2048, cv2 = new Float32Array(cn); // v14: last-ditch soft clip (transparent below 0.85) so stacked boss cries can never overshoot 0 dBFS
       for (let i = 0; i < cn; i++) { const x = i / (cn - 1) * 2 - 1, ax = Math.abs(x); cv2[i] = Math.sign(x) * (ax <= 0.85 ? ax : 0.85 + 0.13 * Math.tanh((ax - 0.85) / 0.13)); }
-      clip.curve = cv2; comp.connect(lim); lim.connect(clip); clip.connect(c.destination);
+      clip.curve = cv2; comp.connect(lim); lim.connect(clip); clip.connect(c.destination); A.preClip = lim; A.vox.connect(A.preClip); // voices sit after the music compressor, so kicks and pops do not duck a line mid-word
       const len = c.sampleRate | 0, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       A.noise = buf;
@@ -1144,7 +1144,7 @@ function fanfare(E, ti, t) {
 // across the whole file so the loop window is click-free whatever the codec priming). Lazy-loaded per stage, next stage
 // preloaded, played on the same bar grid as the sequencer (M), danger layer + comeback fanfare are matching buffers.
 // If a file can't load the old procedural engine (makeMusic) plays that track instead.
-const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 126, 122, 124, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 11, XM_MARK = 0.25;
+const XM_BPM = [123, 122, 121, 124, 123, 120, 121, 124, 125, 123, 126, 118, 120, 128, 122, 124, 96], XM_BARS = 18, XM_PAD = 0.5, XM_DBARS = 4, XM_V = 12, XM_MARK = 0.25;
 const XM = { on: true, gain: 2.2, sd: null, sdT: 0, prime: null, raw: {}, dec: {}, buf: {}, failed: {}, bus: null, duck: null, src: null, srcG: null, track: -1, t0: 0, dly: {}, dSrc: null, dG: null, dOn: false, want: -1, plays: 0, fans: 0, lastErr: null };
 const xmKey = (kind, i) => kind + '-' + String(i).padStart(2, '0');
 const xmLoopLen = (i) => XM_BARS * 240 / XM_BPM[i];
@@ -3624,8 +3624,8 @@ function drawBeachBall(x, y, r, rot) {
   ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke(); ctx.restore();
 }
 
-const SOL_LEN = { a1: 5.51, a2: 4.91, a3: 4.31, a4: 4.41, a5: 4.61, a6: 3.91, a7: 4.21, a8: 4.51, a9: 4.91, a10: 4.81, a11: 4.01, a12: 4.11, a13: 4.11, a14: 4.71, a15: 4.91, a16: 4.31, a17: 4.61, a18: 4.31 };
-const SOL_AV = 36;
+const SOL_LEN = { a1: 5.85, a2: 4.79, a3: 3.17, a4: 4.01, a5: 3.77, a6: 5.49, a7: 4.39, a8: 5.01, a9: 6.49, a10: 5.39, a11: 3.23, a12: 4.55, a13: 3.39, a14: 5.25, a15: 5.39, a16: 3.47, a17: 5.31, a18: 4.97 };
+const SOL_AV = 37;
 const SOL = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, warm: false, mp3: {} };
 function solWarm() { if (SOL.warm) return; SOL.warm = true; for (const k of SOL_ORDER) solFetch(k); }
 function solFetch(key) {
@@ -3658,10 +3658,14 @@ function solEnv(b) {
 function solPlay(key) {
   if (!aok()) return 0;
   if (!SOL.buf[key]) { solDecode(key); return 0; }
-  if (SOL.src) { try { SOL.src.stop(); } catch (e) { /* ended */ } SOL.src = null; }
-  const c = A.ctx, src = c.createBufferSource(), g = c.createGain();
-  src.buffer = SOL.buf[key]; g.gain.value = 1.05; src.connect(g); g.connect(A.vox || A.sfx);
-  src.start(c.currentTime + 0.03); SOL.src = src; return SOL.buf[key].duration;
+  const cur = g.sol && g.sol.cur;
+  // a line already speaking is left alone until it finishes, including its tail
+  if (SOL.src && cur && cur.key === key && cur.played && g.time - cur.t0 < SOL.buf[key].duration - 0.05) return SOL.buf[key].duration;
+  if (SOL.src) { try { SOL.src.stop(); } catch (e) { /* ended */ } SOL.src = null; SOL.gain = null; }
+  const c = A.ctx, src = c.createBufferSource(), gn = c.createGain();
+  src.buffer = SOL.buf[key]; gn.gain.value = 1; src.connect(gn); gn.connect(A.vox || A.sfx);
+  src.onended = () => { if (SOL.src === src) { SOL.src = null; SOL.gain = null; } };
+  src.start(c.currentTime + 0.02); SOL.src = src; SOL.gain = gn; return SOL.buf[key].duration;
 }
 function solDur(key) { const b = SOL.buf[key]; return (b ? b.duration : (SOL_LEN[key] || 4.2)) + 0.35; }
 function solJaw() {
@@ -3793,6 +3797,60 @@ function parkLife(tm, low) {
   ctx.fillStyle = '#ffe66d'; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.quadraticCurveTo(0, 12, 16, 0); ctx.lineTo(12, -4); ctx.lineTo(-12, -4); ctx.fill();
   ctx.fillStyle = '#ff4fd8'; ctx.fillRect(-8, -3, 4, 3); ctx.fillRect(2, -3, 4, 3);
   ctx.restore();
+}
+function seaShops(tm) {
+  const flick = (i) => (Math.sin(tm * 15 + i * 2.4) > -0.94 ? 1 : 0.42);
+  const sign = (x, y, text, col, i, size) => {
+    if (L.cell && y > L.by + 10 && y < L.by + L.cell * VIS - 10 && x > L.bx + 12 && x < L.bx + L.cell * COLS - 12) return;
+    ctx.save();
+    ctx.font = 'bold ' + size + 'px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const a = flick(i);
+    ctx.globalAlpha = 0.5 * a; ctx.fillStyle = col; ctx.fillText(text, x, y);
+    ctx.globalAlpha = a; ctx.fillStyle = '#fffef8'; ctx.fillText(text, x, y);
+    ctx.restore();
+  };
+  const bt = L.cell ? L.by : H * 0.2;
+  const marqueY = Math.max(44, bt - 58);
+  if (marqueY < bt - 14) {
+    sign(W * 0.22, marqueY, 'MOON MALT', '#7cf7ff', 2, 12);
+    sign(W * 0.48, marqueY, 'LAGOON LUNCH', '#ff4fd8', 1, 12);
+  }
+  const shops = [['BURGER BAY', '#ffb347', '#ff4d6a'], ['REEF SUSHI', '#7ef0e2', '#ffe08a'], ['CORAL CAFE', '#ff9ad4', '#ffffff'], ['TIDAL INN', '#c9a6ff', '#ffe66d'], ['ORBIT DINER', '#7cf7ff', '#ff4fd8']];
+  const bb = L.cell ? L.by + L.cell * VIS : H * 0.78;
+  const ctrlTop = H - (L.ctrlH || 72) - 6;
+  const y0 = bb + 3;
+  const bh = Math.max(24, Math.min(40, ctrlTop - y0));
+  const bw = W / shops.length;
+  shops.forEach((s, i) => {
+    const x = i * bw + 2, w = bw - 5;
+    ctx.fillStyle = 'rgba(16,8,36,0.78)'; ctx.fillRect(x, y0, w, bh);
+    ctx.fillStyle = s[1]; ctx.globalAlpha = 0.85 * flick(i + 4); ctx.fillRect(x, y0, w, 4); ctx.globalAlpha = 1;
+    for (let wy = 0; wy < 2; wy++) for (let wx = 0; wx < 2; wx++) {
+      ctx.globalAlpha = 0.5 + 0.5 * flick(i * 4 + wy * 2 + wx);
+      ctx.fillStyle = s[2];
+      ctx.fillRect(x + 5 + wx * w * 0.32, y0 + 8 + wy * 9, Math.max(4, w * 0.18), 5);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#12081c'; ctx.fillRect(x + w * 0.4, y0 + bh * 0.48, Math.max(6, w * 0.16), bh * 0.52);
+    sign(x + w / 2, y0 + 11, s[0], s[1], i + 6, Math.max(8, Math.min(11, w * 0.14)));
+  });
+  // a fish glides into the cafe door, then the next one starts from the left
+  const cafe = 2 * bw + bw * 0.48;
+  const phase = (tm * 0.18) % 1;
+  if (phase < 0.82) {
+    const fx = cafe - 46 + phase * 48, fy = y0 + bh * 0.72;
+    ctx.fillStyle = '#ffd0ea'; ctx.beginPath(); ctx.ellipse(fx, fy, 6, 2.8, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(fx - 5, fy); ctx.lineTo(fx - 9, fy - 3); ctx.lineTo(fx - 9, fy + 3); ctx.fill();
+  }
+  // motel tower in the left gutter, windows flickering, name stays on the street
+  ctx.fillStyle = 'rgba(36,18,64,0.9)'; ctx.fillRect(3, H * 0.32, 16, H * 0.3);
+  for (let i = 0; i < 7; i++) {
+    ctx.globalAlpha = flick(20 + i); ctx.fillStyle = i % 2 ? '#ffe66d' : '#7cf7ff';
+    ctx.fillRect(5, H * 0.34 + i * (H * 0.038), 4, 5);
+    ctx.fillRect(12, H * 0.34 + i * (H * 0.038), 4, 5);
+  }
+  ctx.globalAlpha = 1;
 }
 function seaLife(tm, ddt, low, fy) {
   const fish = (x, y, dir, kind, sc) => {
@@ -4142,6 +4200,7 @@ function bgSea(t) {
   for (let i = (BG.seaBub || []).length - 1; i >= 0; i--) { const b = BG.seaBub[i]; b.y -= b.v * ddt; b.x += Math.sin(tm * 2 + b.p) * 10 * ddt; if (b.y < -8) { BG.seaBub.splice(i, 1); continue; } ctx.moveTo(b.x + b.r, b.y); ctx.arc(b.x, b.y, b.r, 0, 7); }
   ctx.stroke();
   seaLife(tm, ddt, low, fy);
+  seaShops(tm);
 }
 function bgCastle(t) {
   const dt = bgDt(18, t), hz = H * 0.58, wy = H * 0.8, tm = RM() ? 0 : t, ddt = RM() ? 0 : dt, low = fxLow();
