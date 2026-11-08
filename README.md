@@ -71,6 +71,12 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v37 additions
+- Solaris's lines are recorded again. The previous clips were cut off and hissy because the quantized speech model wrote broken samples (not-a-number and huge spikes) into the middle of several lines, and the encoder turned those into silence plus noise. These are full takes from a stable render, denoised, with a short fade and a quiet tail. Nothing stops a line once it has started.
+- Tomorrow Park's music is high-energy electro at 128 BPM: a punchy sidechained kick, off-beat bass, supersaw hooks, vocal-style chops, and a build that drops back into the loop. No noise bed.
+- Sunken Sixties has a street of made-up neon places under the board (Burger Bay, Reef Sushi, Coral Cafe, Tidal Inn, Orbit Diner) plus Lagoon Lunch and Moon Malt above it, with flickering signs, lit windows, a motel tower, and a fish slipping into the cafe.
+- `game.js` is cache-busted to `v=37`.
+
 ## v36 additions
 - Stages 10, 11 and 12 now play original vaporwave-infused techno (four-on-the-floor, crisp tonal hats, a rolling bass and chorused maj7/min9 pads). Tomorrow Park is the brighter one, Sunken Sixties sits deeper and more filtered, and Solaris Keep adds a dorian line with a choir-like synth and a plucked harpsichord figure. The menu bed and the other stages are unchanged. There is no noise bed.
 - Tomorrow Park has bird flocks, a couple of robot birds, a swinging ship and a busier crowd. Sunken Sixties adds an octopus, more kinds of fish, seahorses, crabs, a pufferfish, and a construction yard worked by divers in brass helmets. Solaris Keep shows sparring, a pell, archery and a distant joust, plus more birds over the hills. Reduce Motion holds those moving parts still.
