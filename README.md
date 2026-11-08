@@ -71,6 +71,11 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v42 additions
+- Stage 11, Sunken Sixties, ends in a boss: Maw, a giant tentacle with a shark's jaws, looming over the same neon metropolis. 200 HP, one gentle attack every 24 seconds (a nudge, or one dim ink block). The easy fall speed is unchanged. The city, its creatures, Reduce Motion, test links and saved progress stay.
+- Maw growls instead of talking: a deep sine growl with a mid harmonic, lowpassed, on the intro, on hits, on each attack and on defeat. No noise.
+- `game.js` is cache-busted to `v=42`.
+
 ## v41 additions
 - Sunny's defeat wave is about 8 dB louder than in v40, with extra mid sines (about 160–700 Hz, cut off at 1.6 kHz) so a phone speaker can carry it. A soft clip keeps the stack under 0.8. His spoken line still plays on top. No noise.
 - `game.js` is cache-busted to `v=41`.

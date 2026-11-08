@@ -321,6 +321,7 @@ const sfx = {
   surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
   waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.55); return true; },
+  growl(key, d) { if (!aok()) return false; mawGrowl(A.ctx, anow() + 0.02 + (d || 0), A.sfx, key || 'rumble'); return true; },
   stalk() { if (!aok()) return false; const t0 = anow() + 0.01; for (const [dt2, f] of [[0, 46.2], [0.2, 49], [0.34, 46.2], [0.46, 49], [0.55, 46.2]]) { tone(f, 0.12, 'sawtooth', 0.05, { when: t0 + dt2 }); tone(f * 2, 0.1, 'triangle', 0.03, { when: t0 + dt2 }); } return true; }, // v22: a low two-note pulse that speeds up as he surges (the tell)
   chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   clank(v) { if (!aok()) return false; metalClank(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
@@ -927,12 +928,22 @@ const BOSS_LINES = {
     a17: { text: 'A banner is just a brave rectangle. You have several.' },
     a18: { text: 'Nearly there, friend. Nearly comes with a kettle.' },
   },
+  maw: {
+    intro: { text: 'GRRRRAAAH!' },
+    rumble: { text: 'GRRRR...' },
+    snarl: { text: 'HRRRRNN!' },
+    deep: { text: 'GROOOOWL' },
+    ouch1: { text: 'GRR-AAH!' },
+    ouch2: { text: 'HRRRK!' },
+    ouch3: { text: 'GRAAAH!' },
+    defeat: { text: 'GLUB... GRRR...' },
+  },
 };
 const SOL_ORDER = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16', 'a17', 'a18'];
 const BOSS_VOX = { surfer: SURF_V, gator: GATOR_V };
 const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
-function bossLineSpec(kind, key) { if (kind === 'solaris') return null; const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
+function bossLineSpec(kind, key) { if (kind === 'solaris' || kind === 'maw') return null; const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
 function bossSay(c, t, dest, kind, key, v, nb) { if (kind === 'solaris') return solPlay(key); if (kind === 'surfer' || kind === 'gator') return voxPlay(kind, key); const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
 // v21 gator chase: a woody CHOMP (jaw snap + crunchy splinter crackle + thump) and a metallic CLANK with a tooth pinging
 // off (inharmonic struck-metal partials). Original synthesis.
@@ -1412,7 +1423,7 @@ function ambSync() {
 TRACKS.push(Object.assign({}, TRACKS[3], { name: 'GOLDEN COAST SWELL' }), Object.assign({}, TRACKS[6], { name: 'BILLABONG BOOGIE' })); // v16 mid-boss tracks (procedural fallback)
 TRACKS.push(Object.assign({}, TRACKS[1], { name: 'WORLD OF TOMORROW' }), Object.assign({}, TRACKS[6], { name: 'SUNKEN SIXTIES' }), Object.assign({}, TRACKS[7], { name: 'TORCHLIGHT KEEP' }), Object.assign({}, TRACKS[1], { name: 'MENU DRIFT' })); // v35 vaporwave fallbacks
 for (let i = 0; i < TRACKS.length && i < XM_BPM.length; i++) TRACKS[i].bpm = XM_BPM[i];
-xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); try { const q = new URLSearchParams(location.search), n = parseInt(q.get('stage'), 10) || 0, bk = { surfer: 11, gator: 12, vampire: 10 }[q.get('boss')] || 0; const st = n > 1 ? stageTrack(Math.min(LAST_STAGE, n - 1)) : 0; for (const i of [st, bk, 16]) if (i > 0 && i <= 16) xmFetch(xmKey('loop', i)).catch(() => {}); } catch (e) { /* ignore */ } // v27: ?stage=/?boss= links fetch their loop up front // + the start-screen theme // start downloading the title loop right away (decoded after the first tap)
+xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); try { const q = new URLSearchParams(location.search), n = parseInt(q.get('stage'), 10) || 0, bk = { surfer: 11, gator: 12, vampire: 10, maw: 14 }[q.get('boss')] || 0; const st = n > 1 ? stageTrack(Math.min(LAST_STAGE, n - 1)) : 0; for (const i of [st, bk, 16]) if (i > 0 && i <= 16) xmFetch(xmKey('loop', i)).catch(() => {}); } catch (e) { /* ignore */ } // v27: ?stage=/?boss= links fetch their loop up front // + the start-screen theme // start downloading the title loop right away (decoded after the first tap)
 // live sequencer: look-ahead scheduler (setInterval 25 ms, schedules 150 ms ahead), bar-quantized track switches
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
@@ -3120,11 +3131,11 @@ function miniAnim(kind, dt) {
   if (b) {
     const tk = b.talk, lt = tk ? g.time - tk.t0 : -1;
     F.key = tk ? tk.key : null; F.dur = tk ? tk.dur : 0; F.lt = tk && lt <= tk.dur ? lt : -1;
-    F.jaw = F.lt >= 0 ? ((voxJaw(kind, F.key, F.lt) + 1) ? voxJaw(kind, F.key, F.lt) : specJaw(bossLineSpec(kind, F.key), F.lt)) : 0;
+    F.jaw = kind === 'maw' ? (F.lt >= 0 ? (0.3 + 0.7 * Math.abs(Math.sin(F.lt * (F.key === 'defeat' ? 6 : 11)))) : 0.1 + 0.08 * Math.sin(g.time * 1.3)) : (F.lt >= 0 ? ((voxJaw(kind, F.key, F.lt) + 1) ? voxJaw(kind, F.key, F.lt) : specJaw(bossLineSpec(kind, F.key), F.lt)) : 0);
     F.lk = F.lt >= 0 ? Math.max(0, Math.min(1, F.lt / 0.12, (F.dur - F.lt) / 0.25)) : 0;
     F.ok = b.ouch > 0 ? Math.min(1, b.ouch / 0.4) : 0; F.hit = b.hit || 0; F.dead = b.hp <= 0;
     F.dw = F.dead ? g.time - b.deadT : -1; F.ww = b.wipe && g.time - b.wipe.t0 < SURF_WIPE.popup ? g.time - b.wipe.t0 : -1;
-    F.gone = F.dead ? (kind === 'surfer' ? Math.max(0, Math.min(1, (F.dw - SURF_DIE.end) / SURF_DIE.fade)) : Math.max(0, Math.min(1, (g.time - b.deadT - 1.6) / 1.5))) : 0;
+    F.gone = F.dead ? (kind === 'surfer' ? Math.max(0, Math.min(1, (F.dw - SURF_DIE.end) / SURF_DIE.fade)) : kind === 'maw' ? Math.max(0, Math.min(1, (F.dw - 1.6) / 1.6)) : Math.max(0, Math.min(1, (g.time - b.deadT - 1.6) / 1.5))) : 0;
     if (kind === 'surfer') F.pose = surferPose(F)[0];
     if (kind === 'gator') { // v21 chase: lunge envelope, jaw wide open on the way in, snapped shut at the chomp; teeth lost
       const Lg = b.lunge, lp = Lg ? g.time - Lg.t0 : -1; F.lunge = lungeEnv(lp); F.lungeX = Lg ? Lg.x : 0.3; F.teeth = b.teeth || 0;
@@ -3182,8 +3193,8 @@ function drawBgFigure(kind, t, dt, yk) {
 function drawMiniPortrait(kind, cx, cy, s) {
   const F = miniAnim(kind, 0); if (F.gone >= 1) return;
   const r = s * 1.15; ctx.save(); rr(cx - r, cy - r, r * 2, r * 2, r * 0.3); ctx.clip();
-  ctx.fillStyle = kind === 'surfer' ? 'rgba(255,140,60,0.18)' : 'rgba(60,140,60,0.2)'; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-  const k = s * 0.62; (kind === 'surfer' ? paintSurfer : paintGator)(ctx, T, F, k, cx + (kind === 'gator' ? k * 0.5 : 0), cy - k * 0.25, false);
+  ctx.fillStyle = kind === 'surfer' ? 'rgba(255,140,60,0.18)' : kind === 'maw' ? 'rgba(120,30,160,0.28)' : 'rgba(60,140,60,0.2)'; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  const k = s * 0.62; (kind === 'surfer' ? paintSurfer : kind === 'maw' ? paintMaw : paintGator)(ctx, T, F, k, cx + (kind === 'gator' ? k * 0.5 : 0), cy - k * (kind === 'maw' ? 0.05 : 0.25), false);
   ctx.restore();
 }
 // SUNNY THE SURFER (v18): actually surfing the whole fight - riding / carving on his board, bobbing, crouching,
@@ -3638,14 +3649,56 @@ function chaseStern(t, dt) { // the back of your boat, bitten up; anchor, outboa
     ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.r); const z = L.cell * 0.32; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#6a6a6a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-z * 0.5, -z * 0.5); ctx.lineTo(z * 0.5, -z * 0.5); ctx.lineTo(0, z); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
   BG.teethFly = TF.filter((f) => f.t < 2.5 && f.y < H + 40);
 }
+// MAW (v42): a shark's jaws on a huge tentacle, with more tentacles waving. Neon purple and pink, over the sunken city.
+function paintMaw(X, t, F, s, cx, cy, full) {
+  const wave = RM() ? 0 : t, jaw = Math.max(0, Math.min(1, F.jaw || 0)), fade = F.gone || 0;
+  X.save(); X.globalAlpha = (1 - fade) * (full ? 0.94 : 1);
+  X.translate(cx + (F.hit > 0 ? Math.sin(t * 46) * s * 0.05 : 0), cy + (F.dead ? Math.min(1.2, Math.max(0, F.dw) * 0.35) * s : 0));
+  const n = full ? 6 : 3, reach = full ? 3.5 : 1.45;
+  for (let i = 0; i < n; i++) {
+    const side = (i - (n - 1) / 2), sway = Math.sin(wave * 1.25 + i * 1.35) * s * 0.42;
+    X.strokeStyle = i % 2 ? '#ff4fd8' : '#b06bff'; X.lineWidth = Math.max(2, s * (0.2 - i * 0.018)); X.lineCap = 'round';
+    X.beginPath(); X.moveTo(side * s * 0.12, s * 0.25);
+    X.bezierCurveTo(side * s * 0.7 + sway, s * reach * 0.4, side * s * 1.15 - sway, s * reach * 0.72, side * s * 1.25 + sway * 0.4, s * reach);
+    X.stroke();
+    X.fillStyle = '#7cf7ff';
+    for (let k = 1; k <= 3; k++) { const u = k / 4; X.beginPath(); X.arc(side * s * (0.2 + u) + sway * u, s * (0.25 + u * (reach - 0.3)), s * 0.045, 0, 7); X.fill(); }
+  }
+  X.fillStyle = '#4a1d78'; X.beginPath();
+  X.moveTo(-s * 0.5, s * 0.1); X.bezierCurveTo(-s * 0.72, s * reach * 0.45, -s * 0.28, s * reach * 0.8, 0, s * reach);
+  X.bezierCurveTo(s * 0.28, s * reach * 0.8, s * 0.72, s * reach * 0.45, s * 0.5, s * 0.1); X.closePath(); X.fill();
+  X.strokeStyle = '#ff4fd8'; X.lineWidth = Math.max(1.5, s * 0.04); X.stroke();
+  X.fillStyle = '#7cf7ff';
+  for (let k = 0; k < (full ? 5 : 2); k++) { X.beginPath(); X.ellipse(-s * 0.16 + (k % 2) * s * 0.3, s * (0.45 + k * 0.38), s * 0.07, s * 0.11, 0, 0, 7); X.fill(); }
+  X.fillStyle = F.hit > 0.25 ? '#e6d4ff' : '#6d3aa6';
+  X.beginPath(); X.moveTo(0, -s * 0.95); X.quadraticCurveTo(s * 0.9, -s * 0.12, s * 0.52, s * 0.32); X.quadraticCurveTo(0, s * 0.55, -s * 0.52, s * 0.32); X.quadraticCurveTo(-s * 0.9, -s * 0.12, 0, -s * 0.95); X.fill();
+  X.strokeStyle = '#ff9ad5'; X.lineWidth = Math.max(1.5, s * 0.045); X.stroke();
+  X.fillStyle = '#061018'; X.beginPath(); X.ellipse(-s * 0.28, -s * 0.16, s * 0.15, s * 0.09, -0.35, 0, 7); X.ellipse(s * 0.28, -s * 0.16, s * 0.15, s * 0.09, 0.35, 0, 7); X.fill();
+  X.fillStyle = '#7cf7ff'; X.beginPath(); X.arc(-s * 0.26, -s * 0.16, s * 0.045, 0, 7); X.arc(s * 0.3, -s * 0.16, s * 0.045, 0, 7); X.fill();
+  const open = s * (0.07 + jaw * 0.5);
+  X.fillStyle = '#240818'; X.beginPath(); X.ellipse(0, s * 0.06, s * 0.4, Math.max(s * 0.05, open), 0, 0, 7); X.fill();
+  X.fillStyle = '#fff6e8';
+  for (let i = 0; i < 7; i++) {
+    const tx = -s * 0.32 + i * s * 0.1;
+    X.beginPath(); X.moveTo(tx, s * 0.02); X.lineTo(tx + s * 0.045, s * 0.02 + open * 0.85); X.lineTo(tx + s * 0.09, s * 0.02); X.fill();
+    X.beginPath(); X.moveTo(tx + s * 0.02, s * 0.05 + open); X.lineTo(tx + s * 0.06, s * 0.05 + open * 0.2); X.lineTo(tx + s * 0.1, s * 0.05 + open); X.fill();
+  }
+  X.restore();
+}
 // board overlays for the mid-boss hazards
 function drawMiniFX(bx, by, c, bw) {
-  if (g.wave) { // surf wave sweeps across the lower board
+  if (g.wave) { // surf wave, or Maw's tentacle, sweeps across the lower board
     const w = g.wave, k = Math.min(1, w.t / 1.1), bh = c * VIS, front = w.dir > 0 ? bx - bw * 0.3 + k * bw * 1.6 : bx + bw * 1.3 - k * bw * 1.6, y0 = by + bh - c * 3.2;
+    if (w.ink) {
+      ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip(); ctx.globalAlpha = Math.sin(Math.PI * k) * 0.85;
+      ctx.strokeStyle = '#ff4fd8'; ctx.lineWidth = c * 0.45; ctx.lineCap = 'round'; ctx.beginPath();
+      ctx.moveTo(front - w.dir * bw * 0.55, by + bh); ctx.quadraticCurveTo(front - w.dir * c * 2, y0, front, y0 - c * 0.2); ctx.stroke();
+      ctx.fillStyle = '#7cf7ff'; ctx.beginPath(); ctx.arc(front, y0 - c * 0.2, c * 0.22, 0, 7); ctx.fill(); ctx.restore();
+    } else {
     ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip(); ctx.globalAlpha = Math.sin(Math.PI * k) * 0.55;
     ctx.fillStyle = '#5ee7ff'; ctx.beginPath(); ctx.moveTo(front - w.dir * bw * 0.6, by + bh); ctx.lineTo(front - w.dir * bw * 0.6, y0 + c); ctx.quadraticCurveTo(front - w.dir * c, y0 - c * 0.4, front, y0 + c * 0.4); ctx.quadraticCurveTo(front + w.dir * c * 0.4, y0 + c * 1.4, front, by + bh); ctx.fill();
     ctx.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(front - w.dir * i * c * 0.5, y0 + c * 0.3 + Math.sin(i * 1.7) * c * 0.2, c * 0.22, 0, 7); ctx.fill(); }
-    ctx.restore();
+    ctx.restore(); }
   }
   if (g.murk) { // murky billabong water over the bottom rows (see-through: blocks stay readable)
     const m = g.murk, k = Math.max(0, Math.min(1, m.t / 0.6, (m.dur - m.t) / 0.6)), bh = c * VIS, y0 = by + bh - c * 4;
@@ -3712,7 +3765,43 @@ const VOX_LEN = {
 };
 const VOX_KEYS = { surfer: Object.keys(VOX_LEN.surfer), gator: Object.keys(VOX_LEN.gator), vamp: Object.keys(VOX_LEN.vamp) };
 const VOX = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, gain: null, id: '', soon: null, warm: {} };
+// v42: Maw's voice is a growl, not speech. Sines and one quiet triangle, cut off at 520 Hz, so there is no hiss.
+const GROWL = {
+  intro: { dur: 1.7, f0: 62, f1: 40, amp: 0.46, trem: 8 },
+  rumble: { dur: 1.15, f0: 48, f1: 34, amp: 0.4, trem: 6 },
+  snarl: { dur: 0.85, f0: 72, f1: 108, amp: 0.44, trem: 13 },
+  deep: { dur: 1.35, f0: 42, f1: 30, amp: 0.42, trem: 5 },
+  ouch1: { dur: 0.8, f0: 88, f1: 48, amp: 0.46, trem: 15 },
+  ouch2: { dur: 0.95, f0: 78, f1: 40, amp: 0.48, trem: 12 },
+  ouch3: { dur: 1.15, f0: 96, f1: 36, amp: 0.5, trem: 10 },
+  attack: { dur: 0.65, f0: 58, f1: 84, amp: 0.48, trem: 16 },
+  hit: { dur: 0.42, f0: 70, f1: 44, amp: 0.36, trem: 18 },
+  defeat: { dur: 2.3, f0: 52, f1: 28, amp: 0.5, trem: 5 },
+};
+function mawGrowl(c, t, dest, key) {
+  const G = GROWL[key] || GROWL.rumble, end = t + G.dur;
+  const lp = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+  lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.6;
+  lfo.frequency.value = G.trem; lg.gain.value = G.amp * 0.18;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(G.amp, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(G.amp * 0.7, t + G.dur * 0.55);
+  g.gain.exponentialRampToValueAtTime(0.0001, end);
+  lfo.connect(lg); lg.connect(g.gain); lp.connect(g); g.connect(dest);
+  const voice = (type, mul, amp, fMul) => {
+    const o = c.createOscillator(), gn = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(Math.max(24, G.f0 * fMul), t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(22, G.f1 * fMul), end);
+    gn.gain.value = amp; o.connect(gn); gn.connect(lp); o.start(t); o.stop(end + 0.05);
+  };
+  voice('sine', 1, 1, 1);
+  voice('triangle', 1, 0.28, 2);
+  voice('sine', 1, 0.2, 3.4);
+  lfo.start(t); lfo.stop(end + 0.05);
+}
 function voxDur(kind, key) {
+  if (kind === 'maw') return (GROWL[key] && GROWL[key].dur) || 1.1;
   const b = VOX.buf[kind + '/' + key];
   if (b) return b.duration;
   const table = VOX_LEN[kind];
@@ -4456,6 +4545,7 @@ function bgSea(t) {
   ctx.stroke();
   seaLife(tm, ddt, low, fy);
   seaShops(tm);
+  if (g.boss && g.boss.kind === 'maw') { const F = miniAnim('maw', dt); if (F.gone < 1) paintMaw(ctx, tm, F, Math.min(W, H) * 0.15, W * 0.38, Math.max(H * 0.16, Math.min(H * 0.3, (L.by || H * 0.24) - 6)), true); }
 }
 function bgCastle(t) {
   const dt = bgDt(18, t), hz = H * 0.58, wy = H * 0.8, tm = RM() ? 0 : t, ddt = RM() ? 0 : dt, low = fxLow();
@@ -4678,8 +4768,11 @@ const MINI = {
   gator: { stage: 5, hp: 170, /* v28: 240 -> 170 */ bonus: 10000, bg: 15, track: 12, name: 'GAZZA THE GATOR', place: 'THE BILLABONG', c1: '#8dff5a', c2: '#ffd23d', bar: ['#2f9e3a', '#6fdc4a', '#d8ff9a'], per: 22,
     taunts: ['tasty', 'crikey', 'tasty2'], banner: ['GATOR BOSS!', 'GAZZA IS CHASING YOUR BOAT!'], warn: 'TAIL SPLASH!', win: ['CROC-BLOCKED!', '+$10,000 GATOR BONUS!'],
     twist: { text: 'BOSS! Pop matches to send him packing! His tail splashes murky blocks.', icon: 4 } },
+  maw: { stage: 10, hp: 200, bonus: 15000, bg: 17, track: 14, name: 'MAW', place: 'SUNKEN SIXTIES', c1: '#ff4fd8', c2: '#7cf7ff', bar: ['#6a1f88', '#ff4fd8', '#d7fff8'], per: 24,
+    taunts: ['rumble', 'snarl', 'deep'], banner: ['TENTACLE BOSS!', 'A SHARK-MAWED TENTACLE RISES!'], warn: 'TENTACLE!', win: ['REELED IN!', '+$15,000 MAW BONUS!'],
+    twist: { text: 'BOSS! Pop matches to drive it off! A tentacle nudges, ink drops in.', icon: 1 } },
 };
-const MINI_AT = { 2: 'surfer', 5: 'gator' };
+const MINI_AT = { 2: 'surfer', 5: 'gator', 10: 'maw' };
 const isMini = () => !!(g.boss && g.boss.kind && g.boss.kind !== 'vamp');
 const effPop = () => g.popped - (g.bossPops || 0);
 function startMini(kind) {
@@ -4696,7 +4789,7 @@ function startMini(kind) {
 function bossTalk(key, delay) {
   const b = g.boss; if (!isMini()) return false; delay = delay || 0;
   const dur = voxDur(b.kind, key); b.talk = { key, t0: g.time + delay, dur }; b.said.push(key);
-  voxPlay(b.kind, key, delay);
+  if (b.kind === 'maw') sfx.growl(key, delay); else voxPlay(b.kind, key, delay);
   return true;
 }
 function miniLaugh(why) {
@@ -4725,6 +4818,10 @@ function miniHit(b, d, q) {
     bossTalk('defeat', LUNGE.chomp + 0.45); setTimeout(() => { if (g.boss === b) sfx.miniDefeat(b.kind); }, 1000 * (LUNGE.chomp + 0.45 + bossLineSpec(b.kind, 'defeat').dur + 0.1));
     shake(0.3, 6); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     setTimeout(() => { if (g.boss === b) floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.55, 2.6); }, 900);
+  } else if (b.hp <= 0 && b.kind === 'maw') {
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15);
+    shake(0.4, 8); flashA = 0.35; hurtA = 0.22; showBanner(MB.win[0], MB.win[1], '#ffd23d');
+    floatText(BOSS_LINES.maw.defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0) {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat'); sfx.miniDefeat(b.kind);
     shake(0.45, 10); flashA = 0.4; hurtA = 0.3; showBanner(MB.win[0], MB.win[1], '#ffd23d');
@@ -4739,12 +4836,18 @@ function miniHit(b, d, q) {
     const ln = BOSS_LINES[b.kind]['ouch' + q], H2 = STERN_HARD[q - 1]; gatorLunge(b, { hard: true, q, x: H2.x, what: H2.what }); b.nextLunge = g.time + 6;
     b.laugh = 0; b.barShake = 0.8; bossTalk('ouch' + q, LUNGE.chomp + 0.12); b.ouch = b.talk.dur + LUNGE.chomp + 0.12; b.ouchQ = q; b.ouchAt = g.time + LUNGE.chomp; hurtA = 0.12 + q * 0.04;
     setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.6 : 0.95), 1.6); }, 700);
+  } else if (q && b.kind === 'maw') {
+    const ln = BOSS_LINES.maw['ouch' + q];
+    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
+    shake(0.22, 4 + q); hurtA = 0.12 + q * 0.04; vib(24 + q * 8);
+    floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff9ad5', c * 0.7, 1.5);
   } else if (q) {
     const ln = BOSS_LINES[b.kind]['ouch' + q];
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     tone(700 + q * 200, 0.07, 'square', 0.035, { to: 420 }); shake(0.22, 4 + q * 2); hurtA = 0.15 + q * 0.04; vib(30 + q * 15);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.5);
-  } else sfx.hurt();
+  } else if (b.kind === 'maw') sfx.growl('hit');
+  else sfx.hurt();
 }
 // after the defeat line + bonus, the next stage starts
 function miniWin() {
@@ -4794,9 +4897,16 @@ function miniHazard() {
       if (p && !g.res && !collide(p.t, p.r, p.x + dir, p.y)) { p.x += dir; b.nudges++; }
       floatText(dir > 0 ? 'WAVE! \u2192' : '\u2190 WAVE!', L.bx + c * 5, L.by + c * 4, '#5ee7ff', c * 0.8, 1.1);
     } else if (miniDrop('ball', 1)) { sfx.ball(); floatText('BEACH BALL!', L.bx + c * 5, L.by + c * 4, '#ffb347', c * 0.8, 1.1); }
-  } else {
+  } else if (b.kind === 'gator') {
     if (b.hz % 2) { if (miniDrop('splash', 2)) { sfx.splash(); floatText('TAIL SPLASH!', L.bx + c * 5, L.by + c * 4, '#8dff5a', c * 0.8, 1.1); } }
     else { g.murk = { t: 0, dur: 4 }; b.murks++; sfx.splash(0.6); floatText('MURKY WATER!', L.bx + c * 5, L.by + c * 4, '#b5d96a', c * 0.75, 1.1); }
+  } else if (b.kind === 'maw') {
+    sfx.growl('attack');
+    if (b.hz % 2) {
+      const p = g.piece, dir = Math.random() < 0.5 ? -1 : 1; g.wave = { t: 0, dir, ink: 1 };
+      if (p && !g.res && !collide(p.t, p.r, p.x + dir, p.y)) { p.x += dir; b.nudges++; }
+      floatText(dir > 0 ? 'TENTACLE! \u2192' : '\u2190 TENTACLE!', L.bx + c * 5, L.by + c * 4, '#ff4fd8', c * 0.7, 1.1);
+    } else if (miniDrop('ink', 1)) { tone(130, 0.2, 'sine', 0.14, { to: 64, lp: 420 }); floatText('INK!', L.bx + c * 5, L.by + c * 4, '#7cf7ff', c * 0.85, 1.1); }
   }
 }
 const PAL = [null, '#3D8BFF', '#FFD23F', '#FF4FA3', '#2EE6A6', '#FF8A1F'];
@@ -5267,7 +5377,7 @@ function updateBats(dt) {
     let y = ROWS - 1; while (y >= 0 && g.board[y][bt.col]) y--;
     const p = g.piece, blocked = p && ROT[p.t][p.r].some(([cx, cy]) => p.x + cx === bt.col && p.y + cy >= y - 1);
     const [px, py] = cellXY(bt.col, Math.max(HID, y));
-    if (y > HID + 3 && !blocked) { g.board[y][bt.col] = bt.v || WEB; g.anim[y * COLS + bt.col] = g.time; if (bt.kind === 'ball') tone(300, 0.1, 'triangle', 0.1, { to: 180 }); else if (bt.kind === 'splash') sfx.splash(0.45); else sfx.web(); }
+    if (y > HID + 3 && !blocked) { g.board[y][bt.col] = bt.v || WEB; g.anim[y * COLS + bt.col] = g.time; if (bt.kind === 'ball') tone(300, 0.1, 'triangle', 0.1, { to: 180 }); else if (bt.kind === 'ink') tone(110, 0.16, 'sine', 0.1, { to: 60, lp: 360 }); else if (bt.kind === 'splash') sfx.splash(0.45); else sfx.web(); }
     for (let k = 0; k < 10; k++) part(px + L.cell / 2, py + L.cell / 2, rand(-120, 120), rand(-160, 40), rand(0.3, 0.6), 3, bt.kind === 'ball' ? (k % 2 ? '#ff4fa3' : '#ffffff') : bt.kind === 'splash' ? (k % 2 ? '#9fe08a' : '#2c4a2a') : (k % 2 ? '#e6e6f0' : '#5a1030'), 300, 0);
   }
 }
@@ -5303,7 +5413,7 @@ function updateGame(dt) {
   if (g.bats && g.bats.length) updateBats(dt);
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
   if (g.handoff) updateHandoff();
-  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : g.boss.kind === 'gator' ? 5.2 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
+  else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : g.boss.kind === 'gator' ? 5.2 : g.boss.kind === 'maw' ? 3.4 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
   if (g.stage === 11) updateSolaris();
   voxPump();
   if (g.res) { updateResolve(dt); return; }
@@ -5946,7 +6056,7 @@ function drawHowto() {
     ['6+ LINE', 'MEGA POP! crossing lines = bonus'], ['PAIRS / 3s', "don't pay - only 4+ in a line"], ['TAP', 'rotate (O piece spins its colors)'],
     ['SWIPE \u2190 \u2192', 'move (keep dragging to slide)'], ['SWIPE \u2193', 'soft drop, FLICK \u2193 = hard drop'],
     ['KEYS', '\u2190\u2192 move, \u2191/X/Z rotate, SPACE drop'],     ['STAGES', '13 stages, a twist every 150 pops'],
-    ['', 'rainbow, rock, warps, ice, fog...'], ['', 'park, sunken sixties, Solaris, VAMPIRE'], ['STORE', 'cash is banked: buy power-ups & looks'],
+    ['', 'rainbow, rock, warps, ice, fog...'], ['', 'park, sunken maw, Solaris, VAMPIRE'], ['STORE', 'cash is banked: buy power-ups & looks'],
   ];
   const top = sy + sw / 2 + 18, rowH = Math.min(38, (ph - (top - py) - 80) / lines.length), fs = Math.min(16, pw / 25);
   lines.forEach(([a, b], i) => {
@@ -5969,7 +6079,7 @@ function drawStages() {
   STAGES.forEach((st, i) => {
     const x = px + 10 + (i % cols) * (cw + gap), y = top + Math.floor(i / cols) * (ch + gap), open = stageOpen(i);
     button('stg' + i, x + cw / 2, y + ch * 0.38, cw, Math.max(28, ch * 0.62), String(i + 1), open ? [st.c1, st.c2] : GREY, { fs: ch * 0.28, glow: false, r: 8 });
-    fitTxt(open ? st.name : 'LOCKED', x + cw / 2, y + ch * 0.84, Math.max(9, ch * 0.16), cw - 4, open ? '#fff' : 'rgba(255,255,255,0.55)', null);
+    fitTxt(open ? st.name + ((MINI_AT[i] || i === BOSS) ? ' · BOSS' : '') : 'LOCKED', x + cw / 2, y + ch * 0.84, Math.max(9, ch * 0.16), cw - 4, open ? '#fff' : 'rgba(255,255,255,0.55)', null);
   });
   button('back', W / 2, py + ph - 30, pw * 0.5, 44, 'BACK', OCEAN);
 }
@@ -6408,10 +6518,11 @@ function drawBossBar(bx, by, c, bw) {
   if (kh > 0) { rr(x + ip, y + 3, Math.max(4, iw * kh), h - 6, (h - 6) / 2); const gr = ctx.createLinearGradient(x + ip, 0, x + ip + Math.max(4, iw * kh), 0); const bc = MB ? MB.bar : ['#c0102f', '#ff2a4f', '#ff8fa0']; gr.addColorStop(0, bc[0]); gr.addColorStop(0.7, bc[1]); gr.addColorStop(1, bc[2]); ctx.fillStyle = gr; ctx.fill(); }
   ctx.fillStyle = 'rgba(255,255,255,0.55)'; for (const k of [0.25, 0.5, 0.75]) ctx.fillRect(x + ip + iw * k - 1, y + 3, 2, h - 6); // quarter marks (OUCH!)
   if (MB && b.kind === 'surfer') { ctx.save(); ctx.translate(x + h / 2 + 1, y + h / 2); ctx.rotate(0.6 + Math.sin(T * 3) * 0.15); ctx.fillStyle = '#fff6e0'; ctx.beginPath(); ctx.ellipse(0, 0, h * 0.14, h * 0.42, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ff4fa3'; ctx.fillRect(-h * 0.03, -h * 0.38, h * 0.06, h * 0.76); ctx.restore(); }
+  else if (MB && b.kind === 'maw') { ctx.save(); ctx.translate(x + h / 2 + 1, y + h / 2); ctx.fillStyle = '#ff4fd8'; ctx.beginPath(); ctx.ellipse(0, 0, h * 0.16, h * 0.28, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#fff6e8'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-h * 0.1 + i * h * 0.08, -h * 0.02); ctx.lineTo(-h * 0.06 + i * h * 0.08, h * 0.16); ctx.lineTo(-h * 0.02 + i * h * 0.08, -h * 0.02); ctx.fill(); } ctx.restore(); }
   else if (MB) { ctx.save(); ctx.translate(x + h / 2 + 1, y + h / 2); ctx.fillStyle = '#6fdc4a'; ctx.beginPath(); ctx.ellipse(0, 0, h * 0.4, h * 0.26, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#121a10'; ctx.beginPath(); ctx.ellipse(-h * 0.13, -h * 0.02, h * 0.13, h * 0.1, 0, 0, 7); ctx.ellipse(h * 0.13, -h * 0.02, h * 0.13, h * 0.1, 0, 0, 7); ctx.fill(); ctx.restore(); }
   else { ctx.save(); ctx.translate(x + h / 2 + 1, y + h / 2); batPath(ctx, h * 0.42, 0.5 + 0.5 * Math.sin(T * 12)); ctx.fillStyle = '#ff3355'; ctx.fill(); ctx.restore(); }
   fitTxt(MB ? MB.name : 'COUNT BLOCKULA', x + ip + iw / 2, y + h / 2 + 1, h * 0.62, iw * 0.92, '#ffffff', '#3a0010', 'center', NFONT);
-  if (b.warn) { const a = 0.6 + 0.4 * Math.sin(T * 16); ctx.globalAlpha = a; txt(MB ? (b.kind === 'surfer' ? (b.hz % 2 ? 'BEACH BALL INCOMING!' : 'WAVE INCOMING!') : (b.hz % 2 ? 'MURKY WATER INCOMING!' : 'TAIL SPLASH INCOMING!')) : 'BATS INCOMING!', bx + bw / 2, y + h + c * 0.65, c * 0.6, MB ? MB.c2 : '#ff6b81', '#2a0010'); ctx.globalAlpha = 1; }
+  if (b.warn) { const a = 0.6 + 0.4 * Math.sin(T * 16); ctx.globalAlpha = a; txt(MB ? (b.kind === 'surfer' ? (b.hz % 2 ? 'BEACH BALL INCOMING!' : 'WAVE INCOMING!') : b.kind === 'maw' ? (b.hz % 2 ? 'INK INCOMING!' : 'TENTACLE INCOMING!') : (b.hz % 2 ? 'MURKY WATER INCOMING!' : 'TAIL SPLASH INCOMING!')) : 'BATS INCOMING!', bx + bw / 2, y + h + c * 0.65, c * 0.6, MB ? MB.c2 : '#ff6b81', '#2a0010'); ctx.globalAlpha = 1; }
 }
 function drawVampire(cx, cy, s, b) {
   const hit = b.hit > 0, laugh = b.laugh > 0, low = b.hp < b.max * 0.35, bob = laugh ? Math.abs(Math.sin(T * 14)) * s * 0.08 : Math.sin(T * 1.6) * s * 0.03;
@@ -6456,6 +6567,7 @@ function drawBatsInFlight() {
     const [tx, tyy] = cellXY(bt.col, Math.max(HID, ty)), ex = tx + c / 2, ey = tyy + c / 2, mx = (bt.x0 + ex) / 2, my = Math.min(bt.y0, ey) - c * 4;
     const x = (1 - k) * (1 - k) * bt.x0 + 2 * (1 - k) * k * mx + k * k * ex, y = (1 - k) * (1 - k) * bt.y0 + 2 * (1 - k) * k * my + k * k * ey;
     if (bt.kind === 'ball') { drawBeachBall(x, y, c * 0.42, T * 8); continue; }
+    if (bt.kind === 'ink') { ctx.fillStyle = 'rgba(180,40,220,0.8)'; ctx.beginPath(); ctx.arc(x, y, c * 0.28, 0, 7); ctx.fill(); ctx.fillStyle = '#7cf7ff'; ctx.beginPath(); ctx.arc(x - c * 0.06, y - c * 0.06, c * 0.08, 0, 7); ctx.fill(); drawBlock(spr(bt.v), x - c * 0.22, y + c * 0.05, c * 0.45); continue; }
     if (bt.kind === 'splash') { ctx.fillStyle = 'rgba(160,230,140,0.7)'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x + Math.sin(i * 2.1 + T * 9) * c * 0.35, y - c * 0.25 - i * c * 0.12, c * 0.08, 0, 7); ctx.fill(); } drawBlock(spr(bt.v), x - c * 0.3, y - c * 0.3, c * 0.6); continue; }
     ctx.save(); ctx.translate(x, y); ctx.scale(ex < bt.x0 ? -1 : 1, 1); batPath(ctx, c * 0.55, 0.5 + 0.5 * Math.sin(T * 22 + bt.col)); ctx.fillStyle = '#12000a'; ctx.fill(); ctx.strokeStyle = '#ff3355'; ctx.lineWidth = 1; ctx.stroke();
     ctx.fillStyle = '#ff3355'; ctx.fillRect(-c * 0.08, -c * 0.06, c * 0.05, c * 0.05); ctx.fillRect(c * 0.03, -c * 0.06, c * 0.05, c * 0.05); ctx.restore();
@@ -6953,7 +7065,7 @@ const ACH = [
   ['gator', 'SEE YA LATER', 'Beat the gator', 1500, (q) => q.gator], ['vamp', 'DAYBREAK', 'Defeat the vampire', 3000, (q) => q.vamp],
   ['daily3', 'REGULAR', 'Daily challenge 3 days in a row', 750, () => DAILY.bestStreak >= 3], ['games10', 'HOOKED', 'Play 10 games', 300, (q) => q.games >= 10],
 ];
-const ACH_S = Object.assign({ games: 0, pops: 0, lines: 0, h: 0, v: 0, d: 0, cross: 0, bestChain: 0, megas: 0, best: 0, earned: 0, dailies: 0, surfer: false, gator: false, vamp: false, got: {} }, store.get('bb_stats', {}));
+const ACH_S = Object.assign({ games: 0, pops: 0, lines: 0, h: 0, v: 0, d: 0, cross: 0, bestChain: 0, megas: 0, best: 0, earned: 0, dailies: 0, surfer: false, gator: false, maw: false, vamp: false, got: {} }, store.get('bb_stats', {}));
 reach = (() => { // missing key: old saves keep stages 1-9 if they already beat the vampire, and never lose wallet or stats
   let r = store.get('bb_reach', null);
   if (typeof r !== 'number' || !isFinite(r)) { r = ACH_S.vamp ? 8 : 0; if (!SANDBOX) store.set('bb_reach', r); }
