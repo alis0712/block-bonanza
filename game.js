@@ -1433,12 +1433,47 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
-// v44: bought genres replace the stage loops. Menus stay on the default beds. Sines, triangles and lowpassed saws only.
+// v45: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
+// Techno vaporwave stays a synth. Menus stay on the default beds.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
+const GENRE_REC = { rock: 'genre-rock', pop: 'genre-pop', classical: 'genre-classical' };
+const GR = { buf: {}, pend: {}, src: null, g: null, id: '' };
 function tuneId() { const id = wallet.music || 'vapor'; return wallet.tunes && wallet.tunes.indexOf(id) >= 0 ? id : 'vapor'; }
 function genreWanted() { return tuneId() !== 'vapor' && (state === 'play' || state === 'dying'); }
 function genreBus() { if (!GP.bus && A.ctx) { GP.bus = A.ctx.createGain(); GP.bus.gain.value = 1.15; GP.bus.connect(A.mus); } return GP.bus; }
-function genreStop() { GP.live = false; GP.next = 0; }
+function genreStopFile() {
+  if (!GR.src) { GR.id = ''; return; }
+  const src = GR.src, g = GR.g; GR.src = null; GR.g = null; GR.id = '';
+  try {
+    const t = A.ctx.currentTime;
+    if (g) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.06); }
+    src.stop(t + 0.08);
+  } catch (e) { try { src.stop(); } catch (e2) { /* ended */ } }
+}
+function genreStop() { GP.live = false; GP.next = 0; genreStopFile(); }
+function genreFileStart(id) {
+  if (!A.ctx || !GR.buf[id] || tuneId() !== id) return;
+  genreStopFile();
+  const src = A.ctx.createBufferSource(), g = A.ctx.createGain();
+  src.buffer = GR.buf[id]; src.loop = true;
+  g.gain.value = 1.05;
+  src.connect(g); g.connect(A.mus);
+  src.start();
+  GR.src = src; GR.g = g; GR.id = id; GP.live = true;
+}
+function genreFilePlay(id) {
+  if (!A.ctx || !GENRE_REC[id]) return;
+  if (GR.buf[id]) { genreFileStart(id); return; }
+  if (GR.pend[id]) return;
+  const base = 'music/' + GENRE_REC[id];
+  const grab = (ext) => fetch(base + '.' + ext + '?v=45').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  GR.pend[id] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
+    A.ctx.decodeAudioData(ab.slice(0), res, rej);
+  })).then((b) => {
+    GR.buf[id] = b; delete GR.pend[id];
+    if (tuneId() === id && genreWanted()) genreFileStart(id);
+  }).catch(() => { delete GR.pend[id]; });
+}
 function gTone(when, f, dur, type, amp, lpHz) {
   if (!A.ctx) return; const o = A.ctx.createOscillator(), g = A.ctx.createGain();
   o.type = type; o.frequency.setValueAtTime(Math.max(28, f), when);
@@ -1447,22 +1482,6 @@ function gTone(when, f, dur, type, amp, lpHz) {
   g.connect(genreBus()); o.start(when); o.stop(when + dur + 0.03);
 }
 const GENRE_SONG = {
-  rock: { bpm: 124, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [82, 110, 98, 73][bar];
-    if (s % 8 === 0) gTone(when, 68, 0.12, 'sine', 0.32, 170);
-    if (s % 8 === 4) { gTone(when, 190, 0.08, 'triangle', 0.14, 800); gTone(when, 300, 0.06, 'sine', 0.07, 1000); }
-    if (s % 2 === 0) gTone(when, 1500, 0.025, 'sine', 0.03, 2000);
-    if (s % 2 === 0) gTone(when, root * (s % 4 ? 0.75 : 0.5), 0.13, 'sawtooth', 0.14, 220);
-    if (s % 4 === 2) { gTone(when, root, 0.15, 'sawtooth', 0.09, 820); gTone(when, root * 1.5, 0.15, 'sawtooth', 0.07, 820); } } },
-  pop: { bpm: 118, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [262, 220, 196, 247][bar];
-    if (s % 4 === 0) gTone(when, 76, 0.1, 'sine', 0.28, 190);
-    if (s % 8 === 4) { gTone(when, 523, 0.06, 'sine', 0.09); gTone(when, 784, 0.05, 'sine', 0.05); }
-    if (s % 2 === 0) gTone(when, root / (s % 4 ? 3 : 2), 0.12, 'triangle', 0.12, 480);
-    if (s === 0 || s === 8) { gTone(when, root, 0.32, 'sine', 0.07); gTone(when, root * 1.25, 0.32, 'sine', 0.06); gTone(when, root * 1.5, 0.32, 'sine', 0.05); }
-    if (s % 2 === 1) gTone(when, root * [1, 1.25, 1.5, 2][(s >> 1) % 4], 0.09, 'triangle', 0.06, 1500); } },
-  classical: { bpm: 76, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [196, 220, 174, 233][bar];
-    if (s === 0) { gTone(when, root / 2, 1.9, 'sine', 0.09, 560); gTone(when, root, 1.9, 'sine', 0.07, 760); gTone(when, root * 1.5, 1.9, 'sine', 0.045, 900); }
-    if (s % 4 === 0) gTone(when, root * [1, 1.25, 1.5, 2][(s / 4 + bar) % 4], 0.4, 'sine', 0.08, 1300);
-    if (s === 6 || s === 14) gTone(when, root * (bar % 2 ? 0.75 : 0.5), 0.55, 'triangle', 0.06, 480); } },
   techno: { bpm: 126, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [55, 55, 49, 62][bar];
     if (s % 4 === 0) gTone(when, 56, 0.1, 'sine', 0.32, 150);
     if (s % 4 === 2) gTone(when, root, 0.15, 'sawtooth', 0.12, 200);
@@ -1471,9 +1490,17 @@ const GENRE_SONG = {
     if (s % 2 === 1) gTone(when, root * [2, 3, 4, 3][(bar + s) % 4], 0.07, 'square', 0.035, 980); } },
 };
 function genreTick(now) {
-  const song = GENRE_SONG[tuneId()]; if (!song || !A.ctx) return;
-  GP.live = true; if (!GP.next || GP.next < now - 0.35) GP.next = now + 0.04;
-  let n = 0; while (GP.next < now + 0.16 && n++ < 6) { song.step(GP.step, GP.next); GP.step++; GP.next += 60 / song.bpm / 4; }
+  const id = tuneId();
+  if (id === 'techno') {
+    if (GR.src) genreStopFile();
+    const song = GENRE_SONG.techno; if (!song || !A.ctx) return;
+    GP.live = true; if (!GP.next || GP.next < now - 0.35) GP.next = now + 0.04;
+    let n = 0; while (GP.next < now + 0.16 && n++ < 6) { song.step(GP.step, GP.next); GP.step++; GP.next += 60 / song.bpm / 4; }
+    return;
+  }
+  if (!GENRE_REC[id]) return;
+  GP.live = true; GP.next = 0;
+  if (GR.id !== id || !GR.src) genreFilePlay(id);
 }
 function musicTick() {
   if (!A.ctx || A.ctx.state !== 'running' || !M.E) return;
@@ -1818,9 +1845,9 @@ const SHOP_SKIN = [
 const START_CASH = { free: 0, full: 1000 };
 const GENRES = [
   { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
-  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Guitars, bass, backbeat' },
-  { id: 'pop', name: 'POP', price: 12000, blurb: 'Bright chords and a hook' },
-  { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings and a harp line' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Fast guitars, bass and a kit' },
+  { id: 'pop', name: 'POP', price: 12000, blurb: 'Piano, clean guitar and a hook' },
+  { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings, piano and winds' },
   { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
 ];
 function loadWallet() {
