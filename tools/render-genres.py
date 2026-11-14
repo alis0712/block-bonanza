@@ -128,26 +128,34 @@ def fold_loop(x, sr, seconds):
     return body
 
 
-def crunch(x):
-    """Soft guitar drive. Tanh on a tonal stem does not add a noise bed."""
+def _one_pole(x, a):
     import numpy as np
-    drive = 2.2
-    y = np.tanh(x * drive) / np.tanh(drive)
-    # one-pole lowpass ~5.5 kHz to keep the crunch and drop any fizz
-    a = 0.42
-    z = np.zeros_like(y)
-    acc = np.zeros(y.shape[-1] if y.ndim == 2 else 1, dtype='float32')
-    if y.ndim == 1:
+    y = np.empty_like(x)
+    if x.ndim == 1:
         acc = np.float32(0)
-        for i in range(len(y)):
-            acc += a * (y[i] - acc)
-            z[i] = acc
-    else:
-        acc = np.zeros(2, dtype='float32')
-        for i in range(len(y)):
-            acc += a * (y[i] - acc)
-            z[i] = acc
-    return z * np.float32(0.9)
+        for i in range(len(x)):
+            acc += a * (x[i] - acc)
+            y[i] = acc
+        return y
+    acc = np.zeros(x.shape[1], dtype='float32')
+    for i in range(len(x)):
+        acc += a * (x[i] - acc)
+        y[i] = acc
+    return y
+
+
+def guitar_amp(x, drive=3.4):
+    """Crunch a plucked guitar stem. Asymmetric clip plus a dark cabinet lowpass.
+
+    The lowpass keeps the fuzz in the speaker range and does not add hiss.
+    """
+    import numpy as np
+    hp = x - _one_pole(x, np.float32(0.04))
+    y = np.tanh(drive * (hp + 0.2 * hp * np.abs(hp)))
+    y = y / np.float32(np.tanh(drive))
+    # ~3.6 kHz cabinet. Dark on purpose: grunge weight, no reed fizz.
+    y = _one_pole(y, np.float32(0.28))
+    return y * np.float32(0.92)
 
 
 def encode(wav, stem):
@@ -173,10 +181,14 @@ def finish(name, wav_in, seconds):
 
 
 # ---------------------------------------------------------------- rock
-# Original instrumental. Fast pop-punk: muted chugs, then open power chords,
-# eighth-note bass, acoustic kit, a major-key lead hook. Key of A.
+# Original instrumental. Fast pop-punk with a heavier grunge chorus.
+# Palm-muted chugs, then bigger fuzzy stabs with gaps (no held fifth drone),
+# a single-note guitar lead doubled at the octave, pick bass, acoustic kit.
+# Key of E. Not based on any existing song's melody or riff.
 
-A, E, D, G, Fs = 45, 40, 38, 43, 42
+ROCK_BPM = 168
+ROCK_BARS = 80
+E, A, D, G, B, Fs = 40, 45, 38, 43, 47, 42
 
 
 def rock_kit(s, bar, kind='verse', fill=False, crash=False):
@@ -218,55 +230,68 @@ def rock_bass(s, bar, root, drive=True):
         s.n(3, n, t + i * 0.5, 0.42, 112 if i % 2 == 0 else 96)
 
 
+def rock_strum(s, ch, root, beat, dur, vel):
+    """Downstroke. The three notes are a few milliseconds apart and they end
+    before the next hit, so a fifth cannot sit there like a pipe drone."""
+    for i, n in enumerate((root, root + 7, root + 12)):
+        s.n(ch, n, beat + i * 0.018, max(0.05, dur - i * 0.01), vel - i * 6)
+
+
 def rock_chug(s, bar, root):
     t = bar * 4
     for i in range(8):
-        vel = 96 if i % 2 == 0 else 78
-        power(s, 0, root, t + i * 0.5, 0.16, vel)
-        power(s, 1, root, t + i * 0.5 + 0.02, 0.15, vel - 8)
+        vel = 104 if i % 2 == 0 else 82
+        rock_strum(s, 0, root, t + i * 0.5, 0.11, vel)
+        rock_strum(s, 1, root, t + i * 0.5 + 0.02, 0.10, vel - 8)
 
 
 def rock_open(s, bar, root):
+    """One big fuzzy stab, then muted chugs. The stab is short."""
     t = bar * 4
-    for i in range(8):
-        vel = 118 if i % 2 == 0 else 100
-        power(s, 0, root, t + i * 0.5, 0.48, vel)
-        power(s, 1, root, t + i * 0.5 + 0.022, 0.46, vel - 6)
+    rock_strum(s, 5, root, t, 0.26, 122)
+    rock_strum(s, 6, root, t + 0.03, 0.24, 112)
+    rock_strum(s, 5, root, t + 2.0, 0.22, 116)
+    rock_strum(s, 6, root, t + 2.03, 0.20, 106)
+    for off in (1.0, 1.5, 2.5, 3.0, 3.5):
+        rock_strum(s, 0, root, t + off, 0.10, 96)
+        rock_strum(s, 1, root, t + off + 0.02, 0.09, 86)
 
 
+# Single notes in E major, each one short, plus the octave under it.
+# Not a fifth, so it cannot turn into a chanter-and-drone.
 HOOK = [
-    (0.00, 73, 0.42, 114), (0.50, 76, 0.42, 112), (1.00, 81, 0.85, 120),
-    (2.00, 79, 0.40, 110), (2.50, 78, 0.40, 108), (3.00, 76, 0.85, 114),
-    (4.00, 76, 0.40, 112), (4.50, 78, 0.40, 110), (5.00, 79, 0.85, 116),
-    (6.00, 76, 0.40, 108), (6.50, 74, 0.40, 106), (7.00, 73, 0.85, 114),
-    (8.00, 69, 0.40, 106), (8.50, 73, 0.40, 108), (9.00, 76, 0.85, 118),
-    (10.0, 74, 0.40, 108), (10.5, 76, 0.40, 110), (11.0, 78, 0.85, 116),
-    (12.0, 79, 0.32, 112), (12.35, 78, 0.30, 110), (12.70, 76, 0.30, 108),
-    (13.05, 74, 0.30, 106), (13.50, 73, 0.70, 114), (14.50, 76, 0.40, 110),
+    (0.00, 68, 0.28, 112), (0.50, 64, 0.22, 104), (1.00, 66, 0.22, 106), (1.50, 68, 0.32, 110),
+    (2.00, 71, 0.28, 114), (2.50, 69, 0.22, 106), (3.00, 68, 0.22, 104), (3.50, 66, 0.28, 108),
+    (4.00, 64, 0.22, 104), (4.50, 68, 0.22, 108), (5.00, 71, 0.36, 116), (6.00, 69, 0.22, 106),
+    (6.50, 66, 0.22, 104), (7.00, 64, 0.30, 110),
+    (8.00, 68, 0.22, 108), (8.50, 71, 0.22, 112), (9.00, 73, 0.32, 116), (10.0, 71, 0.22, 108),
+    (10.5, 68, 0.22, 104), (11.0, 66, 0.28, 106), (12.0, 64, 0.22, 102), (12.5, 66, 0.22, 104),
+    (13.0, 68, 0.22, 108), (13.5, 71, 0.30, 114), (14.5, 68, 0.22, 106),
 ]
-HARM = {73: 69, 76: 73, 81: 76, 79: 74, 78: 74, 74: 71, 69: 64}
 
 
-def rock_hook(s, bar, harmony=False):
+def rock_hook(s, bar):
     base = bar * 4
     for off, pitch, dur, vel in HOOK:
         s.n(2, pitch, base + off, dur, vel)
-        if harmony and pitch in HARM:
-            s.n(4, HARM[pitch], base + off, dur, vel - 16)
+        s.n(4, pitch - 12, base + off, dur * 0.9, vel - 18)
 
 
 def build_rock(guitars=True, bed=True):
-    s = Song(176, 88)
+    s = Song(ROCK_BPM, ROCK_BARS)
     if guitars:
-        s.prog(0, 30, pan=42, vol=108)   # distortion guitar, left
-        s.prog(1, 30, pan=86, vol=100)   # double, right
-        s.prog(2, 29, pan=70, vol=112)   # overdriven lead
-        s.prog(4, 30, pan=58, vol=90)    # harmony guitar
-        s.mf.addPitchWheelEvent(0, 1, 0, 8520)  # about +8 cents
+        s.prog(0, 28, pan=40, vol=112)   # muted electric, left chugs
+        s.prog(1, 28, pan=88, vol=104)   # muted double, right
+        s.prog(5, 27, pan=36, vol=116)   # clean electric, left stabs (fuzzed later)
+        s.prog(6, 27, pan=92, vol=108)   # clean double, right
+        s.prog(2, 27, pan=72, vol=114)   # single-note lead
+        s.prog(4, 27, pan=56, vol=96)    # octave under the lead
+        s.mf.addPitchWheelEvent(0, 1, 0, 8600)
+        s.mf.addPitchWheelEvent(0, 6, 0, 7900)
     if bed:
-        s.prog(3, 34, pan=64, vol=118)   # pick bass
-    verse = [A, A, E, D, A, G, D, E]
-    chorus = [D, A, E, A]
+        s.prog(3, 34, pan=64, vol=120)   # pick bass
+    verse = [E, E, A, D, E, G, D, A]
+    chorus = [E, G, D, A]
     for bar in range(16):
         root = verse[bar % 8]
         if guitars:
@@ -290,7 +315,7 @@ def build_rock(guitars=True, bed=True):
             if guitars:
                 rock_open(s, bar, root)
                 if i == 0:
-                    rock_hook(s, bar, harmony=False)
+                    rock_hook(s, bar)
             elif bed:
                 rock_bass(s, bar, root, True)
             if bed:
@@ -317,63 +342,27 @@ def build_rock(guitars=True, bed=True):
             if guitars:
                 rock_open(s, bar, root)
                 if i == 0:
-                    rock_hook(s, bar, harmony=True)
+                    rock_hook(s, bar)
             elif bed:
                 rock_bass(s, bar, root, True)
             if bed:
                 rock_kit(s, bar, 'chorus', fill=(i == 3), crash=True)
-    # bridge: pedal, then a snare build. No chord wash into the loop.
-    walk = [A, G, D, E]
-    for i, root in enumerate(walk):
+    # heavier spaced stabs, then a snare build into the loop
+    for i, root in enumerate((E, G, D, A)):
         bar = 72 + i
-        t = bar * 4
-        if guitars:
-            for k in range(8):
-                s.n(0, root, t + k * 0.5, 0.14, 84)
-                s.n(1, root + 12, t + k * 0.5 + 0.02, 0.12, 74)
-        if bed:
-            s.n(3, root - 12, t, 1.7, 104)
-            s.n(3, (root - 12) + 7, t + 2, 1.5, 96)
-            rock_kit(s, bar, 'half', crash=(i == 0))
-    for bar in (76, 77):
-        if guitars:
-            rock_chug(s, bar, A if bar == 76 else D)
-        elif bed:
-            rock_bass(s, bar, A if bar == 76 else D, True)
-        if bed:
-            rock_kit(s, bar, 'build', crash=False)
-    # final hook, then a tom fill and a clean cut so the loop restarts on the crash
-    for cycle in range(1):
-        for i, root in enumerate(chorus):
-            bar = 78 + i
-            if bar >= 86:
-                break
-            if guitars:
-                rock_open(s, bar, root)
-                if i == 0:
-                    rock_hook(s, bar, harmony=True)
-            elif bed:
-                rock_bass(s, bar, root, True)
-            if bed:
-                rock_kit(s, bar, 'chorus', fill=False, crash=True)
-    # bars 82-85 second hook statement, 86-87 fill only
-    for i, root in enumerate(chorus):
-        bar = 82 + i
         if guitars:
             rock_open(s, bar, root)
-            if i == 0:
-                rock_hook(s, bar, harmony=True)
         elif bed:
             rock_bass(s, bar, root, True)
         if bed:
-            rock_kit(s, bar, 'chorus', fill=(i == 3), crash=True)
-    for bar, root in ((86, E), (87, A)):
-        t = bar * 4
-        if bed:
-            s.n(3, root - 12, t, 1.2, 100)
-            rock_kit(s, bar, 'build' if bar == 87 else 'verse', fill=(bar == 86), crash=False)
-        if guitars and bar == 86:
+            rock_kit(s, bar, 'half', crash=(i == 0))
+    for bar, root in ((76, E), (77, A), (78, D), (79, E)):
+        if guitars and bar < 79:
             rock_chug(s, bar, root)
+        elif bed and bar < 79:
+            rock_bass(s, bar, root, True)
+        if bed:
+            rock_kit(s, bar, 'build', crash=(bar == 79))
     return s
 
 
@@ -633,45 +622,103 @@ def build_classical():
     return s
 
 
-def mix_rock(bed, gtr, out, sr_expected=44100):
+def add_synth_stabs(y, sr, bpm):
+    """A few decaying square-wave notes. Short on purpose, and only in one chorus."""
+    import numpy as np
+    beat = 60.0 / bpm
+    # two little answers in the second chorus, not a pad
+    notes = []
+    for bar in (58, 66):
+        base = bar * 4 * beat
+        for off, midi in ((0.0, 80), (0.35, 83), (0.7, 80), (1.15, 76)):
+            notes.append((base + off * beat, 440.0 * 2 ** ((midi - 69) / 12.0)))
+    for start, freq in notes:
+        n0 = int(start * sr)
+        n1 = min(len(y), n0 + int(0.09 * sr))
+        if n0 < 0 or n0 >= len(y):
+            continue
+        t = np.arange(n1 - n0, dtype='float32') / sr
+        env = np.exp(-t * 38.0)[:, None]
+        wave = np.sign(np.sin(2 * np.pi * freq * t))[:, None] * env * np.float32(0.045)
+        y[n0:n1] += wave
+    return y
+
+
+def drone_report(x, sr, bpm):
+    """Flag a sustained reed. Chugs should pump at the eighth-note rate."""
+    import numpy as np
+    mono = x.mean(axis=1) if x.ndim == 2 else x
+    eighth = 60.0 / bpm / 2.0
+    seconds = len(mono) / sr
+    spots = [('verse', 2.0, 8.0), ('chorus', 20 * 4 * 60 / bpm, 20 * 4 * 60 / bpm + 6)]
+    bad = []
+    for name, t0, t1 in spots:
+        t1 = min(t1, seconds - 0.1)
+        seg = mono[int(t0 * sr):int(t1 * sr)]
+        win = max(1, int(sr * 0.008))
+        env = np.convolve(np.abs(seg), np.ones(win) / win, mode='valid')
+        cv = float(env.std() / (env.mean() + 1e-9))
+        spec = np.abs(np.fft.rfft(env - env.mean()))
+        freqs = np.fft.rfftfreq(len(env), 1.0 / sr)
+        hz = 1.0 / eighth
+        band = (freqs > hz * 0.7) & (freqs < hz * 1.35)
+        mod = float(spec[band].max() / (np.median(spec[1:]) + 1e-12))
+        print(f'  {name}: envelope_cv={cv:.2f} eighth_mod={mod:.2f}')
+        if cv < 0.55:
+            bad.append(name)
+    return bad
+
+
+def mix_rock(bed, gtr, out):
     import numpy as np
     a, sr = read_wav(bed)
-    b, sr2 = read_wav(gtr)
+    b, _sr2 = read_wav(gtr)
     n = min(len(a), len(b))
     a = a[:n]
-    b = crunch(b[:n])
-    y = a * np.float32(0.82) + b * np.float32(0.72)
+    b = guitar_amp(b[:n], drive=3.6)
+    y = a * np.float32(0.95) + b * np.float32(0.88)
+    y = add_synth_stabs(y, sr, ROCK_BPM)
     write_wav(out, y, sr)
-    return out
+    return out, sr
 
 
 def main():
+    import sys
+    rock_only = len(sys.argv) > 1 and sys.argv[1] == 'rock'
     jobs = []
     print('rock midi')
     bed = build_rock(guitars=False, bed=True)
     gtr = build_rock(guitars=True, bed=False)
     bed.save(os.path.join(TMP, 'rock-bed.mid'))
     gtr.save(os.path.join(TMP, 'rock-gtr.mid'))
-    print('pop midi')
-    pop = build_pop()
-    pop.save(os.path.join(TMP, 'pop.mid'))
-    print('classical midi')
-    cl = build_classical()
-    cl.save(os.path.join(TMP, 'classical.mid'))
+    if not rock_only:
+        print('pop midi')
+        pop = build_pop()
+        pop.save(os.path.join(TMP, 'pop.mid'))
+        print('classical midi')
+        cl = build_classical()
+        cl.save(os.path.join(TMP, 'classical.mid'))
 
-    print('rendering (FluidR3_GM)')
+    print('rendering rock (FluidR3 clean/muted guitars, fuzzed after)')
     render_wav(os.path.join(TMP, 'rock-bed.mid'), os.path.join(TMP, 'rock-bed.wav'), True)
-    render_wav(os.path.join(TMP, 'rock-gtr.mid'), os.path.join(TMP, 'rock-gtr.wav'), True)
+    render_wav(os.path.join(TMP, 'rock-gtr.mid'), os.path.join(TMP, 'rock-gtr.wav'), False)
     mixed = os.path.join(TMP, 'rock-mix.wav')
     mix_rock(os.path.join(TMP, 'rock-bed.wav'), os.path.join(TMP, 'rock-gtr.wav'), mixed)
-    render_wav(os.path.join(TMP, 'pop.mid'), os.path.join(TMP, 'pop.wav'), True)
-    render_wav(os.path.join(TMP, 'classical.mid'), os.path.join(TMP, 'classical.wav'), True)
+    if not rock_only:
+        render_wav(os.path.join(TMP, 'pop.mid'), os.path.join(TMP, 'pop.wav'), True)
+        render_wav(os.path.join(TMP, 'classical.mid'), os.path.join(TMP, 'classical.wav'), True)
 
     print('loop + encode')
-    # 88 bars at 176, 56 at 112, 58 at 116. All 120.000 seconds.
-    finish('rock', mixed, 88 * 4 * 60 / 176)
-    finish('pop', os.path.join(TMP, 'pop.wav'), 56 * 4 * 60 / 112)
-    finish('classical', os.path.join(TMP, 'classical.wav'), 58 * 4 * 60 / 116)
+    rock_seconds = ROCK_BARS * 4 * 60 / ROCK_BPM
+    x, sr = read_wav(mixed)
+    print('drone check')
+    bad = drone_report(x, sr, ROCK_BPM)
+    if bad:
+        raise SystemExit('sustained tone in ' + ', '.join(bad))
+    finish('rock', mixed, rock_seconds)
+    if not rock_only:
+        finish('pop', os.path.join(TMP, 'pop.wav'), 56 * 4 * 60 / 112)
+        finish('classical', os.path.join(TMP, 'classical.wav'), 58 * 4 * 60 / 116)
     print('done')
 
 

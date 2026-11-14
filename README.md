@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v46 additions
+- The rock bed was rebuilt. The old one held distorted fifths with no gap, and that drone read as bagpipes. Rhythm guitars are now FluidR3's muted and clean electric programs (real plucked notes), fuzzed afterwards, with a rest between every stab. The lead is a single guitar note doubled at the octave. A few short synth stabs show up in one chorus only. Pop, classical, techno, prices, the lock and saves are unchanged.
+- `game.js` is cache-busted to `v=46`.
+
 ## v45 additions
 - Indie rock, pop and classical in the music shop are recorded-instrument tracks, not the synth bed. Rock is an original fast pop-punk instrumental (distorted guitars, pick bass, acoustic kit). Pop is an original piano-and-guitar song with a kit and claps. Classical is an original allegro for strings, piano, flute, oboe and horn, with no drums. They were rendered offline with FluidR3_GM (MIT, Frank Wen) and they loop. Techno vaporwave is still the synth. Prices, the full-version lock and saves are unchanged.
 - The rendered files lazy-load the first time that genre is selected. Licenses are in `music/GENRE-LICENSES.md`.
