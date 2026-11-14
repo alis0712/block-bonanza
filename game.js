@@ -1433,7 +1433,8 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
-// v44: bought genres replace the stage loops. Menus stay on the default beds. Sines, triangles and lowpassed saws only.
+// v45: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
+// Techno vaporwave stays a synth. Menus stay on the default beds.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { rock: 'genre-rock', pop: 'genre-pop', classical: 'genre-classical' };
 const GR = { buf: {}, pend: {}, src: null, g: null, id: '' };
