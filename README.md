@@ -71,6 +71,12 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v44 additions
+- Boss test links (`?boss=`) no longer write stage progress or the wallet. Beating Maw now pays the Reeled In award, the same way Sunny and Gazza do.
+- Maw keeps his growls and adds a roar when he swims in, a quiet glide with bubble bloops while he drifts, a slap on the tentacle nudge, bubbles on the ink drop, a hurt snarl on a big hit, an angry roar at each quarter, and bubbles after the defeat roar. All sines, no noise.
+- The store has a Music tab. Vaporwave (the per-stage soundtrack) is free. Indie rock ($8,000), pop ($12,000), classical ($18,000) and techno vapor ($15,000) can be bought with in-game cash only after the full version is owned. The free edition sees them locked. Menus keep their own beds. The choice is saved.
+- `game.js` is cache-busted to `v=44`.
+
 ## v43 additions
 - Maw drifts across the Sunken Sixties skyline on a smooth path, and now and then swims closer (larger, a little brighter, out to the edges) before fading back into the distance. Where he crosses the board he turns faint, so the blocks stay readable. Reduce Motion holds him still.
 - The brass-helmet divers walk the scaffold, climb between weld points, and one rides the crane.
