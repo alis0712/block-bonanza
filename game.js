@@ -1433,7 +1433,8 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
-// v45: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
+// v46: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
+// Rock uses plucked guitars fuzzed after the render (the old distorted-fifth drone is gone).
 // Techno vaporwave stays a synth. Menus stay on the default beds.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { rock: 'genre-rock', pop: 'genre-pop', classical: 'genre-classical' };
@@ -1466,7 +1467,7 @@ function genreFilePlay(id) {
   if (GR.buf[id]) { genreFileStart(id); return; }
   if (GR.pend[id]) return;
   const base = 'music/' + GENRE_REC[id];
-  const grab = (ext) => fetch(base + '.' + ext + '?v=45').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=46').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[id] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {

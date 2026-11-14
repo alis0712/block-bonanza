@@ -38,10 +38,13 @@ partly from his own recordings, with help acknowledged in the upstream README
 (Suren M. Seron, Scott Hanan, Steve Aupperle, Chris Gillman, Alex Taubr, Chris
 Prola, Andrew Klenk, Winfried Hubbe, Dylan, Tim, Gort, Uros Katic, Ethan Winer).
 
-The rock guitar stem is the FluidR3 distortion / overdriven guitar programs,
-passed through a soft tanh drive and a lowpass. That drive does not add a noise
-bed. Drums, bass, piano, strings and winds are the FluidR3 samples without
-added distortion.
+The v46 rock guitars are FluidR3's clean electric and muted-electric programs
+(plucked notes, not the distortion-guitar patch). A tanh fuzz and a low cabinet
+filter are applied after the render. Notes are short, with a gap, so a fifth
+cannot sit as a drone. The lead is a single note with its octave, not a reed.
+A handful of decaying square-wave stabs, synthesized, sit in one chorus only.
+Drums and bass are FluidR3 samples. Pop and classical still use the FluidR3
+programs from v45, without that guitar fuzz.
 
 `tools/render-genres.py` is the arrangement and the render script. The techno
 vaporwave genre is still synthesized in `game.js` and does not use this bank.
