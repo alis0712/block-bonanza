@@ -117,7 +117,7 @@ let reach = 0; // highest stage index the stage select may start (0 = stage 1). 
 const TEST_Q = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
 const TEST_STAGE = (() => { const n = parseInt(TEST_Q.get('stage'), 10); return n >= 1 && n <= LAST_STAGE + 1 ? n : 0; })();
 const UNLOCK_ALL = TEST_Q.get('unlock') === 'all';
-const SANDBOX = TEST_STAGE > 0 || UNLOCK_ALL;
+const SANDBOX = TEST_STAGE > 0 || UNLOCK_ALL || !!TEST_Q.get('boss'); // v44: ?boss= is a test link too, so it must not write saves
 const stageOpen = (i) => UNLOCK_ALL || i <= reach;
 function noteReach(i) { if (SANDBOX) return; i = i | 0; if (i > reach && i <= LAST_STAGE) { reach = i; store.set('bb_reach', reach); } }
 let lastInit = String(store.get('bb_init', 'AAA')).slice(0, 3).padEnd(3, 'A');
@@ -322,6 +322,9 @@ const sfx = {
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
   waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.55); return true; },
   growl(key, d) { if (!aok()) return false; mawGrowl(A.ctx, anow() + 0.02 + (d || 0), A.sfx, key || 'rumble'); return true; },
+  glide() { if (!aok()) return false; mawGlide(A.ctx, anow() + 0.01, A.sfx); return true; },
+  slap() { if (!aok()) return false; mawSlap(A.ctx, anow() + 0.01, A.sfx); return true; },
+  bubbles() { if (!aok()) return false; mawBubbles(A.ctx, anow() + 0.01, A.sfx); return true; },
   weld() { if (!aok()) return false; weldCrackle(A.ctx, anow() + 0.01, A.sfx); return true; },
   stalk() { if (!aok()) return false; const t0 = anow() + 0.01; for (const [dt2, f] of [[0, 46.2], [0.2, 49], [0.34, 46.2], [0.46, 49], [0.55, 46.2]]) { tone(f, 0.12, 'sawtooth', 0.05, { when: t0 + dt2 }); tone(f * 2, 0.1, 'triangle', 0.03, { when: t0 + dt2 }); } return true; }, // v22: a low two-note pulse that speeds up as he surges (the tell)
   chomp(v) { if (!aok()) return false; gatorChomp(A.ctx, anow() + 0.01, A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
@@ -1241,6 +1244,7 @@ function xmGraph() {
 const xmUsable = (i) => XM.on && !XM.failed[xmKey('loop', i)];
 // start track i so that loop position 0 (start of drop A) lands exactly on `when` (a bar line of M's grid)
 function xmPlay(i, when) {
+  if (genreWanted()) { XM.want = i; return; }
   if (!A.ctx) return; xmGraph();
   const key = xmKey('loop', i), b = XM.buf[key], c = A.ctx;
   XM.want = i; xmPrefetch(i); for (const j of XM_NEXT(i)) xmPrefetch(j);
@@ -1429,9 +1433,60 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
+// v44: bought genres replace the stage loops. Menus stay on the default beds. Sines, triangles and lowpassed saws only.
+const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
+function tuneId() { const id = wallet.music || 'vapor'; return wallet.tunes && wallet.tunes.indexOf(id) >= 0 ? id : 'vapor'; }
+function genreWanted() { return tuneId() !== 'vapor' && (state === 'play' || state === 'dying'); }
+function genreBus() { if (!GP.bus && A.ctx) { GP.bus = A.ctx.createGain(); GP.bus.gain.value = 1.15; GP.bus.connect(A.mus); } return GP.bus; }
+function genreStop() { GP.live = false; GP.next = 0; }
+function gTone(when, f, dur, type, amp, lpHz) {
+  if (!A.ctx) return; const o = A.ctx.createOscillator(), g = A.ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(Math.max(28, f), when);
+  if (lpHz) { const lp = A.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = lpHz; o.connect(lp); lp.connect(g); } else o.connect(g);
+  g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, amp), when + Math.min(0.02, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  g.connect(genreBus()); o.start(when); o.stop(when + dur + 0.03);
+}
+const GENRE_SONG = {
+  rock: { bpm: 124, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [82, 110, 98, 73][bar];
+    if (s % 8 === 0) gTone(when, 68, 0.12, 'sine', 0.32, 170);
+    if (s % 8 === 4) { gTone(when, 190, 0.08, 'triangle', 0.14, 800); gTone(when, 300, 0.06, 'sine', 0.07, 1000); }
+    if (s % 2 === 0) gTone(when, 1500, 0.025, 'sine', 0.03, 2000);
+    if (s % 2 === 0) gTone(when, root * (s % 4 ? 0.75 : 0.5), 0.13, 'sawtooth', 0.14, 220);
+    if (s % 4 === 2) { gTone(when, root, 0.15, 'sawtooth', 0.09, 820); gTone(when, root * 1.5, 0.15, 'sawtooth', 0.07, 820); } } },
+  pop: { bpm: 118, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [262, 220, 196, 247][bar];
+    if (s % 4 === 0) gTone(when, 76, 0.1, 'sine', 0.28, 190);
+    if (s % 8 === 4) { gTone(when, 523, 0.06, 'sine', 0.09); gTone(when, 784, 0.05, 'sine', 0.05); }
+    if (s % 2 === 0) gTone(when, root / (s % 4 ? 3 : 2), 0.12, 'triangle', 0.12, 480);
+    if (s === 0 || s === 8) { gTone(when, root, 0.32, 'sine', 0.07); gTone(when, root * 1.25, 0.32, 'sine', 0.06); gTone(when, root * 1.5, 0.32, 'sine', 0.05); }
+    if (s % 2 === 1) gTone(when, root * [1, 1.25, 1.5, 2][(s >> 1) % 4], 0.09, 'triangle', 0.06, 1500); } },
+  classical: { bpm: 76, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [196, 220, 174, 233][bar];
+    if (s === 0) { gTone(when, root / 2, 1.9, 'sine', 0.09, 560); gTone(when, root, 1.9, 'sine', 0.07, 760); gTone(when, root * 1.5, 1.9, 'sine', 0.045, 900); }
+    if (s % 4 === 0) gTone(when, root * [1, 1.25, 1.5, 2][(s / 4 + bar) % 4], 0.4, 'sine', 0.08, 1300);
+    if (s === 6 || s === 14) gTone(when, root * (bar % 2 ? 0.75 : 0.5), 0.55, 'triangle', 0.06, 480); } },
+  techno: { bpm: 126, step(i, when) { const bar = (i / 16 | 0) % 4, s = i % 16, root = [55, 55, 49, 62][bar];
+    if (s % 4 === 0) gTone(when, 56, 0.1, 'sine', 0.32, 150);
+    if (s % 4 === 2) gTone(when, root, 0.15, 'sawtooth', 0.12, 200);
+    if (s % 2 === 0) gTone(when, 1700, 0.02, 'sine', 0.028, 2200);
+    if (s === 0) { gTone(when, root * 2, 0.85, 'sawtooth', 0.045, 640); gTone(when, root * 2.52, 0.85, 'sine', 0.035, 860); }
+    if (s % 2 === 1) gTone(when, root * [2, 3, 4, 3][(bar + s) % 4], 0.07, 'square', 0.035, 980); } },
+};
+function genreTick(now) {
+  const song = GENRE_SONG[tuneId()]; if (!song || !A.ctx) return;
+  GP.live = true; if (!GP.next || GP.next < now - 0.35) GP.next = now + 0.04;
+  let n = 0; while (GP.next < now + 0.16 && n++ < 6) { song.step(GP.step, GP.next); GP.step++; GP.next += 60 / song.bpm / 4; }
+}
 function musicTick() {
   if (!A.ctx || A.ctx.state !== 'running' || !M.E) return;
   const now = A.ctx.currentTime;
+  if (genreWanted()) {
+    if (XM.src) xmStopLoop(now, 0.06);
+    genreTick(now);
+    if (M.next < now - 0.2) M.next = now + 0.05;
+    let guard = 0; const sd = 60 / 120 / 4;
+    while (M.next < now + 0.15 && guard++ < 32) { M.next += sd; M.step++; }
+    return;
+  }
+  if (GP.live) genreStop();
   if (M.next < now - 0.2) { // the scheduler fell behind (tab stall, context resumed): re-anchor
     if (XM.src && XM.track === M.track && !M.pending) { const sd = stepDur(M.track), k = Math.ceil((now + 0.05 - XM.t0) / sd); M.next = XM.t0 + k * sd; M.step = k; } // stay on the loop's own grid
     else M.next = now + 0.05;
@@ -1455,7 +1510,7 @@ function musicStart() {
   if (xmUsable(M.track)) xmPlay(M.track, M.next);
   M.timer = setInterval(musicTick, 25); musicTick();
 }
-function musicStop() { if (M.timer) { clearInterval(M.timer); M.timer = null; } M.pending = null; if (M.E) setDanger(false, true); xmStopAll(); }
+function musicStop() { if (M.timer) { clearInterval(M.timer); M.timer = null; } M.pending = null; if (M.E) setDanger(false, true); xmStopAll(); genreStop(); }
 function desiredTrack() {
   if (state === 'play' || state === 'dying') return isMini() ? MINI[g.boss.kind].track : stageTrack(Math.min(LAST_STAGE, g.stage || 0));
   if (state === 'store' || state === 'stages' || state === 'howto' || state === 'scores' || state === 'stats') return 16; // a different vaporwave bed from the title
@@ -1761,10 +1816,19 @@ const SHOP_SKIN = [
   { id: 'pixel', name: 'PIXEL RETRO', price: 10000 }, { id: 'jelly', name: 'JELLY', price: 15000 }, { id: 'gem', name: 'GEMSTONE', price: 40000 },
 ];
 const START_CASH = { free: 0, full: 1000 };
+const GENRES = [
+  { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Guitars, bass, backbeat' },
+  { id: 'pop', name: 'POP', price: 12000, blurb: 'Bright chords and a hook' },
+  { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings and a harp line' },
+  { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
+];
 function loadWallet() {
-  const w = Object.assign({ cash: 0, edition: 'free', grants: {}, inv: {}, bgs: [], bg: 'auto', skins: [], skin: 'classic', banked: 0, games: 0 }, store.get('bb_wallet', {}));
+  const w = Object.assign({ cash: 0, edition: 'free', grants: {}, inv: {}, bgs: [], bg: 'auto', skins: [], skin: 'classic', banked: 0, games: 0, tunes: ['vapor'], music: 'vapor' }, store.get('bb_wallet', {}));
   w.cash = Math.max(0, Math.floor(+w.cash || 0)); w.inv = Object.assign({ wipe: 0, bomb: 0 }, w.inv); w.grants = w.grants || {};
   ['auto', 'tropical'].forEach((id) => { if (w.bgs.indexOf(id) < 0) w.bgs.push(id); }); if (w.skins.indexOf('classic') < 0) w.skins.push('classic');
+  if (!Array.isArray(w.tunes)) w.tunes = ['vapor']; if (w.tunes.indexOf('vapor') < 0) w.tunes.unshift('vapor');
+  if (!GENRES.some((g0) => g0.id === w.music)) w.music = 'vapor';
   if (w.edition !== 'full') w.edition = 'free';
   return w;
 }
@@ -1822,6 +1886,17 @@ function buySkin(id) {
   const it = SHOP_SKIN.find((b) => b.id === id);
   if (wallet.skins.indexOf(id) < 0) { if (!spend(it.price)) return false; wallet.skins.push(id); } else sfx.blip();
   wallet.skin = id; saveWallet(); buildSprites(); return true;
+}
+function buyTune(id) {
+  const it = GENRES.find((g0) => g0.id === id); if (!it) return false;
+  const owned = wallet.tunes.indexOf(id) >= 0;
+  if (!owned) {
+    if (wallet.edition !== 'full') { shop.shake = 0.6; shop.msg = { t: 0, text: 'REQUIRES FULL VERSION' }; sfx.blip(); return false; }
+    if (!spend(it.price)) return false; wallet.tunes.push(id);
+  } else sfx.blip();
+  wallet.music = id; saveWallet();
+  if (id === 'vapor' && GP.live) { genreStop(); if (XM.src) xmStopLoop(A.ctx.currentTime, 0.1); }
+  return true;
 }
 const STAGE_BG = [0, 1, 2, 3, 4, 9, 10, 11, 12, 16, 17, 18, 13]; // BGS index per stage (5 = title, 6-8 = store exclusives)
 function bgFor(stageIdx) { const it = SHOP_BG.find((b) => b.id === wallet.bg); return it && it.bg >= 0 ? it.bg : STAGE_BG[stageIdx] || 0; }
@@ -3779,7 +3854,9 @@ const GROWL = {
   ouch3: { dur: 1.15, f0: 96, f1: 36, amp: 0.5, trem: 10 },
   attack: { dur: 0.65, f0: 58, f1: 84, amp: 0.48, trem: 16 },
   hit: { dur: 0.42, f0: 70, f1: 44, amp: 0.36, trem: 18 },
-  defeat: { dur: 2.3, f0: 52, f1: 28, amp: 0.5, trem: 5 },
+  defeat: { dur: 2.3, f0: 52, f1: 28, amp: 0.42, trem: 5 },
+  roar: { dur: 1.25, f0: 78, f1: 40, amp: 0.3, trem: 6 },
+  hurt: { dur: 0.5, f0: 104, f1: 52, amp: 0.28, trem: 16 },
 };
 // v43: a short weld crackle. A few sine ticks through a bandpass, no noise bed, kept quiet.
 function weldCrackle(c, t, dest) {
@@ -3815,6 +3892,39 @@ function mawGrowl(c, t, dest, key) {
   voice('triangle', 1, 0.28, 2);
   voice('sine', 1, 0.2, 3.4);
   lfo.start(t); lfo.stop(end + 0.05);
+}
+// v44: movement and hits around the growls. Sines only, quiet, lowpassed, no noise.
+function mawGlide(c, t, dest) {
+  const o = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.85);
+  lp.type = 'lowpass'; lp.frequency.value = 380; lp.Q.value = 0.6;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.1, t + 0.16); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+  o.connect(lp); lp.connect(g); g.connect(dest); o.start(t); o.stop(t + 1);
+  for (let i = 0; i < 3; i++) {
+    const b = c.createOscillator(), gb = c.createGain(), when = t + 0.22 + i * 0.16;
+    b.type = 'sine'; b.frequency.setValueAtTime(88 + i * 16, when); b.frequency.exponentialRampToValueAtTime(54, when + 0.22);
+    gb.gain.setValueAtTime(0.0001, when); gb.gain.exponentialRampToValueAtTime(0.05, when + 0.03); gb.gain.exponentialRampToValueAtTime(0.0001, when + 0.24);
+    b.connect(gb); gb.connect(dest); b.start(when); b.stop(when + 0.28);
+  }
+}
+function mawSlap(c, t, dest) {
+  const o = c.createOscillator(), o2 = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+  o.type = 'sine'; o2.type = 'triangle';
+  o.frequency.setValueAtTime(96, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.22);
+  o2.frequency.setValueAtTime(170, t); o2.frequency.exponentialRampToValueAtTime(64, t + 0.16);
+  lp.type = 'lowpass'; lp.frequency.value = 340;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+  o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(dest); o.start(t); o2.start(t); o.stop(t + 0.3); o2.stop(t + 0.3);
+}
+function mawBubbles(c, t, dest) {
+  for (let i = 0; i < 6; i++) {
+    const b = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(), when = t + i * 0.16;
+    b.type = 'sine'; const f = 64 + (i % 3) * 18;
+    b.frequency.setValueAtTime(f, when); b.frequency.exponentialRampToValueAtTime(Math.max(34, f * 0.55), when + 0.26);
+    lp.type = 'lowpass'; lp.frequency.value = 260;
+    g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(0.08 - i * 0.008, when + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
+    b.connect(lp); lp.connect(g); g.connect(dest); b.start(when); b.stop(when + 0.34);
+  }
 }
 function voxDur(kind, key) {
   if (kind === 'maw') return (GROWL[key] && GROWL[key].dur) || 1.1;
@@ -4652,6 +4762,12 @@ function bgSea(t) {
       if (L.cell) ctx.rect(bx, by, bw, bh);
       ctx.clip('evenodd');
       paintMaw(ctx, tm, F, s, c.x, c.y, true, { a: c.a, close: c.close });
+      if (ddt && g.boss.hp > 0 && state === 'play' && !paused) {
+        if (c.close > 0.8 && !BG.mawIn) { BG.mawIn = 1; sfx.growl('roar'); }
+        if (c.close < 0.35) BG.mawIn = 0;
+        BG.glideT = (BG.glideT || 0) + ddt;
+        if (BG.glideT > 3.6) { BG.glideT = 0; sfx.glide(); }
+      }
       ctx.restore();
       if (L.cell) {
         ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
@@ -4933,7 +5049,7 @@ function miniHit(b, d, q) {
     shake(0.3, 6); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     setTimeout(() => { if (g.boss === b) floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.55, 2.6); }, 900);
   } else if (b.hp <= 0 && b.kind === 'maw') {
-    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15);
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15); sfx.growl('roar', 0.2); setTimeout(() => { if (g.boss === b) sfx.bubbles(); }, 1200);
     shake(0.4, 8); flashA = 0.35; hurtA = 0.22; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES.maw.defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0) {
@@ -4952,7 +5068,7 @@ function miniHit(b, d, q) {
     setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.6 : 0.95), 1.6); }, 700);
   } else if (q && b.kind === 'maw') {
     const ln = BOSS_LINES.maw['ouch' + q];
-    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
+    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); sfx.growl('roar', 0.1); b.ouch = b.talk.dur; b.ouchQ = q;
     shake(0.22, 4 + q); hurtA = 0.12 + q * 0.04; vib(24 + q * 8);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff9ad5', c * 0.7, 1.5);
   } else if (q) {
@@ -4960,7 +5076,7 @@ function miniHit(b, d, q) {
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     tone(700 + q * 200, 0.07, 'square', 0.035, { to: 420 }); shake(0.22, 4 + q * 2); hurtA = 0.15 + q * 0.04; vib(30 + q * 15);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.5);
-  } else if (b.kind === 'maw') sfx.growl('hit');
+  } else if (b.kind === 'maw') sfx.growl(d >= 8 ? 'hurt' : 'hit');
   else sfx.hurt();
 }
 // after the defeat line + bonus, the next stage starts
@@ -5016,11 +5132,11 @@ function miniHazard() {
     else { g.murk = { t: 0, dur: 4 }; b.murks++; sfx.splash(0.6); floatText('MURKY WATER!', L.bx + c * 5, L.by + c * 4, '#b5d96a', c * 0.75, 1.1); }
   } else if (b.kind === 'maw') {
     sfx.growl('attack');
-    if (b.hz % 2) {
+    if (b.hz % 2) { sfx.slap();
       const p = g.piece, dir = Math.random() < 0.5 ? -1 : 1; g.wave = { t: 0, dir, ink: 1 };
       if (p && !g.res && !collide(p.t, p.r, p.x + dir, p.y)) { p.x += dir; b.nudges++; }
       floatText(dir > 0 ? 'TENTACLE! \u2192' : '\u2190 TENTACLE!', L.bx + c * 5, L.by + c * 4, '#ff4fd8', c * 0.7, 1.1);
-    } else if (miniDrop('ink', 1)) { tone(130, 0.2, 'sine', 0.14, { to: 64, lp: 420 }); floatText('INK!', L.bx + c * 5, L.by + c * 4, '#7cf7ff', c * 0.85, 1.1); }
+    } else if (miniDrop('ink', 1)) { sfx.bubbles(); floatText('INK!', L.bx + c * 5, L.by + c * 4, '#7cf7ff', c * 0.85, 1.1); }
   }
 }
 const PAL = [null, '#3D8BFF', '#FFD23F', '#FF4FA3', '#2EE6A6', '#FF8A1F'];
@@ -5719,6 +5835,7 @@ function pressButton(b, x, y, pid) {
   if (id.startsWith('buy_')) { buyPU(id.slice(4)); return; }
   if (id.startsWith('bg_')) { buyBG(id.slice(3)); return; }
   if (id.startsWith('skin_')) { buySkin(id.slice(5)); return; }
+  if (id.startsWith('tune_')) { buyTune(id.slice(5)); return; }
   if (id === 'upgrade') { if (!isFullEdition()) shop.modal = 'upgrade'; sfx.blip(); return; }
   if (id.startsWith('use_')) { usePU(id.slice(4)); return; }
   if (id.startsWith('pbuy_')) { buyPU(id.slice(5)); return; }
@@ -6844,7 +6961,7 @@ function drawStore() {
   wobblyWord('STORE', px + pw * 0.27, top + hh + 4, Math.min(30, pw / 10), T, 1, LOGO, pw * 0.45);
   walletPill(px + pw - 10, top + hh + 4, 'right', Math.min(30, H * 0.046));
   shopMsgDraw(px + pw * 0.72, top + hh * 2.6);
-  const tabs = ['POWER-UPS', 'BACKGROUNDS', 'BLOCK SKINS'], th = Math.min(38, H * 0.058), tw = (pw - 16) / 3, ty = top + hh * 2 + 18;
+  const tabs = ['POWER-UPS', 'BACKGROUNDS', 'SKINS', 'MUSIC'], th = Math.min(38, H * 0.058), tw = (pw - 16) / 4, ty = top + hh * 2 + 18;
   tabs.forEach((n, i) => button('tab' + i, px + 8 + tw * i + tw / 2, ty + th / 2, tw - 5, th, n, i === shop.tab ? DEEP : ['rgba(0,229,255,0.28)', 'rgba(41,121,255,0.28)'], { fs: th * 0.36, glow: i === shop.tab, r: 10 }));
   const fh = Math.min(46, H * 0.066), c0 = ty + th + 10, c1 = bot - fh * 2 - 22;
   const ax = px + 10, aw = pw - 20, ah = c1 - c0;
@@ -6879,7 +6996,7 @@ function drawStore() {
       const lab = eq ? 'EQUIPPED' : owned ? 'EQUIP' : money(b.price);
       button('bg_' + b.id, x + cw / 2, y + chh - bh2 / 2 - 5, cw - 12, bh2, lab, eq ? GOLD : owned ? TEAL : canAfford(b.price) ? DEEP : GREY, { r: 8, fs: bh2 * 0.42, glow: false });
     });
-  } else {
+  } else if (shop.tab === 2) {
     const rh = Math.min(76, (ah - 4 * 6) / SHOP_SKIN.length);
     SHOP_SKIN.forEach((sk, i) => {
       const y = c0 + i * (rh + 6), owned = wallet.skins.indexOf(sk.id) >= 0, eq = wallet.skin === sk.id;
@@ -6889,6 +7006,18 @@ function drawStore() {
       fitTxt(sk.name, ax + 10, y + rh * 0.27, Math.min(17, rh * 0.26), aw * 0.5, '#ffe23d', '#03243a', 'left');
       const bw2 = Math.min(130, aw * 0.36), bh2 = Math.min(38, rh * 0.5);
       button('skin_' + sk.id, ax + aw - bw2 / 2 - 10, y + rh / 2, bw2, bh2, eq ? 'EQUIPPED' : owned ? 'EQUIP' : money(sk.price), eq ? GOLD : owned ? TEAL : canAfford(sk.price) ? DEEP : GREY, { r: 10, fs: bh2 * 0.4 });
+    });
+  } else {
+    const full = wallet.edition === 'full', rh = Math.min(78, (ah - 28) / GENRES.length);
+    fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 8, 12, aw - 8, '#9fe8ff', null);
+    GENRES.forEach((g0, i) => {
+      const y = c0 + 22 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
+      rr(ax, y, aw, rh, 12); ctx.fillStyle = 'rgba(0,10,30,0.6)'; ctx.fill(); ctx.strokeStyle = eq ? '#ffe23d' : 'rgba(0,229,255,0.5)'; ctx.lineWidth = eq ? 3 : 1.5; ctx.stroke();
+      fitTxt(g0.name, ax + 12, y + rh * 0.32, Math.min(16, rh * 0.28), aw * 0.48, '#ffe23d', '#03243a', 'left');
+      fitTxt(locked ? 'REQUIRES FULL VERSION' : g0.blurb, ax + 12, y + rh * 0.68, Math.min(12, rh * 0.2), aw * 0.5, locked ? '#ffb3b3' : '#e0fff7', null, 'left');
+      const bw2 = Math.min(128, aw * 0.34), bh2 = Math.min(36, rh * 0.55);
+      const lab = eq ? 'PLAYING' : owned ? 'PLAY' : locked ? 'LOCKED' : money(g0.price);
+      button('tune_' + g0.id, ax + aw - bw2 / 2 - 10, y + rh / 2, bw2, bh2, lab, eq ? GOLD : locked ? GREY : owned || canAfford(g0.price) ? TEAL : GREY, { r: 10, fs: bh2 * 0.38, glow: false });
     });
   }
   button('upgrade', W / 2, c1 + 10 + fh / 2, pw * 0.8, fh * 0.9, isFullEdition() ? 'FULL EDITION \u2713' : 'UPGRADE TO FULL', isFullEdition() ? GREY : GOLD, { fs: fh * 0.36 });
@@ -7176,7 +7305,7 @@ const ACH = [
   ['chain3', 'CHAIN x3', 'Reach a x3 chain', 400, (q) => q.bestChain >= 3], ['chain5', 'CHAIN x5', 'Reach a x5 chain', 1500, (q) => q.bestChain >= 5],
   ['mega', 'MEGA POP', 'Pop a line of 6+', 600, (q) => q.megas > 0], ['k1', 'BLOCK BUSTER', 'Pop 1,000 blocks in total', 1000, (q) => q.pops >= 1000],
   ['rich', 'HIGH ROLLER', 'Score $10,000 in one game', 800, (q) => q.best >= 10000], ['surfer', 'WIPEOUT', 'Beat Sunny the surfer', 1000, (q) => q.surfer],
-  ['gator', 'SEE YA LATER', 'Beat the gator', 1500, (q) => q.gator], ['vamp', 'DAYBREAK', 'Defeat the vampire', 3000, (q) => q.vamp],
+  ['gator', 'SEE YA LATER', 'Beat the gator', 1500, (q) => q.gator], ['maw', 'REELED IN', 'Beat Maw the tentacle', 2000, (q) => q.maw], ['vamp', 'DAYBREAK', 'Defeat the vampire', 3000, (q) => q.vamp],
   ['daily3', 'REGULAR', 'Daily challenge 3 days in a row', 750, () => DAILY.bestStreak >= 3], ['games10', 'HOOKED', 'Play 10 games', 300, (q) => q.games >= 10],
 ];
 const ACH_S = Object.assign({ games: 0, pops: 0, lines: 0, h: 0, v: 0, d: 0, cross: 0, bestChain: 0, megas: 0, best: 0, earned: 0, dailies: 0, surfer: false, gator: false, maw: false, vamp: false, got: {} }, store.get('bb_stats', {}));
