@@ -60,6 +60,7 @@ const STAGES = [
   { name: 'NEO METROPOLIS', bpm: 130, c1: '#00e5ff', c2: '#ff3df2', root: 40, prog: [0, 0, 3, 5], chord: [0, 3, 7, 10, 12, 10, 7, 3],
     kick: 'x..x..x...x..x..', hat: 'xxoxxxoxxxoxxxox', clap: '....x.......x...', bass: 'x..xo..x..x.o..x', perc: '..x..x...x..x.x.',
     arp: 'xx.xx.xx.xx.xx.x', bw: 'square', aw: 'triangle', alp: 2200 },
+  { name: 'SUNNY', c1: '#ffb347', c2: '#5ee7ff', boss: 'surfer' },
   { name: 'STORM PLANET', bpm: 136, c1: '#b388ff', c2: '#3dffd8', root: 36, prog: [0, 1, 0, -2], chord: [0, 1, 7, 12, 13, 12, 7, 1],
     kick: 'x...x...x...x.x.', hat: '..o...o...o...o.', clap: '....x.......x...', bass: 'xxoxxxoxxxoxxxox', perc: 'x.......x.......',
     arp: 'x.x.x.x.x.x.x.x.', bw: 'sawtooth', aw: 'sawtooth', alp: 1400 },
@@ -67,15 +68,32 @@ const STAGES = [
     kick: 'x...x...x...x...', hat: 'xxxxxxxxxxxxxxxx', clap: '....x..x....x...', bass: 'x.x.x.xox.x.x.xo', perc: '...x......x..x..',
     arp: 'xxxxxxxxxxxxxxxx', bw: 'square', aw: 'square', alp: 2600, glitch: true },
   { name: 'DEEP SEA ABYSS', c1: '#2bd9ff', c2: '#7dffd0' },
+  { name: 'GAZZA', c1: '#8dff5a', c2: '#ffd23d', boss: 'gator' },
   { name: 'CRYSTAL CAVERNS', c1: '#d77dff', c2: '#7df9ff' },
   { name: 'CLOCKWORK FACTORY', c1: '#ffb347', c2: '#ffd98a' },
   { name: 'HAUNTED FOREST', c1: '#9dff6a', c2: '#c9a6ff' },
   { name: 'TOMORROW PARK', c1: '#ff4fd8', c2: '#7cf7ff' },
   { name: 'SUNKEN SIXTIES', c1: '#ff9ad5', c2: '#7dfff0' },
+  { name: 'MAW', c1: '#ff4fd8', c2: '#7cf7ff', boss: 'maw' },
   { name: 'SOLARIS KEEP', c1: '#ffb347', c2: '#ff5a6a' },
   { name: "VAMPIRE'S TOMB", c1: '#ff3355', c2: '#ffb3c1' },
+  { name: 'VAMPIRE', c1: '#ff3355', c2: '#ffd56a', boss: 'vamp' },
 ];
-const BOSS = 12, LAST_STAGE = 12; // v33: vampire is stage 13. 10 park, 11 sunken sixties, 12 castle.
+const BOSS = 16, LAST_STAGE = 16; // v57: 17 stages. Each boss sits right after its own world.
+// Old puzzle index for vaporwave loops and the old twist rules. -1 is a boss-only stage.
+const STAGE_OLD = [0, 1, 2, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10, 10, 11, 12, 12];
+const STAGE_MECH = [0, 1, 2, -1, 3, 4, 5, -1, 6, 7, 8, 9, 10, -1, 11, 15, -1];
+const BOSS_OF = { 3: 'surfer', 7: 'gator', 13: 'maw', 16: 'vamp' };
+const mechOf = (st) => STAGE_MECH[st] | 0;
+const mech = () => mechOf(g.stage);
+function popsStage(ep) {
+  const n = Math.floor(ep / STAGE_POPS);
+  if (n >= 13) return 16;
+  if (n >= 12) return 15;
+  return [0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 14][n] || 0;
+}
+// Pop count that belongs to this stage, so clearing it opens the next one and nothing is skipped.
+const STAGE_EP = [0, 150, 300, 450, 450, 600, 750, 900, 900, 1050, 1200, 1350, 1500, 1650, 1650, 1800, 1950];
 const TEAL = ['#00E5FF', '#1DE9B6'], AQUA = ['#1DE9B6', '#2979FF'], OCEAN = ['#00E5FF', '#2979FF'], DEEP = ['#00B8D4', '#1DE9B6', '#2979FF'];
 const LOGO = ['#00E5FF', '#1DE9B6', '#64FFDA', '#2979FF', '#18FFFF', '#00BFA5', '#448AFF'];
 const TAGLINES = [
@@ -1247,7 +1265,7 @@ function xmFindMark(b) {
   const off = Math.max(-0.05, Math.min(0.1, mi / sr - XM_MARK)); XM.prime = off; return off;
 }
 // Track map: 1-9 stages 1-9, 10 vampire (stage 13), 11 Sunny, 12 Gazza, 13 park, 14 sunken sixties, 15 castle.
-function stageTrack(st) { return st >= BOSS ? 10 : st === 9 ? 13 : st === 10 ? 14 : st === 11 ? 15 : (st | 0) + 1; }
+function stageTrack(st) { const o = STAGE_OLD[st] | 0; return o >= 12 ? 10 : o === 9 ? 13 : o === 10 ? 14 : o === 11 ? 15 : o + 1; }
 const XM_NEXT = (i) => (i === 3 ? [4, 11] : i === 6 ? [7, 12] : i === 9 ? [13] : i === 11 ? [4] : i === 12 ? [7] : i === 13 ? [14] : i === 14 ? [15] : i === 15 ? [10] : i === 16 ? [0] : i === 10 ? [] : [Math.min(9, i + 1)]);
 function xmEvict() { // keep memory bounded on phones: title, current, next (+ their danger/fanfare) only
   const keep = new Set(), cur = Math.max(0, XM.track);
@@ -1458,7 +1476,7 @@ const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
 // Techno vaporwave stays a synth.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { pop: 'genre-pop', classical: 'genre-classical' };
-// title and menu are the v52 tracks. Each stage, including the four bosses, has its own file.
+// title and menu are unchanged. Boss stages reuse the rock file of the world they follow.
 const ROCK_FILE = {
   title: 'rock-title', menu: 'rock-menu',
   s01: 'rock-s01', s02: 'rock-s02', s03: 'rock-s03', s04: 'rock-s04', s05: 'rock-s05',
@@ -1467,12 +1485,10 @@ const ROCK_FILE = {
 };
 const GR = { buf: {}, pend: {}, src: null, g: null, key: '', fade: null };
 function tuneId() { const id = wallet.music || 'vapor'; return wallet.tunes && wallet.tunes.indexOf(id) >= 0 ? id : 'vapor'; }
+const ROCK_BY_STAGE = ['s01', 's02', 's03', 's03', 's04', 's05', 's06', 's06', 's07', 's08', 's09', 's10', 's11', 's11', 's12', 's13', 's13'];
 function rockSlot() {
   if (state === 'start') return 'title';
-  if (state === 'play' || state === 'dying') {
-    const st = Math.max(0, Math.min(12, (g && g.stage) | 0));
-    return 's' + String(st + 1).padStart(2, '0');
-  }
+  if (state === 'play' || state === 'dying') return ROCK_BY_STAGE[Math.max(0, Math.min(LAST_STAGE, (g && g.stage) | 0))];
   return 'menu';
 }
 function genreKey() {
@@ -1525,7 +1541,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=56').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=57').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
@@ -1906,7 +1922,7 @@ const SHOP_SKIN = [
 const START_CASH = { free: 0, full: 1000 };
 const GENRES = [
   { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
-  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'A different rock song on every stage. Title and menu keep their own.' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Each world keeps its own rock song. A boss uses that same song. Title and menu keep theirs.' },
   { id: 'pop', name: 'POP', price: 12000, blurb: 'Piano, clean guitar and a hook' },
   { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings, piano and winds' },
   { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
@@ -1992,7 +2008,7 @@ function buyTune(id) {
   if (id === 'vapor' && GP.live) { genreStop(); if (XM.src) xmStopLoop(A.ctx.currentTime, 0.1); }
   return true;
 }
-const STAGE_BG = [0, 1, 2, 3, 4, 9, 10, 11, 12, 16, 17, 18, 13]; // BGS index per stage (5 = title, 6-8 = store exclusives)
+const STAGE_BG = [0, 1, 2, 14, 3, 4, 9, 15, 10, 11, 12, 16, 17, 17, 18, 13, 13]; // boss stages reuse their world's backdrop
 function bgFor(stageIdx) { const it = SHOP_BG.find((b) => b.id === wallet.bg); return it && it.bg >= 0 ? it.bg : STAGE_BG[stageIdx] || 0; }
 function bankRun() {
   if (SANDBOX) { g.bank = null; return; } // test links leave the real wallet alone
@@ -5185,7 +5201,7 @@ function miniWin() {
 // v17: the boss theme crossfades into the next stage's track on its next bar line, and the next stage
 // (backdrop, twist, banner) begins at that same moment
 function miniNext() {
-  const ep = effPop(), ns = Math.max(g.stage + 1, Math.min(LAST_STAGE, Math.floor(ep / STAGE_POPS)));
+  const ep = effPop(), ns = Math.max(g.stage + 1, Math.min(LAST_STAGE, popsStage(ep)));
   if (M.timer && aok() && M.E) { g.handoff = { ns, at: requestTrack(ns + 1, DROP_BAR, 1.2, true), t: g.time }; return; }
   finishHandoff(ns, false);
 }
@@ -5243,15 +5259,19 @@ const TWISTS = [
   { text: 'Line up 4+ of one color: across, down or diagonal!', icon: 1 },
   { text: 'Rainbow blocks match ANY color!', icon: RAINBOW },
   { text: 'Steel girders only break when a match pops next to them!', icon: VINE },
+  { text: 'BOSS! Pop matches to wipe Sunny out!', icon: 2 },
   { text: 'Storm rock surges up from below! Pop next to it to smash it!', icon: LAVA },
   { text: 'Gravity distortion! Space warps and blocks swap colors!', icon: 3 },
   { text: 'Dim blocks only light up when a match pops next to them!', icon: DIM + 1 },
+  { text: 'BOSS! Pop matches to send Gazza packing!', icon: 4 },
   { text: 'Frozen blocks need TWO matches next to them to shatter!', icon: ICE + 2 },
   { text: 'The conveyor row slides every few seconds! Watch the arrows!', icon: GEAR_I },
   { text: 'Spooky fog drifts in and hides some blocks for a moment!', icon: FOG_I },
   { text: 'A rocket spark swaps one block\'s color. Watch the glow!', icon: 4 },
   { text: 'A lazy current nudges the falling piece one column!', icon: 1 },
+  { text: 'BOSS! Pop matches to drive Maw off!', icon: 1 },
   { text: 'A loose stone drops in. Pop a match beside it!', icon: VINE },
+  { text: 'The castle drops a loose stone. Pop a match beside it!', icon: VINE },
   { text: 'FINAL BOSS! Pop matches to drain the vampire\'s health!', icon: BAT_I },
 ];
 const cellColor = (v) => (v >= 1 && v <= 5 ? PAL[v] : isDim(v) ? PAL[v - DIM] : isIce(v) || isIce2(v) ? '#cdf6ff' : v === WEB ? '#d8d8ea' : v === RAINBOW ? '#ffffff' : v === VINE ? '#b0bec5' : v === LAVA ? '#7cf7ff' : v === BOMB ? '#ff4050' : '#ffffff');
@@ -5259,7 +5279,7 @@ const spr = (v) => (v >= 1 && v <= 5 ? v - 1 : isDim(v) ? 9 + v - DIM : isIce(v)
   : v === RAINBOW ? 5 : v === VINE ? 6 : v === LAVA ? 7 : v === BOMB ? 9 : 8);
 const g = { board: [], queue: [], score: 0, disp: 0, popped: 0, level: 1, stage: 0, pop: 0, time: 0, anim: new Float32Array(ROWS * COLS), fallOff: new Float32Array(ROWS * COLS) };
 let state = 'start', paused = false, T = 0, overT = 0, rankNew = 0, overJoke = '';
-function nColors() { return g.stage >= 8 ? 5 : g.stage >= 3 ? 4 : 3; } // 3 colors in stages 1-3, 4 in 4-8, 5 from stage 9 through the end
+function nColors() { const s = g.stage | 0; return s <= 3 ? 3 : s <= 9 ? 4 : 5; }
 const rnd = () => (g.rng ? g.rng() : Math.random()); // v28: the daily challenge uses a fixed seed
 function makePiece(t) {
   const n = nColors(), a = 1 + (rnd() * n | 0);
@@ -5267,10 +5287,11 @@ function makePiece(t) {
   const roll = rnd(), cols = [];
   for (let i = 0; i < 4; i++) cols.push(roll < 0.15 ? a : (rnd() < 0.5 ? a : b));
   if (roll > 0.88) cols[rnd() * 4 | 0] = 1 + (rnd() * n | 0);
-  if (g.stage === 1 && rnd() < 0.14) cols[rnd() * 4 | 0] = RAINBOW;
-  if (g.stage === 2 && rnd() < 0.16) cols[rnd() * 4 | 0] = VINE;
-  if (g.stage === 5 && rnd() < 0.2) { const i = rnd() * 4 | 0; cols[i] = DIM + cols[i]; } // deep sea: one dim cell
-  if (g.stage === 6 && rnd() < 0.16) { const i = rnd() * 4 | 0; cols[i] = ICE + cols[i]; } // caverns: one frozen cell
+  const m0 = mech();
+  if (m0 === 1 && rnd() < 0.14) cols[rnd() * 4 | 0] = RAINBOW;
+  if (m0 === 2 && rnd() < 0.16) cols[rnd() * 4 | 0] = VINE;
+  if (m0 === 5 && rnd() < 0.2) { const i = rnd() * 4 | 0; cols[i] = DIM + cols[i]; } // deep sea: one dim cell
+  if (m0 === 6 && rnd() < 0.16) { const i = rnd() * 4 | 0; cols[i] = ICE + cols[i]; } // caverns: one frozen cell
   return { t, cols };
 }
 function newGame() {
@@ -5478,17 +5499,23 @@ function beginPop(pop) {
     RINGS.push({ x: cx, y: cy, r: c * 9, t: 0, color: '#ffe23d' });
   } else if (g.chain < 2) shake(0.12, 3);
   const ep = effPop(), nl = Math.floor(ep / LEVEL_POPS) + 1;
-  if (!isMini() && nl > g.level) {
-    const ns = Math.min(LAST_STAGE, Math.floor(ep / STAGE_POPS)), mk = MINI_AT[g.stage];
-    if (ns > g.stage && mk && !g.beat[mk]) { startMini(mk); setTimeout(sfx.level, 350); } // v16: stage 3 / 6 end with a mid-boss (speed stays put)
-    else if ((g.level = nl) && ns !== g.stage) { enterStage(ns); setTimeout(sfx.level, 350); }
-    else if (g.stage < BOSS) { showBanner('LEVEL ' + nl, gravInterval() <= gravFloor() + 0.001 ? 'KEEP IT UP!' : 'FASTER! FASTER!', STAGES[g.stage].c2); setTimeout(sfx.level, 350); }
+  if (!isMini() && !(g.boss && g.boss.hp > 0) && nl > g.level) {
+    g.level = nl;
+    const dest = Math.min(LAST_STAGE, popsStage(ep));
+    if (dest > g.stage) {
+      let land = dest;
+      for (let i = g.stage + 1; i <= dest; i++) if (BOSS_OF[i] && !g.beat[BOSS_OF[i]]) { land = i; break; }
+      enterStage(land); setTimeout(sfx.level, 350);
+    } else if (g.stage < BOSS) { showBanner('LEVEL ' + nl, gravInterval() <= gravFloor() + 0.001 ? 'KEEP IT UP!' : 'FASTER! FASTER!', STAGES[g.stage].c2); setTimeout(sfx.level, 350); }
   }
 }
 function enterStage(ns, queued) {
-  g.stage = ns; M.stage = ns; noteReach(ns); setBG(bgFor(ns)); if (ns === BOSS) voxWarm('vamp'); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
-  if (ns !== 11) g.sol = null;
-  g.boss = ns === BOSS ? { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 } : null;
+  g.stage = ns; M.stage = ns; noteReach(ns); setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
+  if (mechOf(ns) !== 11) g.sol = null;
+  const kind = BOSS_OF[ns];
+  if (kind === 'vamp') { voxWarm('vamp'); g.boss = { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 }; }
+  else g.boss = null;
+  if (kind && kind !== 'vamp') { startMini(kind, true); return; }
   stageBanner(ns, queued);
 }
 // v14: the vampire laughs (sound + background + portrait). Throttled: at most once every 7 s, never during an OUCH
@@ -5576,35 +5603,36 @@ function applyGlitch() {
 function updateTwists(dt) {
   g.twistT += dt;
   if (isMini()) { gatorChase(dt); miniTwist(dt); return; } // v16 mid-boss replaces the stage twist
-  if (g.stage === 2 && g.twistT > 30) { g.twistT = 0; riseRow('vine'); return; }
-  if (g.stage === 3) {
+  const m = mech();
+  if (m === 2 && g.twistT > 30) { g.twistT = 0; riseRow('vine'); return; }
+  if (m === 3) {
     const PER = 20;
     if (g.twistT > PER - 2.6 && !g.warn) { g.warn = { t: 0 }; sfx.rumble(); }
     if (g.warn) g.warn.t += dt;
     if (g.twistT > PER) { g.twistT = 0; g.warn = null; riseRow('lava'); }
     return;
   }
-  if (g.stage === 4) {
+  if (m === 4) {
     if (!g.glitch && g.twistT > 6) startGlitch();
     else if (g.glitch) { g.glitch.t += dt; if (g.glitch.t > 1.3) applyGlitch(); }
   }
-  if (g.stage === 7) { // clockwork conveyor: 2 s warning (gears wind up, arrows flash), then the row slides one step
+  if (m === 7) { // clockwork conveyor: 2 s warning (gears wind up, arrows flash), then the row slides one step
     const PER = 13;
     if (g.twistT > PER - 2 && !g.convWarn) { g.convWarn = { t: 0 }; sfx.gears(); }
     if (g.convWarn) g.convWarn.t += dt;
     if (g.twistT > PER) { if (shiftConveyor()) { g.twistT = 0; g.convWarn = null; } else g.twistT = PER - 0.25; }
     return;
   }
-  if (g.stage === 8) { // haunted fog
+  if (m === 8) { // haunted fog
     if (!g.fog && g.twistT > 9) startFog();
     else if (g.fog) { const f = g.fog; f.t += dt; f.x += f.vx * dt; if (f.t > f.dur) { g.fog = null; g.twistT = 0; } }
     return;
   }
-  if (g.stage === 9 || g.stage === 10 || g.stage === 11) { // park spark / sea current / castle stone. Slow, one thing at a time.
-    const PER = g.stage === 10 ? 20 : 18;
+  if (m === 9 || m === 10 || m === 11 || m === 15) { // park spark / sea current / castle stone. Slow, one thing at a time.
+    const PER = m === 10 ? 20 : 18;
     if (g.twistT > PER - 1.5 && !g.warn) g.warn = { t: 0 };
     if (g.warn) g.warn.t += dt;
-    if (g.twistT > PER) { g.twistT = 0; g.warn = null; if (g.stage === 9) atomicSpark(); else if (g.stage === 10) seaCurrent(); else dropStone(); }
+    if (g.twistT > PER) { g.twistT = 0; g.warn = null; if (m === 9) atomicSpark(); else if (m === 10) seaCurrent(); else dropStone(); }
     return;
   }
   if (g.stage === BOSS && g.boss && g.boss.hp > 0) { // vampire summons bats that drop spider webs; gentle step-up below 35% hp
@@ -5724,7 +5752,7 @@ function gravFloor() { return gravFloorAt(g.stage); }
 function gravCurve(lv, st) { // v40: one notch slower (7%). Same ramp shape, same boss fights.
   const l = lv - 1, v = 1.07 * Math.pow(0.94, Math.min(l, 4)) * Math.pow(0.92, Math.max(0, l - 4)) * (st >= 7 ? 0.94 : 1);
   return Math.max(gravFloorAt(st), v); }
-function gravFloorAt(st) { return st === BOSS ? 0.15 : st >= 9 ? 0.14 : st >= 7 ? 0.15 : 0.17; }
+function gravFloorAt(st) { return st >= 16 ? 0.15 : st >= 12 ? 0.14 : st >= 8 ? 0.15 : 0.17; }
 function gravInterval() { if (g.tut) return 1.1; if (g.boss) { if (g.boss.grav == null) g.boss.grav = gravCurve(g.level, g.stage); return g.boss.grav; } return gravCurve(g.level, g.stage); } // bosses: flat speed
 function updateGame(dt) {
   g.time += dt;
@@ -5739,7 +5767,7 @@ function updateGame(dt) {
   if (g.wave) { g.wave.t += dt; if (g.wave.t > 1.2) g.wave = null; } if (g.murk) { g.murk.t += dt; if (g.murk.t > g.murk.dur) g.murk = null; }
   if (g.handoff) updateHandoff();
   else if (isMini() && g.boss.doneAt && g.time - g.boss.doneAt > (g.boss.kind === 'surfer' ? 4.6 : g.boss.kind === 'gator' ? 5.2 : g.boss.kind === 'maw' ? 3.4 : 3) && !g.res && state === 'play') miniNext(); // v18: the womp womp finishes first
-  if (g.stage === 11) updateSolaris();
+  if (mech() === 11) updateSolaris();
   voxPump();
   if (g.res) { updateResolve(dt); return; }
   if (!g.piece) return;
@@ -5789,7 +5817,7 @@ const LETTERS = { '.': 0, B: 1, Y: 2, P: 3, G: 4, O: 5, '*': RAINBOW, V: VINE, L
   b: DIM + 1, y: DIM + 2, p: DIM + 3, g: DIM + 4, o: DIM + 5, 1: ICE + 1, 2: ICE + 2, 3: ICE + 3, 4: ICE + 4, 5: ICE + 5, '!': ICE2 + 1, '@': ICE2 + 2, '#': ICE2 + 3, '$': ICE2 + 4, '%': ICE2 + 5 };
 const dbg = {
   figPx(kind) { const C = BG['fcv_' + kind]; if (!C) return -1; const d = C.x.getImageData(0, 0, C.width, C.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++; return n; }, voices: { crash: surfCrash, womp: wompWomp, chomp: gatorChomp, clank: metalClank, laugh: vampLaugh2, laugh3: vampLaugh3, ouch: vampOuch, defeat: vampDefeatCry, say: bossSay }, laughs: LAUGHS, lines: BOSS_LINES, mini: MINI, lineSpec: bossLineSpec, specJaw,
-  startMini(kind) { if (!MINI[kind]) return false; const MB = MINI[kind]; g.popped = (MB.stage + 1) * STAGE_POPS - 1; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(MB.stage); g.popped++; startMini(kind); bgFade = 0; return true; },
+  startMini(kind) { const idx = { surfer: 3, gator: 7, maw: 13 }[kind]; if (idx == null) return false; dbg.setStage(idx); return true; },
   audio() { return A; }, ambKind() { return AMB.kind; }, paintSurfer(...a) { return paintSurfer(...a); }, // v24 hiss meter hooks, v25 pose sheet
   miniState() { const b = g.boss; if (!isMini()) return null; const F = BG['f_' + b.kind]; return { kind: b.kind, hp: b.hp, max: b.max, lv: b.lv, talk: b.talk ? Object.assign({}, b.talk) : null, said: b.said.slice(), hz: b.hz, nudges: b.nudges, drops: b.drops, murks: b.murks, doneAt: b.doneAt, pose: F ? F.pose : null, ww: F ? F.ww : -1, dw: F ? F.dw : -1, wipes: (b.wipes || []).slice(), crashes: b.crashes || 0, womps: b.womps || 0, wompAt: b.wompAt || 0, ouch: b.ouch, jaw: F ? F.jaw : 0, lt: F ? F.lt : -1, gone: F ? F.gone : 1, lunges: b.lunges || 0, chomps: b.chomps || 0, bites: (b.bites || []).length, teeth: b.teeth || 0, clanks: b.clanks || 0, lunge: F ? F.lunge || 0 : 0, emerge: F ? F.emerge || 0 : 0, close: F ? F.close || 0 : 0, spin: F ? F.spin || 0 : 0, flip: F ? (F.flip == null ? -1 : F.flip) : -1, flips: F ? F.flips || 0 : 0, oceanRows: BG.oceanRows || 0, tell: F ? F.tell || 0 : 0, boot: !!BG.boot, teethFly: (BG.teethFly || []).length, level: g.level, stage: g.stage, ep: effPop(), track: desiredTrack() }; },
   setPopped(n) { g.popped = n; g.level = Math.floor(effPop() / LEVEL_POPS) + 1; }, get level() { return g.level; },
@@ -5800,8 +5828,8 @@ const dbg = {
     g.res = null; g.glitch = null; g.warn = null; g.twistT = 0;
     if (piece) { g.piece = { t: piece.t, r: piece.r || 0, x: piece.x, y: piece.y == null ? 2 : piece.y, cols: [...piece.cols].map((ch) => LETTERS[ch]) }; g.lock = 0; g.resets = 0; g.lowY = g.piece.y; }
   },
-  setStage(i) { g.popped = i * STAGE_POPS; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
-  solSay(i) { if (g.stage !== 11) return 0; solWarm(); const key = SOL_ORDER[((i | 0) % SOL_ORDER.length + SOL_ORDER.length) % SOL_ORDER.length]; const dur = solDur(key); g.sol = { next: g.time + dur + 24, i: SOL_ORDER.indexOf(key), cur: { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false }, said: ((g.sol && g.sol.said) || 0) + 1 }; if (solPlay(key)) g.sol.cur.played = true; return dur; }, solReady(k) { return !!(SOL.buf[k || 'a1']); }, warmSol() { solWarm(); solPump(); },
+  setStage(i) { g.popped = STAGE_EP[i] || 0; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
+  solSay(i) { if (mech() !== 11) return 0; solWarm(); const key = SOL_ORDER[((i | 0) % SOL_ORDER.length + SOL_ORDER.length) % SOL_ORDER.length]; const dur = solDur(key); g.sol = { next: g.time + dur + 24, i: SOL_ORDER.indexOf(key), cur: { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false }, said: ((g.sol && g.sol.said) || 0) + 1 }; if (solPlay(key)) g.sol.cur.played = true; return dur; }, solReady(k) { return !!(SOL.buf[k || 'a1']); }, warmSol() { solWarm(); solPump(); },
   get reach() { return reach; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; if (g.boss.lunge && g.boss.lunge.done) g.boss.lunge = null; } return bossLaugh(w || 'test'); },
@@ -5824,7 +5852,7 @@ const dbg = {
   timeScale(v) { TS = v; }, board() { return g.board.map((r) => Array.from(r)); }, setEdition, gameOver() { gameOver(); }, setScore(n) { g.score = n; g.disp = n; },
   gatorSink() { if (BG.gator) BG.gator.nextSink = 0; },
   setTwistT(v) { g.twistT = v; },
-  twistNow() { g.twistT = 999; if (g.stage === 3) g.warn = { t: 3 }; if (g.stage === 7) g.convWarn = { t: 2 }; if (g.boss) g.boss.warn = { t: 2 }; },
+  twistNow() { g.twistT = 999; if (mech() === 3) g.warn = { t: 3 }; if (mech() === 7) g.convWarn = { t: 2 }; if (g.boss) g.boss.warn = { t: 2 }; },
   hideBanner() { banner = null; pendBanner = null; },
   setRM(v) { settings.rm = !!v; saveSettings(); return settings.rm; },
   sunLid() { return sunLid(T); }, sunLidAt(t) { return sunLidAt(t); },
@@ -6382,7 +6410,7 @@ function drawHowto() {
     ['4 IN A LINE', '4+ of one color across, down or diagonal POP!'], ['CHAINS', 'falling blocks that match: x2, x3...'],
     ['6+ LINE', 'MEGA POP! crossing lines = bonus'], ['PAIRS / 3s', "don't pay - only 4+ in a line"], ['TAP', 'rotate (O piece spins its colors)'],
     ['SWIPE \u2190 \u2192', 'move (keep dragging to slide)'], ['SWIPE \u2193', 'soft drop, FLICK \u2193 = hard drop'],
-    ['KEYS', '\u2190\u2192 move, \u2191/X/Z rotate, SPACE drop'],     ['STAGES', '13 stages, a twist every 150 pops'],
+    ['KEYS', '\u2190\u2192 move, \u2191/X/Z rotate, SPACE drop'],     ['STAGES', '17 stages, a twist every 150 pops'],
     ['', 'rainbow, rock, warps, ice, fog...'], ['', 'park, sunken maw, Solaris, VAMPIRE'], ['STORE', 'cash is banked: buy power-ups & looks'],
   ];
   const top = sy + sw / 2 + 18, rowH = Math.min(38, (ph - (top - py) - 80) / lines.length), fs = Math.min(16, pw / 25);
@@ -6406,7 +6434,10 @@ function drawStages() {
   STAGES.forEach((st, i) => {
     const x = px + 10 + (i % cols) * (cw + gap), y = top + Math.floor(i / cols) * (ch + gap), open = stageOpen(i);
     button('stg' + i, x + cw / 2, y + ch * 0.38, cw, Math.max(28, ch * 0.62), String(i + 1), open ? [st.c1, st.c2] : GREY, { fs: ch * 0.28, glow: false, r: 8 });
-    fitTxt(open ? st.name + ((MINI_AT[i] || i === BOSS) ? ' · BOSS' : '') : 'LOCKED', x + cw / 2, y + ch * 0.84, Math.max(9, ch * 0.16), cw - 4, open ? '#fff' : 'rgba(255,255,255,0.55)', null);
+    fitTxt(open ? st.name : 'LOCKED', x + cw / 2, y + ch * 0.84, Math.max(8, ch * 0.15), cw - 4, open ? '#fff' : 'rgba(255,255,255,0.55)', null);
+    if (st.boss) {
+      ctx.save(); ctx.translate(x + cw - 11, y + 9); ctx.fillStyle = '#ffe23d'; ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(2.2, -2); ctx.lineTo(7, -1.2); ctx.lineTo(3.2, 2.2); ctx.lineTo(4.2, 7); ctx.lineTo(0, 4.4); ctx.lineTo(-4.2, 7); ctx.lineTo(-3.2, 2.2); ctx.lineTo(-7, -1.2); ctx.lineTo(-2.2, -2); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
   });
   button('back', W / 2, py + ph - 30, pw * 0.5, 44, 'BACK', OCEAN);
 }
@@ -6439,7 +6470,7 @@ const FRAME_STYLE = {
   battlement: { fill: 'rgba(92,84,74,0.94)', stroke: '#ffd27a', name: 'battlement' },
   coffin: { fill: 'rgba(54,12,26,0.94)', stroke: '#ffd56a', name: 'gothic coffin' },
 };
-const FRAME_OF = ['wave', 'pipe', 'neon', 'bolt', 'warp', 'port', 'gem', 'gear', 'vine', 'atomic', 'dome', 'battlement', 'coffin'];
+const FRAME_OF = ['wave', 'pipe', 'neon', 'surf', 'bolt', 'warp', 'port', 'log', 'gem', 'gear', 'vine', 'atomic', 'dome', 'dome', 'battlement', 'coffin', 'coffin'];
 function frameId() {
   if (isMini() && g.boss.kind === 'surfer') return 'surf';
   if (isMini() && g.boss.kind === 'gator') return 'log';
@@ -6617,8 +6648,8 @@ function drawBoard() {
   ctx.save(); ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
   const res = g.res, fallK = res && res.phase === 'fall' ? Math.min(1, res.t / res.dur) : 1, popK = res && res.phase === 'pop' ? res.t / res.dur : -1;
   const gl = g.glitch;
-  if (g.stage === 7 && state === 'play') drawConveyor(bx, by, c, bw);
-  const convK = g.stage === 7 ? Math.min(1, (g.time - g.convAt) / 0.22) : 1, fogOn = !!g.fog;
+  if (mech() === 7 && state === 'play') drawConveyor(bx, by, c, bw);
+  const convK = mech() === 7 ? Math.min(1, (g.time - g.convAt) / 0.22) : 1, fogOn = !!g.fog;
   for (let y = HID - 1; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       const v = g.board[y][x]; if (!v) continue;
@@ -6656,8 +6687,8 @@ function drawBoard() {
     ctx.fillStyle = gr; ctx.fillRect(bx, by + bh - c * 2.5, bw, c * 2.5);
     txt('STORM SURGE!', bx + bw / 2, by + bh - c * 0.9, c * 0.75, '#3dffd8', '#1a0638');
   }
-  if (g.warn && g.stage >= 9 && g.stage <= 11) {
-    const a = 0.55 + 0.4 * Math.sin(T * 12), lab = ['ATOMIC SPARK!', 'CURRENT RISING!', 'LOOSE STONE!'][g.stage - 9], col = STAGES[g.stage].c2;
+  if (g.warn && (mech() === 9 || mech() === 10 || mech() === 11 || mech() === 15)) {
+    const a = 0.55 + 0.4 * Math.sin(T * 12), lab = mech() === 9 ? 'ATOMIC SPARK!' : mech() === 10 ? 'CURRENT RISING!' : 'LOOSE STONE!', col = STAGES[g.stage].c2;
     ctx.globalAlpha = a; txt(lab, bx + bw / 2, by + c * 2.2, c * 0.62, col, '#140818'); ctx.globalAlpha = 1;
   }
   const p = g.piece;
@@ -6779,7 +6810,7 @@ function drawHUD() {
   }
   const rx = pxp - ps * 1.5 - 14;
   const mb = isMini() ? MINI[g.boss.kind] : null;
-  txt('STAGE ' + (g.stage + 1) + (mb ? ' BOSS' : '') + (SANDBOX ? '  TEST' : ''), rx, y0 + h * 0.28, Math.max(11, h * 0.2), SANDBOX ? '#ffd180' : 'rgba(255,255,255,0.9)', 'rgba(0,0,0,0.55)', 'right');
+  txt('STAGE ' + (g.stage + 1) + ((mb || BOSS_OF[g.stage]) ? ' BOSS' : '') + (SANDBOX ? '  TEST' : ''), rx, y0 + h * 0.28, Math.max(11, h * 0.2), SANDBOX ? '#ffd180' : 'rgba(255,255,255,0.9)', 'rgba(0,0,0,0.55)', 'right');
   fitTxt(mb ? mb.place : st.name, rx, y0 + h * 0.66, h * 0.3, Math.max(60, rx - L.bx - h * 2.6), mb ? mb.c1 : st.c1, '#000', 'right');
 }
 function drawSide() {
@@ -6803,7 +6834,7 @@ function drawSide() {
     y += c * 1.6;
   } else if (g.stage < LAST_STAGE) { // progress to next stage
     const k = (effPop() % STAGE_POPS) / STAGE_POPS;
-    txt(g.stage === LAST_STAGE - 1 || (MINI_AT[g.stage] && !g.beat[MINI_AT[g.stage]]) ? 'TO THE BOSS' : 'NEXT STAGE', x + w / 2, y + c * 0.35, c * 0.38, 'rgba(255,255,255,0.7)', null);
+    txt(BOSS_OF[g.stage + 1] ? 'TO THE BOSS' : 'NEXT STAGE', x + w / 2, y + c * 0.35, c * 0.38, 'rgba(255,255,255,0.7)', null);
     rr(x + 2, y + c * 0.7, w - 4, c * 0.5, c * 0.25); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
     rr(x + 2, y + c * 0.7, Math.max(c * 0.5, (w - 4) * k), c * 0.5, c * 0.25); ctx.fillStyle = st.c1; ctx.fill();
     y += c * 1.6;
@@ -6814,7 +6845,7 @@ function drawSide() {
   }
   if (g.maxChain >= 2) { txt('BEST CHAIN', x + w / 2, y + c * 0.35, c * 0.38, 'rgba(255,255,255,0.7)', null); txt('x' + g.maxChain, x + w / 2, y + c, c * 0.72, '#2bf0ff', '#1a0530', 'center', NFONT); }
   if (g.boss && state !== 'won') { const vp = vampPos(); if (isMini()) drawMiniPortrait(g.boss.kind, vp.x, vp.y, vp.s); else drawVampire(vp.x, vp.y, vp.s, g.boss); }
-  else if (g.stage === 11 && state !== 'won') { const vp = vampPos(), s = Math.min(15, vp.s * 0.33); paintSolaris(ctx, vp.x, Math.min(vp.y, L.by + L.cell * VIS - s * 2.55), s, solJaw(), T); }
+  else if (mech() === 11 && state !== 'won') { const vp = vampPos(), s = Math.min(15, vp.s * 0.33); paintSolaris(ctx, vp.x, Math.min(vp.y, L.by + L.cell * VIS - s * 2.55), s, solJaw(), T); }
 }
 // ---- stage 8-10 overlays
 function drawConveyor(bx, by, c, bw) {
@@ -7406,9 +7437,15 @@ const ACH = [
   ['daily3', 'REGULAR', 'Daily challenge 3 days in a row', 750, () => DAILY.bestStreak >= 3], ['games10', 'HOOKED', 'Play 10 games', 300, (q) => q.games >= 10],
 ];
 const ACH_S = Object.assign({ games: 0, pops: 0, lines: 0, h: 0, v: 0, d: 0, cross: 0, bestChain: 0, megas: 0, best: 0, earned: 0, dailies: 0, surfer: false, gator: false, maw: false, vamp: false, got: {} }, store.get('bb_stats', {}));
-reach = (() => { // missing key: old saves keep stages 1-9 if they already beat the vampire, and never lose wallet or stats
+reach = (() => { // v57 inserts a boss stage after each boss world. Old 0-12 reach maps onto the new 0-16 list once.
   let r = store.get('bb_reach', null);
-  if (typeof r !== 'number' || !isFinite(r)) { r = ACH_S.vamp ? 8 : 0; if (!SANDBOX) store.set('bb_reach', r); }
+  const map = [0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 14, 16];
+  if (store.get('bb_reach_v', 0) < 17) {
+    if (typeof r !== 'number' || !isFinite(r)) r = ACH_S.vamp ? 16 : 0;
+    else r = map[Math.max(0, Math.min(12, r | 0))];
+    if (ACH_S.vamp) r = 16;
+    if (!SANDBOX) { store.set('bb_reach', r); store.set('bb_reach_v', 17); }
+  }
   return Math.max(0, Math.min(LAST_STAGE, r | 0));
 })();
 const ACHQ = [];
@@ -7513,7 +7550,7 @@ function frame(now) {
       ctx.restore();
       if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA + ')'; ctx.fillRect(0, 0, W, H); }
       if (hurtA > 0) { ctx.fillStyle = 'rgba(255,20,50,' + hurtA + ')'; ctx.fillRect(0, 0, W, H); } // v14 OUCH! red flash
-      drawHUD(); drawControls(); drawBannerUI(); if (g.stage === 11) drawSolBubble(); if (g.tut && state === 'play') drawTut();
+      drawHUD(); drawControls(); drawBannerUI(); if (mech() === 11) drawSolBubble(); if (g.tut && state === 'play') drawTut();
       if (state === 'play' && paused) { if (pmenu) drawPUMenu(); else drawPause(); }
       else if (state === 'entry') { drawEntry(); drawFX(); }
       else if (state === 'over') drawOver();
@@ -7526,7 +7563,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 layout();
-if (TEST_STAGE > 0 && !DBG_BOSS) startGame(); // ?stage=N (1-13) drops straight into that stage
+if (TEST_STAGE > 0 && !DBG_BOSS) startGame(); // ?stage=N (1-17) drops straight into that stage
 window.__bb = {
   get state() { return state; }, get paused() { return paused; }, get test() { return { sandbox: SANDBOX, stage: TEST_STAGE, unlock: UNLOCK_ALL }; }, get piece() { return g.piece ? Object.assign({}, g.piece) : null; },
   get score() { return g.score; }, get popped() { return g.popped; }, get stage() { return g.stage; }, get chain() { return g.maxChain; }, get resolving() { return !!g.res; }, dbg, get audio() { return A.ctx ? A.ctx.state : 'none'; },

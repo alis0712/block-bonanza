@@ -86,7 +86,7 @@ Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use th
 Files:
 
 - `rock-title` (unchanged from v52), `rock-menu` (v56)
-- `rock-s01` through `rock-s13`, one per stage
+- `rock-s01` through `rock-s13`. v57 adds no files. Stages 4, 8, 14 and 17 replay `rock-s03`, `rock-s06`, `rock-s11` and `rock-s13`.
 - `genre-pop.ogg` / `genre-pop.mp3`
 - `genre-classical.ogg` / `genre-classical.mp3`
 - `genre-rock.ogg` / `genre-rock.mp3` is the older single rock bed and is no longer played

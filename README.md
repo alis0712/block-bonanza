@@ -11,7 +11,7 @@ The game opens on a wacky vaporwave sunset start screen: a striped retro sun ove
 marble bust in shades, spinning 3D blocks and googly-eyed bouncing blocks under a squash-and-stretch logo.
 The first tap turns sound on and starts the start-screen theme, **SUNSET BOING** (an original 112 BPM future-funk loop,
 `music/start-00.b64`). The second tap slides into the main menu while the theme crossfades into the menu music.
-With sound off, one tap goes straight to the menu. `?stage=N` (1–13) starts that stage immediately. `?unlock=all` opens every stage in the stage select for this visit only.
+With sound off, one tap goes straight to the menu. `?stage=N` (1–17) starts that stage immediately. `?unlock=all` opens every stage in the stage select for this visit only.
 
 ## Controls
 - **Tap**: rotate
@@ -70,6 +70,12 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 ## v29 additions
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
+
+## v57 additions
+- Seventeen stages. Each boss comes right after its own world: Neo Metropolis then Sunny, Deep Sea Abyss then Gazza, Sunken Sixties then Maw, Vampire's Tomb then the vampire. The stage select numbers them 1–17 and marks the four boss stages with a star.
+- No new music. Sunny still plays `rock-s03`, Gazza `rock-s06`, Maw `rock-s11`, and the vampire `rock-s13`. The regular stage in front of each boss plays that same file. Every other stage keeps the track it already had. The title and the menu are unchanged.
+- An old save's unlocked stage moves forward with the new numbering, once. Beating a boss on the old map still counts. `?stage=N` uses 1–17. `?boss=` and `?unlock=all` still work.
+- `game.js` is cache-busted to `v=57`.
 
 ## v56 additions
 - The rock menu is a loud distorted-guitar, bass and drum riff at 140 BPM (BaDoink). The clean indie loop is gone. The title screen and every stage are unchanged.
@@ -216,7 +222,7 @@ with a soft wave crash each time someone catches a wave.
 
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
-Playtest links (this visit only: they do not write `bb_reach`, the wallet, or scores, and they do not pay the victory bonus): `?stage=N` (1–13) starts that stage immediately, e.g. https://alis0712.github.io/block-bonanza/?stage=12. `?unlock=all` opens every stage in the stage select, e.g. https://alis0712.github.io/block-bonanza/?unlock=all. `?boss=surfer`, `?boss=gator` and `?boss=vampire` jump straight to a boss fight. `?music=rock` plays the rock beds for this visit only, e.g. https://alis0712.github.io/block-bonanza/?music=rock and https://alis0712.github.io/block-bonanza/?music=rock&stage=1.
+Playtest links (this visit only: they do not write `bb_reach`, the wallet, or scores, and they do not pay the victory bonus): `?stage=N` (1–17) starts that stage immediately, e.g. https://alis0712.github.io/block-bonanza/?stage=17. `?unlock=all` opens every stage in the stage select, e.g. https://alis0712.github.io/block-bonanza/?unlock=all. `?boss=surfer`, `?boss=gator`, `?boss=maw` and `?boss=vampire` jump straight to a boss fight. `?music=rock` plays the rock beds for this visit only, e.g. https://alis0712.github.io/block-bonanza/?music=rock and https://alis0712.github.io/block-bonanza/?music=rock&stage=1.
 
 Also: ghost piece, lock delay, SRS wall kicks, particles and screen shake, animated backgrounds and a procedural techno
 track per stage, top-10 best scores with initials, wallet and store items (all saved on the device).
