@@ -71,6 +71,11 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v49 additions
+- Indie rock, once bought and selected, replaces the vaporwave bed on the start splash, the main menu, the stage map, the store, and every stage. There are six played beds, not one loop: a title riff, a slower menu, a bright stage, a murky stage, a driving stage, and one heavier faster bed for all four bosses. Pop, classical and techno are still the single tracks they already were, and they still play only during a game.
+- `?music=rock` selects rock and the full edition for this visit only. It does not write the wallet, stage progress or scores, and it combines with `?stage=N`, `?boss=` and `?unlock=all`.
+- `game.js` is cache-busted to `v=49`.
+
 ## v48 additions
 - Indie rock is no longer a grid of single guitar notes. It is an arrangement of people playing: a fuzz-pedal guitar performance, a low-tuned chugged riff, a Gretsch drum-kit groove, and a bass riff. All four are CC0. The guitars and the kit are in front. Pop, classical, techno, prices, the lock and saves are unchanged. Credits are on the Music tab.
 - `game.js` is cache-busted to `v=48`.
@@ -181,7 +186,7 @@ with a soft wave crash each time someone catches a wave.
 
 All backgrounds are drawn procedurally on canvas: static scenery is pre-rendered once, and only the moving parts animate.
 
-Playtest links (this visit only: they do not write `bb_reach`, the wallet, or scores, and they do not pay the victory bonus): `?stage=N` (1–13) starts that stage immediately, e.g. https://alis0712.github.io/block-bonanza/?stage=12. `?unlock=all` opens every stage in the stage select, e.g. https://alis0712.github.io/block-bonanza/?unlock=all. `?boss=surfer`, `?boss=gator` and `?boss=vampire` jump straight to a boss fight.
+Playtest links (this visit only: they do not write `bb_reach`, the wallet, or scores, and they do not pay the victory bonus): `?stage=N` (1–13) starts that stage immediately, e.g. https://alis0712.github.io/block-bonanza/?stage=12. `?unlock=all` opens every stage in the stage select, e.g. https://alis0712.github.io/block-bonanza/?unlock=all. `?boss=surfer`, `?boss=gator` and `?boss=vampire` jump straight to a boss fight. `?music=rock` plays the rock beds for this visit only, e.g. https://alis0712.github.io/block-bonanza/?music=rock and https://alis0712.github.io/block-bonanza/?music=rock&stage=1.
 
 Also: ghost piece, lock delay, SRS wall kicks, particles and screen shake, animated backgrounds and a procedural techno
 track per stage, top-10 best scores with initials, wallet and store items (all saved on the device).

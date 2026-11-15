@@ -117,7 +117,8 @@ let reach = 0; // highest stage index the stage select may start (0 = stage 1). 
 const TEST_Q = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(); } })();
 const TEST_STAGE = (() => { const n = parseInt(TEST_Q.get('stage'), 10); return n >= 1 && n <= LAST_STAGE + 1 ? n : 0; })();
 const UNLOCK_ALL = TEST_Q.get('unlock') === 'all';
-const SANDBOX = TEST_STAGE > 0 || UNLOCK_ALL || !!TEST_Q.get('boss'); // v44: ?boss= is a test link too, so it must not write saves
+const TEST_MUSIC = TEST_Q.get('music') === 'rock' ? 'rock' : ''; // v49: page-load rock test, combinable with stage/boss/unlock
+const SANDBOX = TEST_STAGE > 0 || UNLOCK_ALL || !!TEST_Q.get('boss') || !!TEST_MUSIC; // v44: ?boss= is a test link too, so it must not write saves
 const stageOpen = (i) => UNLOCK_ALL || i <= reach;
 function noteReach(i) { if (SANDBOX) return; i = i | 0; if (i > reach && i <= LAST_STAGE) { reach = i; store.set('bb_reach', reach); } }
 let lastInit = String(store.get('bb_init', 'AAA')).slice(0, 3).padEnd(3, 'A');
@@ -1433,47 +1434,80 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
-// v48: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
-// Rock is performed guitar, bass and drum recordings, not a note grid.
-// Techno vaporwave stays a synth. Menus stay on the default beds.
+// v49: a bought rock selection replaces the vaporwave bed on the start screen, the menu, the map and every stage.
+// Rock is several performed recordings (see ROCK_FILE). Pop, classical and techno stay one track, and only during play.
+// Techno vaporwave stays a synth.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
-const GENRE_REC = { rock: 'genre-rock', pop: 'genre-pop', classical: 'genre-classical' };
-const GR = { buf: {}, pend: {}, src: null, g: null, id: '' };
+const GENRE_REC = { pop: 'genre-pop', classical: 'genre-classical' };
+// title = start splash. menu = title screen, map, store. shore/murk/drive = stage groups. boss = stages 3, 6, 11 and 13.
+const ROCK_FILE = { title: 'rock-title', menu: 'rock-menu', shore: 'rock-shore', murk: 'rock-murk', drive: 'rock-drive', boss: 'rock-boss' };
+const GR = { buf: {}, pend: {}, src: null, g: null, key: '', fade: null };
 function tuneId() { const id = wallet.music || 'vapor'; return wallet.tunes && wallet.tunes.indexOf(id) >= 0 ? id : 'vapor'; }
-function genreWanted() { return tuneId() !== 'vapor' && (state === 'play' || state === 'dying'); }
+function rockSlot() {
+  if (state === 'start') return 'title';
+  if (state === 'play' || state === 'dying') {
+    const st = (g && g.stage) | 0;
+    if (isMini() || st === 2 || st === 5 || st === 10 || st === BOSS) return 'boss';
+    if (st === 1 || st === 8) return 'murk';
+    if (st === 3 || st === 4 || st === 7 || st === 11) return 'drive';
+    return 'shore';
+  }
+  return 'menu';
+}
+function genreKey() {
+  const id = tuneId();
+  if (id === 'vapor') return '';
+  if (id === 'rock') return 'rock:' + rockSlot();
+  if (state === 'play' || state === 'dying') return id;
+  return '';
+}
+function genreWanted() { return !!genreKey(); }
 function genreBus() { if (!GP.bus && A.ctx) { GP.bus = A.ctx.createGain(); GP.bus.gain.value = 1.15; GP.bus.connect(A.mus); } return GP.bus; }
-function genreStopFile() {
-  if (!GR.src) { GR.id = ''; return; }
-  const src = GR.src, g = GR.g; GR.src = null; GR.g = null; GR.id = '';
+function genreFileName(key) {
+  if (key.indexOf('rock:') === 0) return ROCK_FILE[key.slice(5)] || '';
+  return GENRE_REC[key] || '';
+}
+function genreStopOne(src, g, fade) {
+  if (!src || !A.ctx) return;
+  const t = A.ctx.currentTime, f = fade == null ? 0.08 : fade;
   try {
-    const t = A.ctx.currentTime;
-    if (g) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.06); }
-    src.stop(t + 0.08);
+    if (g) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.linearRampToValueAtTime(0.0001, t + f); }
+    src.stop(t + f + 0.05);
   } catch (e) { try { src.stop(); } catch (e2) { /* ended */ } }
 }
-function genreStop() { GP.live = false; GP.next = 0; genreStopFile(); }
-function genreFileStart(id) {
-  if (!A.ctx || !GR.buf[id] || tuneId() !== id) return;
-  genreStopFile();
+function genreStopFile(fade) {
+  genreStopOne(GR.src, GR.g, fade);
+  if (GR.fade) genreStopOne(GR.fade.src, GR.fade.g, fade);
+  GR.src = null; GR.g = null; GR.key = ''; GR.fade = null;
+}
+function genreStop() { GP.live = false; GP.next = 0; genreStopFile(0.2); }
+function genreFileStart(key) {
+  if (!A.ctx || !GR.buf[key] || genreKey() !== key) return;
+  if (GR.key === key && GR.src) return;
+  if (GR.fade) { genreStopOne(GR.fade.src, GR.fade.g, 0.12); GR.fade = null; }
+  const prev = GR.src, prevG = GR.g;
   const src = A.ctx.createBufferSource(), g = A.ctx.createGain();
-  src.buffer = GR.buf[id]; src.loop = true;
-  g.gain.value = 1.05;
+  const t = A.ctx.currentTime, fade = prev ? 0.45 : 0.2;
+  src.buffer = GR.buf[key]; src.loop = true;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(1.05, t + fade);
   src.connect(g); g.connect(A.mus);
   src.start();
-  GR.src = src; GR.g = g; GR.id = id; GP.live = true;
+  if (prev) { genreStopOne(prev, prevG, fade); GR.fade = { src: prev, g: prevG }; }
+  GR.src = src; GR.g = g; GR.key = key; GP.live = true;
 }
-function genreFilePlay(id) {
-  if (!A.ctx || !GENRE_REC[id]) return;
-  if (GR.buf[id]) { genreFileStart(id); return; }
-  if (GR.pend[id]) return;
-  const base = 'music/' + GENRE_REC[id];
-  const grab = (ext) => fetch(base + '.' + ext + '?v=48').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
-  GR.pend[id] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
+function genreFilePlay(key) {
+  if (!A.ctx || !genreFileName(key)) return;
+  if (GR.buf[key]) { genreFileStart(key); return; }
+  if (GR.pend[key]) return;
+  const base = 'music/' + genreFileName(key);
+  const grab = (ext) => fetch(base + '.' + ext + '?v=49').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
-    GR.buf[id] = b; delete GR.pend[id];
-    if (tuneId() === id && genreWanted()) genreFileStart(id);
-  }).catch(() => { delete GR.pend[id]; });
+    GR.buf[key] = b; delete GR.pend[key];
+    if (genreKey() === key) genreFileStart(key);
+  }).catch(() => { delete GR.pend[key]; });
 }
 function gTone(when, f, dur, type, amp, lpHz) {
   if (!A.ctx) return; const o = A.ctx.createOscillator(), g = A.ctx.createGain();
@@ -1499,15 +1533,16 @@ function genreTick(now) {
     let n = 0; while (GP.next < now + 0.16 && n++ < 6) { song.step(GP.step, GP.next); GP.step++; GP.next += 60 / song.bpm / 4; }
     return;
   }
-  if (!GENRE_REC[id]) return;
+  const key = genreKey();
+  if (!key || key === 'techno') return;
   GP.live = true; GP.next = 0;
-  if (GR.id !== id || !GR.src) genreFilePlay(id);
+  if (GR.key !== key || !GR.src) genreFilePlay(key);
 }
 function musicTick() {
   if (!A.ctx || A.ctx.state !== 'running' || !M.E) return;
   const now = A.ctx.currentTime;
   if (genreWanted()) {
-    if (XM.src) xmStopLoop(now, 0.06);
+    if (XM.src) xmStopLoop(now, 0.4);
     genreTick(now);
     if (M.next < now - 0.2) M.next = now + 0.05;
     let guard = 0; const sd = 60 / 120 / 4;
@@ -1535,7 +1570,7 @@ function musicStart() {
   ensureEngine();
   M.next = A.ctx.currentTime + 0.08; M.step = 0; M.pending = null;
   M.track = desiredTrack(); M.E.setTrack(M.track, M.next);
-  if (xmUsable(M.track)) xmPlay(M.track, M.next);
+  if (!genreWanted() && xmUsable(M.track)) xmPlay(M.track, M.next);
   M.timer = setInterval(musicTick, 25); musicTick();
 }
 function musicStop() { if (M.timer) { clearInterval(M.timer); M.timer = null; } M.pending = null; if (M.E) setDanger(false, true); xmStopAll(); genreStop(); }
@@ -1569,10 +1604,11 @@ function requestTrack(ti, startBar, minLead, lift) {
 let pendBanner = null;
 function stageBanner(i, queued) {
   const show = () => showBanner('STAGE ' + (i + 1), STAGES[i].name, STAGES[i].c1, TWISTS[i]);
-  if (queued) show(); // v17: the music hand-off already landed on this bar line
+  if (queued || tuneId() === 'rock') show(); // rock crossfades on its own, no synth riser
   else if (M.timer && aok()) { const at = requestTrack(i + 1, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 function syncTrack() {
+  if (tuneId() === 'rock') return; // the rock file for this stage is chosen in genreTick
   if (!M.timer || M.pending || pendBanner || (g && g.handoff)) return;
   const want = desiredTrack();
   if (want !== M.track) requestTrack(want, want === 0 || state === 'play' && g.popped === 0 ? 0 : DROP_BAR, 0.15, false);
@@ -1846,7 +1882,7 @@ const SHOP_SKIN = [
 const START_CASH = { free: 0, full: 1000 };
 const GENRES = [
   { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
-  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Played fuzz guitar and a live kit' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Played riffs for the menu, stages and bosses' },
   { id: 'pop', name: 'POP', price: 12000, blurb: 'Piano, clean guitar and a hook' },
   { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings, piano and winds' },
   { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
@@ -1892,6 +1928,12 @@ let adSkip = 2, adT = 0;
 (function initEdition() {
   if (DEV_HOST) { try { const q = new URLSearchParams(location.search).get('edition'); if (q === 'full' || q === 'free') wallet.edition = q; } catch (e) { /* ignore */ } } // v27: dev hosts only
   applyEditionGrant(); saveWallet();
+  // ?music=rock selects rock and the full edition for this visit only. saveWallet is a no-op while SANDBOX.
+  if (TEST_MUSIC === 'rock') {
+    wallet.edition = 'full';
+    if (wallet.tunes.indexOf('rock') < 0) wallet.tunes.push('rock');
+    wallet.music = 'rock';
+  }
 })();
 function canAfford(p) { return wallet.cash >= p; }
 let shop = { tab: 0, shake: 0, msg: null, modal: null, thumbs: {}, thumbQ: [] };
@@ -5041,7 +5083,8 @@ function startMini(kind) {
     lastLaugh: g.time, nextLaugh: g.time + rand(8, 11), laughs: 0, why: {}, cries: 0, kinds: {}, lv: null, talk: null, said: [], hz: 0, nudges: 0, drops: 0, murks: 0, deadT: 0, doneAt: 0, start: g.time };
   setBG(MB.bg);
   const show = () => { showBanner(MB.banner[0], MB.banner[1], MB.c1, MB.twist); setTimeout(() => { if (isMini() && g.boss.kind === kind && g.boss.hp > 0) { bossTalk('intro'); floatText(BOSS_LINES[kind].intro.text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.7, 1.6); } }, 1100); };
-  if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
+  if (tuneId() === 'rock') show();
+  else if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 // say one of the boss's lines (sound + the jaw/face animation follows it)
 function bossTalk(key, delay) {
@@ -6126,6 +6169,7 @@ function stSun(t) { // striped retro sun, stripes slide down slowly
   return c;
 }
 function stStart() { // the theme loop (own gain -> music bus, so the Music slider + mute apply)
+  if (tuneId() === 'rock') return; // v49: the rock title bed replaces the vaporwave splash
   if (!A.ctx || ST.src || !settings.sound || settings.vMusic <= 0) return;
   const go = (b) => {
     if (!b || ST.src || state !== 'start' || ST.out >= 0) return; ST.buf = b;
@@ -7038,7 +7082,7 @@ function drawStore() {
   } else {
     const full = wallet.edition === 'full', rh = Math.min(72, (ah - 52) / GENRES.length);
     fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 6, 12, aw - 8, '#9fe8ff', null);
-    fitTxt('Rock CC0: Billyguiro, bangcorrupt, lennartgreen, CVLTIV8R.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
+    fitTxt('Rock CC0: aceinet, Billyguiro, bangcorrupt, Dusk225, MiDiGUy, lennartgreen.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
     GENRES.forEach((g0, i) => {
       const y = c0 + 34 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
       rr(ax, y, aw, rh, 12); ctx.fillStyle = 'rgba(0,10,30,0.6)'; ctx.fill(); ctx.strokeStyle = eq ? '#ffe23d' : 'rgba(0,229,255,0.5)'; ctx.lineWidth = eq ? 3 : 1.5; ctx.stroke();
@@ -7282,7 +7326,7 @@ function drawFPS() { if (!settings.fps) return; txt(Math.round(fpsS) + ' FPS', L
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
 function syncMusic() {
-  const want = A.ctx && settings.sound && settings.vMusic > 0 && (state === 'title' || state === 'scores' || state === 'howto' || state === 'stages' || state === 'store' || (state === 'play' && (!paused || opt.open)));
+  const want = A.ctx && settings.sound && settings.vMusic > 0 && (state === 'title' || state === 'scores' || state === 'howto' || state === 'stages' || state === 'store' || state === 'stats' || (state === 'start' && tuneId() === 'rock') || (state === 'play' && (!paused || opt.open)));
   if (want && !M.timer) musicStart(); else if (!want && M.timer) musicStop();
   if (state !== 'play') M.stage = 0;
   syncTrack(); updatePending(); try { ambSync(); } catch (e) { /* ambience is optional */ }
