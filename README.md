@@ -71,6 +71,11 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v52 additions
+- The rock beds are one guitar phrase and one drum groove on a shared grid, instead of several players at several tempos. Guitar notes land within 15 ms of the kit's 16th-note grid (91% of them; the 90th percentile is 14.5 ms). v51's choruses were 22–47 ms off that grid, and only 16–43% of the guitar notes were inside 15 ms. Leads, bass and a second guitar that would not lock were left out. The menu is 128 BPM, the murk beds 132, the vampire 136, the title and the sunny stages 140, drive 146, Sunny and Gazza 148.
+- While rock (or any bought genre) is the music, stage ambience drops to 0.18 of its normal level, about 15 dB. Waves and the other beds sit behind the song. Gameplay sound effects are not ducked.
+- `game.js` is cache-busted to `v=52`.
+
 ## v51 additions
 - Stage 1 was only the kit on a phone because that guitar lived under 400 Hz. Every rock bed now keeps the guitars above the snare in the band a speaker can play. The shore song (stages 1, 7 and 10) and the menu each have a repeating lead hook, a second guitar, a bass line, and an answer lick, and each section uses a different slice of the performance.
 - `game.js` is cache-busted to `v=51`.
