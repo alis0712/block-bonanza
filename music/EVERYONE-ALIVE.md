@@ -24,13 +24,13 @@ A played drum fill marks each new section. Every bed uses this same arc. They di
 | Bed | Main guitar | Kit | Lead hook / solo |
 | --- | --- | --- | --- |
 | Title | aceinet, A-to-G riff | lennartgreen, as recorded | aceinet licks, then a Tokai solo |
-| Menu | GENERALMiDiGUy chords | same kit at half speed | same players, later in their takes |
-| Shore (stages 1, 7, 10) | Billyguiro fuzz | kit as recorded, plus CVLTIV8R bass | aceinet licks, Tokai solo |
+| Menu | GENERALMiDiGUy chords, Dusk225 under them, bass tucked in | same kit at half speed | aceinet licks, a step quieter than the stages |
+| Shore (stages 1, 7, 10) | Dusk225 riff, Billyguiro fuzz under it, CVLTIV8R bass | kit as recorded | aceinet licks as the hook, a short answer lick, Tokai solo |
 | Murk (stages 2, 9) | aceinet, slower dirty riff | kit at half speed | short Vrezerino lick, Tokai solo |
-| Drive (stages 4, 5, 8, 12) | Dusk225 rock riff | kit as recorded | aceinet licks, Tokai solo |
-| Sunny (stage 3) | Billyguiro | kit about 12% faster | Tokai solo, then aceinet licks |
-| Gazza (stage 6) | bangcorrupt low chug | kit about 12% faster | aceinet licks, Vrezerino lick |
-| Maw (stage 11) | aceinet dirty riff | kit as recorded | Tokai solo, aceinet licks |
+| Drive (stages 4, 5, 8, 12) | aceinet A-to-G riff, Billyguiro under it | kit as recorded | aceinet licks, Tokai solo |
+| Sunny (stage 3) | Dusk225 riff, Billyguiro under it | kit about 12% faster | aceinet licks, Tokai solo |
+| Gazza (stage 6) | aceinet A-to-G, bangcorrupt chug under it | kit about 12% faster | aceinet licks, Vrezerino lick |
+| Maw (stage 11) | aceinet dirty riff, chug under it | kit as recorded | aceinet licks, Tokai solo |
 | Vampire (stage 13) | GENERALMiDiGUy chords | kit as recorded | aceinet licks, Tokai solo |
 
 The four bosses do not share one file. They do share the pool of recordings above.

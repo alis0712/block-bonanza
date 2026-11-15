@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v51 additions
+- Stage 1 was only the kit on a phone because that guitar lived under 400 Hz. Every rock bed now keeps the guitars above the snare in the band a speaker can play. The shore song (stages 1, 7 and 10) and the menu each have a repeating lead hook, a second guitar, a bass line, and an answer lick, and each section uses a different slice of the performance.
+- `game.js` is cache-busted to `v=51`.
+
 ## v50 additions
 - The rock beds are full songs now: a quiet opening, a verse, a louder chorus with a lead hook, a breakdown, a solo, and a bigger final chorus. They are mastered near the vaporwave loops and played at the same music-bus gain, so they sit with the rest of the soundtrack. Sunny, Gazza, Maw and the vampire each get their own bed. No singing. The reference note is `music/EVERYONE-ALIVE.md`.
 - `game.js` is cache-busted to `v=50`.
