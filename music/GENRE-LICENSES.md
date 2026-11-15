@@ -38,13 +38,16 @@ partly from his own recordings, with help acknowledged in the upstream README
 (Suren M. Seron, Scott Hanan, Steve Aupperle, Chris Gillman, Alex Taubr, Chris
 Prola, Andrew Klenk, Winfried Hubbe, Dylan, Tim, Gort, Uros Katic, Ethan Winer).
 
-The v47 rock bed does not use FluidR3 and it has no synthesized tones.
+The v48 rock bed does not use a soundfont and it has no synthesized notes. It is an arrangement of four CC0 performances. The riffs and the drum groove were played by those musicians; this project did not write them, and it does not copy Local H or any other commercial song. The new part is the sequence: which performance plays when, a small tempo fit so they share 166 BPM, and the mix.
 
-- **Guitars.** [FSBS Electric Guitar Distorted #2](https://freepats.zenvoid.org/ElectricGuitar/distorted-electric-guitar.html) by the FreePats project. A Fender electric guitar was recorded direct, then the same takes were played through an amplifier and an effects rack by the sample author. The bank is published under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The song plays those recorded notes (power chords and a single-note lead). Nothing is added on top: no oscillator, no extra fuzz.
-- **Bass.** [Picked Bass YR](https://freepats.zenvoid.org/ElectricGuitar/clean-electric-bass.html) by Andrea Biasior, sampled from a Yamaha RBX and contributed to FreePats under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
-- **Drums.** MuldjordKit by Lars Muldjord, a close-miked acoustic drum kit. Source: <https://github.com/freepats/muldjordkit> and <http://www.muldjord.com/>. License: [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). The samples are sequenced into this original arrangement and mixed with the guitar and bass. The recordings themselves are not edited.
+Freesound only hands the original WAV to a logged-in user. The files used here are Freesound's own high-quality preview MP3s of those CC0 recordings (about 190 kbps).
 
-Pop and classical still use the FluidR3 programs from v45.
+- **Verse guitar.** "Grunge sad guitar 166bpm loop" by Billyguiro. A FAIM electric guitar through a pedalboard that includes a Toxic Fuzz. https://freesound.org/people/Billyguiro/sounds/845806/ — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+- **Heavy guitar.** "Chug Riff" by bangcorrupt. A low-tuned electric guitar (CGCEgc, Invader pickups) played as power chords and recorded through an amp. https://freesound.org/people/bangcorrupt/sounds/832833/ — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+- **Drums.** "Uptempo Rock Drum Groove Upbeat 160 BpM" by lennartgreen. Played on a Gretsch Renown kit with a Mapex snare, multitrack. https://freesound.org/people/lennartgreen/sounds/860527/ — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+- **Bass.** "bass rock riff 4" by CVLTIV8R, a Charvel electric bass performance, under the verse guitar only. https://freesound.org/people/CVLTIV8R/sounds/799090/ — [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+The same credit line is in the Music tab of the store. Pop and classical still use the FluidR3 programs from v45.
 
 `tools/render-genres.py` is the arrangement and the render script. The techno
 vaporwave genre is still synthesized in `game.js` and does not use this bank.

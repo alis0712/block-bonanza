@@ -371,8 +371,8 @@ def _highpass(x, sr, fc):
     import numpy as np
     a = np.float32(np.exp(-2.0 * np.pi * fc / sr))
     y = np.empty_like(x)
-    px = np.float32(0)
-    py = np.float32(0)
+    px = np.zeros(x.shape[1], dtype='float32') if x.ndim == 2 else np.float32(0)
+    py = np.zeros(x.shape[1], dtype='float32') if x.ndim == 2 else np.float32(0)
     for i in range(len(x)):
         py = a * (py + x[i] - px)
         px = x[i]
@@ -757,13 +757,204 @@ def build_classical():
     return s
 
 
+# Performances, not one-shots. Each file is a person playing.
+# Freesound serves the original WAV only to logged-in users. These URLs are
+# the site's own high-quality preview of those CC0 recordings.
+PLAYED = {
+    'verse': 'https://cdn.freesound.org/previews/845/845806_15551003-hq.mp3',  # Billyguiro, 166 bpm fuzz guitar
+    'heavy': 'https://cdn.freesound.org/previews/832/832833_9524907-hq.mp3',  # bangcorrupt, low-tuned chug
+    'drums': 'https://cdn.freesound.org/previews/860/860527_3661618-hq.mp3',  # lennartgreen, Gretsch kit, 160 bpm
+    'bass': 'https://cdn.freesound.org/previews/799/799090_2520418-hq.mp3',  # CVLTIV8R, Charvel bass riff
+}
+PLAYED_BPM = 166
+PLAYED_BARS = 80
+
+
+def _fetch_played(name, url):
+    import urllib.request
+    cache = '/tmp/v48-src'
+    os.makedirs(cache, exist_ok=True)
+    mp3 = os.path.join(cache, name + '.mp3')
+    wav = os.path.join(cache, name + '.wav')
+    if not os.path.exists(mp3) or os.path.getsize(mp3) < 1000:
+        urllib.request.urlretrieve(url, mp3)
+    if not os.path.exists(wav) or os.path.getmtime(wav) < os.path.getmtime(mp3):
+        subprocess.check_call(['ffmpeg', '-y', '-v', 'error', '-i', mp3, '-ac', '2', '-ar', '44100', wav])
+    return wav
+
+
+def _atempo(src, factor, dest):
+    # atempo keeps the pitch. One step stays inside 0.5..2.0.
+    subprocess.check_call([
+        'ffmpeg', '-y', '-v', 'error', '-i', src,
+        '-filter:a', f'atempo={factor:.6f}', '-ac', '2', '-ar', '44100', dest,
+    ])
+
+
+def _fit_bars(src, bars, dest):
+    """Stretch a performance so it lands on an exact bar count at PLAYED_BPM."""
+    seconds = bars * 4 * 60.0 / PLAYED_BPM
+    x, sr = read_wav(src)
+    have = len(x) / sr
+    factor = have / seconds
+    if abs(factor - 1.0) < 0.004:
+        return src
+    _atempo(src, factor, dest)
+    return dest
+
+
+def _paste(dst, src, at, fade):
+    import numpy as np
+    end = min(len(dst), at + len(src))
+    n = end - at
+    if n <= 0:
+        return
+    if fade > 8 and at > 0:
+        f = min(fade, n // 2, at)
+        ramp = np.linspace(0.0, 1.0, f, dtype='float32')[:, None]
+        dst[at:at + f] = dst[at:at + f] * (1.0 - ramp) + src[:f] * ramp
+        if n > f:
+            dst[at + f:end] = src[f:n]
+    else:
+        dst[at:end] = src[:n]
+
+
+def _p99m(x):
+    import numpy as np
+    return float(np.percentile(np.abs(x).max(axis=1), 99))
+
+
+def assemble_played_rock(out_wav):
+    """Arrange whole performances. Nothing is sliced into a MIDI grid."""
+    import numpy as np
+    sr = 44100
+    bar = int(round(4 * 60.0 / PLAYED_BPM * sr))
+    total = PLAYED_BARS * bar
+    fade = int(0.04 * sr)
+    paths = {k: _fetch_played(k, u) for k, u in PLAYED.items()}
+    verse = _fit_bars(paths['verse'], 8, os.path.join(TMP, 'verse-fit.wav'))
+    heavy = _fit_bars(paths['heavy'], 32, os.path.join(TMP, 'heavy-fit.wav'))
+    drums = _fit_bars(paths['drums'], 8, os.path.join(TMP, 'drums-fit.wav'))
+    bass = _fit_bars(paths['bass'], 8, os.path.join(TMP, 'bass-fit.wav'))
+    v, _ = read_wav(verse)
+    h, _ = read_wav(heavy)
+    d, _ = read_wav(drums)
+    b, _ = read_wav(bass)
+    # trim or pad each phrase to the bar grid it was stretched toward
+    def take(x, bars):
+        n = bars * bar
+        if len(x) >= n:
+            return x[:n]
+        y = np.zeros((n, 2), dtype='float32')
+        y[:len(x)] = x
+        return y
+    v, h, d, b = take(v, 8), take(h, 32), take(d, 8), take(b, 8)
+    # Keep the kick's thump; the chug is already a wall from about 100 Hz up.
+    h = _highpass(h, sr, 90.0) * np.float32(0.86)
+    gtr = np.zeros((total, 2), dtype='float32')
+    drm = np.zeros((total, 2), dtype='float32')
+    bas = np.zeros((total, 2), dtype='float32')
+    # Same phrase abuts on its own loop point. The two guitar changes crossfade.
+    for start in (0, 8, 56, 64, 72):
+        _paste(gtr, v, start * bar, 0)
+        _paste(bas, b, start * bar, 0)
+    _paste(gtr, h, 16 * bar - fade, fade)
+    _paste(gtr, v, 48 * bar - fade, fade)
+    _paste(bas, b, 48 * bar, 0)
+    for start in range(0, PLAYED_BARS, 8):
+        _paste(drm, d, start * bar, 0)
+    gtr *= np.float32(0.62 / (_p99m(gtr) + 1e-9))
+    drm *= np.float32(0.58 / (_p99m(drm) + 1e-9))
+    bas *= np.float32(0.20 / (_p99m(bas) + 1e-9))
+    y = gtr + drm + bas
+    peak = float(np.max(np.abs(y)))
+    if peak > 0.98:
+        y *= np.float32(0.98 / peak)
+    _played_report(gtr, drm, bas, y, sr)
+    write_wav(out_wav, y, sr)
+    return out_wav
+
+
+def _crack_times(x, sr, lo, hi, gap):
+    import numpy as np
+    spec = np.fft.rfft(x.mean(axis=1))
+    freqs = np.fft.rfftfreq(len(x), 1.0 / sr)
+    spec[(freqs < lo) | (freqs >= hi)] = 0
+    y = np.fft.irfft(spec, n=len(x)).astype('float32')
+    hop = int(0.01 * sr)
+    env = np.array([np.sqrt(np.mean(y[i:i + hop] ** 2)) for i in range(0, len(y) - hop, hop)])
+    thr = np.percentile(env, 82)
+    times = []
+    for i in range(1, len(env) - 1):
+        if env[i] > thr and env[i] >= env[i - 1] and env[i] > env[i + 1]:
+            t = i * 0.01
+            if not times or t - times[-1] > gap:
+                times.append(t)
+    return times
+
+
+def _hit_corr(x, sr, times):
+    import numpy as np
+    w = int(0.035 * sr)
+    clips = []
+    for t in times[:16]:
+        c = int(t * sr)
+        if c + w < len(x):
+            clips.append(x[c:c + w, 0])
+    if len(clips) < 4:
+        return 0.0
+    cs = []
+    for i in range(len(clips)):
+        for j in range(i + 1, len(clips)):
+            u = clips[i] - clips[i].mean()
+            v = clips[j] - clips[j].mean()
+            cs.append(float((u * v).sum() / (np.sqrt((u * u).sum() * (v * v).sum()) + 1e-9)))
+    return float(np.median(cs))
+
+
+def _played_report(gtr, drm, bas, mix, sr):
+    import numpy as np
+    # One 8-bar pass of the kit, so the repeated loop is not what we measure.
+    bar = int(round(4 * 60.0 / PLAYED_BPM * sr))
+    one = drm[:8 * bar]
+    times = _crack_times(one, sr, 1500, 6000, 0.12)
+    iv = np.diff(times) if len(times) > 3 else np.array([1.0])
+    cv = float(iv.std() / (iv.mean() + 1e-9))
+    corr = _hit_corr(one, sr, times)
+    # a techno kick is a perfect quarter-note grid; this is that grid's CV
+    techno_iv = np.ones(32) * (60.0 / 126.0)
+    techno_cv = float(techno_iv.std() / techno_iv.mean())
+    gp, dp, bp = _p99m(gtr), _p99m(drm), _p99m(bas)
+    print(f'  levels guitar={gp:.3f} drums={dp:.3f} bass={bp:.3f}')
+    print(f'  drum hit-interval cv={cv:.2f} (techno quarter-note grid cv={techno_cv:.2f})')
+    print(f'  drum hit-to-hit waveform corr={corr:.2f}')
+    if gp < bp * 1.4 or dp < bp * 1.4:
+        raise SystemExit('bass is covering the guitars or the drums')
+    if cv < 0.12:
+        raise SystemExit('drums are on a machine grid')
+    if corr > 0.65:
+        raise SystemExit('drum hits are copies of one sample')
+    mono = mix.mean(axis=1)
+    hop = int(0.03 * sr)
+    airs = []
+    rms = []
+    for i in range(0, len(mono) - hop, hop):
+        fr = mono[i:i + hop]
+        rms.append(float(np.sqrt(np.mean(fr * fr))))
+        sp = np.abs(np.fft.rfft(fr)) ** 2
+        f = np.fft.rfftfreq(len(fr), 1.0 / sr)
+        airs.append(float(sp[f >= 8000].sum() / (sp.sum() + 1e-12)))
+    rms = np.array(rms)
+    airs = np.array(airs)
+    quiet = float(np.median(airs[rms <= np.percentile(rms, 15)]))
+    print(f'  quiet-frame air={quiet:.3f}')
+    if quiet > 0.2:
+        raise SystemExit('hiss in the quiet frames')
+
+
 def main():
     import sys
     rock_only = len(sys.argv) > 1 and sys.argv[1] == 'rock'
-    fonts = rock_fonts()
-    print('rock midi (recorded guitar, bass, kit)')
-    for part in ('gtr', 'lead', 'drm', 'bas'):
-        build_rock(part).save(os.path.join(TMP, 'rock-' + part + '.mid'))
     if not rock_only:
         print('pop midi')
         pop = build_pop()
@@ -771,26 +962,27 @@ def main():
         print('classical midi')
         cl = build_classical()
         cl.save(os.path.join(TMP, 'classical.mid'))
-
-    print('rendering recorded rock')
-    render_wav(os.path.join(TMP, 'rock-gtr.mid'), os.path.join(TMP, 'rock-gtr.wav'), False, fonts['gtr'], 0.55)
-    render_wav(os.path.join(TMP, 'rock-lead.mid'), os.path.join(TMP, 'rock-lead.wav'), False, fonts['gtr'], 0.70)
-    render_wav(os.path.join(TMP, 'rock-drm.mid'), os.path.join(TMP, 'rock-drm.wav'), False, fonts['drm'], 0.95)
-    render_wav(os.path.join(TMP, 'rock-bas.mid'), os.path.join(TMP, 'rock-bas.wav'), False, fonts['bas'], 0.85)
-    mixed = os.path.join(TMP, 'rock-mix.wav')
-    mix_rock(
-        os.path.join(TMP, 'rock-gtr.wav'),
-        os.path.join(TMP, 'rock-lead.wav'),
-        os.path.join(TMP, 'rock-drm.wav'),
-        os.path.join(TMP, 'rock-bas.wav'),
-        mixed,
-    )
-    if not rock_only:
         render_wav(os.path.join(TMP, 'pop.mid'), os.path.join(TMP, 'pop.wav'), True)
         render_wav(os.path.join(TMP, 'classical.mid'), os.path.join(TMP, 'classical.wav'), True)
-
+    print('assembling played rock')
+    mixed = os.path.join(TMP, 'rock-mix.wav')
+    assemble_played_rock(mixed)
     print('loop + encode')
-    finish('rock', mixed, ROCK_BARS * 4 * 60 / ROCK_BPM)
+    # The arrangement is already an exact bar count, so the seam is one
+    # overlap of the downbeat with itself, not a reverb tail.
+    import numpy as np
+    x, sr = read_wav(mixed)
+    seam = int(0.03 * sr)
+    fade_in = np.linspace(0.0, 1.0, seam, dtype='float32')[:, None]
+    fade_out = 1.0 - fade_in
+    head = x[:seam].copy()
+    body = x[:-seam].copy()
+    body[:seam] = head * fade_in + x[-seam:] * fade_out
+    peak = float(abs(body).max()) or 1
+    body *= min(2.5, 0.84 / peak)
+    loop = os.path.join(TMP, 'rock-loop.wav')
+    write_wav(loop, body, sr)
+    encode(loop, 'genre-rock')
     if not rock_only:
         finish('pop', os.path.join(TMP, 'pop.wav'), 56 * 4 * 60 / 112)
         finish('classical', os.path.join(TMP, 'classical.wav'), 58 * 4 * 60 / 116)
