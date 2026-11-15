@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v50 additions
+- The rock beds are full songs now: a quiet opening, a verse, a louder chorus with a lead hook, a breakdown, a solo, and a bigger final chorus. They are mastered near the vaporwave loops and played at the same music-bus gain, so they sit with the rest of the soundtrack. Sunny, Gazza, Maw and the vampire each get their own bed. No singing. The reference note is `music/EVERYONE-ALIVE.md`.
+- `game.js` is cache-busted to `v=50`.
+
 ## v49 additions
 - Indie rock, once bought and selected, replaces the vaporwave bed on the start splash, the main menu, the stage map, the store, and every stage. There are six played beds, not one loop: a title riff, a slower menu, a bright stage, a murky stage, a driving stage, and one heavier faster bed for all four bosses. Pop, classical and techno are still the single tracks they already were, and they still play only during a game.
 - `?music=rock` selects rock and the full edition for this visit only. It does not write the wallet, stage progress or scores, and it combines with `?stage=N`, `?boss=` and `?unlock=all`.
