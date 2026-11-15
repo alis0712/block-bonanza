@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v54 additions
+- Stage 1 is a new grunge bed: thick low distorted guitar, bass and drums, with a quieter verse, a loud chorus at 0:30, a breakdown, a lead section and a bigger final chorus. The title screen is unchanged. The menu has its own laid-back rock track.
+- `game.js` is cache-busted to `v=54`.
+
 ## v53 additions
 - Each stage has its own rock song, from a different full-band recording. The title screen and the main menu are still the v52 tracks. Choruses land at different times (the sunny boss starts on the chorus; the storm and the haunted forest wait past half a minute).
 - Stage ambience while a bought genre plays is 0.45 of normal, about 7 dB down, so waves and the other beds stay audible under the music.

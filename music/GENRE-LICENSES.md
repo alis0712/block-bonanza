@@ -38,7 +38,7 @@ partly from his own recordings, with help acknowledged in the upstream README
 (Suren M. Seron, Scott Hanan, Steve Aupperle, Chris Gillman, Alex Taubr, Chris
 Prola, Andrew Klenk, Winfried Hubbe, Dylan, Tim, Gort, Uros Katic, Ethan Winer).
 
-v53 keeps pop, classical and techno as they were. The title and the menu are still the v52 beds (aceinet's A-to-G phrase locked to lennartgreen's Gretsch kit). Every stage has its own full-band performance, played together so the guitar and the kit cannot drift apart. The shape of each stage song is different. See `EVERYONE-ALIVE.md`. None of the notes come from Local H.
+v54 keeps pop, classical and techno as they were. The title is still the v52 bed (aceinet's A-to-G phrase locked to lennartgreen's Gretsch kit). The menu is a separate laid-back track. Stage 1 is a grunge guitar, bass and drum performance; stages 2-13 are unchanged. See `EVERYONE-ALIVE.md`. None of the notes come from Local H.
 
 While a genre bed is playing, stage ambience on `A.amb` is multiplied by 0.45 (about -7 dB). The waves and the other beds stay audible under the song. Gameplay hits stay on `A.sfx`.
 
@@ -53,7 +53,8 @@ Title and menu, both [CC0](https://creativecommons.org/publicdomain/zero/1.0/):
 
 Stage performances, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). F. Benjamin (BaDoink) played these himself except where noted:
 
-- Stage 1, ["Dry Mix Loop"](https://freesound.org/people/BaDoink/sounds/564458/) — drums, bass and two guitars
+- Stage 1, ["Grunge distortion guitar soundtrack"](https://freesound.org/people/ValentinSosnitskiy/sounds/495685/) by ValentinSosnitskiy — CC BY. Overdriven guitar, bass and drums. His own progression, not a copy of any other song
+- Menu, ["Got Mo Bluez"](https://freesound.org/people/BaDoink/sounds/564839/) — laid-back electric guitar and drums
 - Stage 2, ["Industrial Metal Fusion 120"](https://freesound.org/people/BaDoink/sounds/566057/) — guitar, bass and drums at 120
 - Stage 3, ["Kick 130"](https://freesound.org/people/BaDoink/sounds/579754/) — dry hard rock at 130, D minor
 - Stage 4, ["Hard Rock Loop"](https://freesound.org/people/BaDoink/sounds/524240/) — chordal hard rock
@@ -84,7 +85,7 @@ Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use th
 
 Files:
 
-- `rock-title`, `rock-menu` (unchanged from v52)
+- `rock-title` (unchanged from v52), `rock-menu` (v54)
 - `rock-s01` through `rock-s13`, one per stage
 - `genre-pop.ogg` / `genre-pop.mp3`
 - `genre-classical.ogg` / `genre-classical.mp3`
