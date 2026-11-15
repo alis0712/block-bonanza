@@ -54,7 +54,7 @@ Title and menu, both [CC0](https://creativecommons.org/publicdomain/zero/1.0/):
 Stage performances, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). F. Benjamin (BaDoink) played these himself except where noted:
 
 - Stage 1, ["Grunge distortion guitar soundtrack"](https://freesound.org/people/ValentinSosnitskiy/sounds/495685/) by ValentinSosnitskiy — CC BY. Overdriven guitar, bass and drums. His own progression, not a copy of any other song
-- Menu, ["Rockin Audio Clip"](https://freesound.org/people/BaDoink/sounds/547891/) — distorted guitar, bass and drums at 140 BPM. The clip plays twice so the riff comes back, then loops
+- Menu, ["Rockin Audio Clip"](https://freesound.org/people/BaDoink/sounds/547891/) — distorted guitar, bass and drums at 140 BPM. The original clip also has BaDoink singing. v58 keeps the instruments and removes that vocal. The clip plays twice so the riff comes back, then loops
 - Stage 2, ["Industrial Metal Fusion 120"](https://freesound.org/people/BaDoink/sounds/566057/) — guitar, bass and drums at 120
 - Stage 3, ["Kick 130"](https://freesound.org/people/BaDoink/sounds/579754/) — dry hard rock at 130, D minor
 - Stage 4, ["Hard Rock Loop"](https://freesound.org/people/BaDoink/sounds/524240/) — chordal hard rock
@@ -85,7 +85,7 @@ Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use th
 
 Files:
 
-- `rock-title` (unchanged from v52), `rock-menu` (v56)
+- `rock-title` (unchanged from v52), `rock-menu` (v58, same BaDoink clip with the vocal removed)
 - `rock-s01` through `rock-s13`. v57 adds no files. Stages 4, 8, 14 and 17 replay `rock-s03`, `rock-s06`, `rock-s11` and `rock-s13`.
 - `genre-pop.ogg` / `genre-pop.mp3`
 - `genre-classical.ogg` / `genre-classical.mp3`
