@@ -100,8 +100,25 @@ const settings = (() => { const st = store.get('bb_settings', {}), o = Object.as
   if (st.sv !== 2) { o.sv = 2; try { store.set('bb_settings', o); } catch (e) { /* ignore */ } }
   delete o.music; if (st.hap == null && st.vibrate === false) o.hap = 0; ['vMusic', 'vSfx', 'vAmb', 'vVox'].forEach((k) => { o[k] = Math.max(0, Math.min(100, Math.round(+o[k] || 0))); }); return o; })();
 const volK = (v) => (v <= 0 ? 0 : Math.pow(v / 70, 1.6)); // slider % -> gain (70% = the original mix, 100% = +5 dB)
+// A bought genre is the thing you came to hear. Stage beds (waves, drips, wind,
+// the crowd) drop about 15 dB while one is playing. Gameplay hits stay on A.sfx.
+let ambAimed = -1;
+function ambGain() {
+  let duck = 1;
+  try { if (typeof genreKey === 'function' && genreKey()) duck = 0.18; } catch (e) { /* still on vaporwave */ }
+  return BUS.amb * volK(settings.vAmb) * duck;
+}
+function aimAmb() {
+  if (!A.ctx || !A.amb) return;
+  const want = ambGain();
+  if (Math.abs(want - ambAimed) < 0.0005) return;
+  ambAimed = want;
+  const t = A.ctx.currentTime;
+  A.amb.gain.cancelScheduledValues(t);
+  A.amb.gain.setTargetAtTime(want, t, 0.08);
+}
 function applyVolumes() { if (!A.ctx) return; const t = A.ctx.currentTime, set = (n, v) => { if (n) { n.gain.cancelScheduledValues(t); n.gain.setTargetAtTime(v, t, 0.03); } };
-  set(A.mus, BUS.mus * volK(settings.vMusic)); set(A.sfx, BUS.sfx * volK(settings.vSfx)); set(A.amb, BUS.amb * volK(settings.vAmb)); set(A.vox, volK(settings.vVox)); }
+  set(A.mus, BUS.mus * volK(settings.vMusic)); set(A.sfx, BUS.sfx * volK(settings.vSfx)); aimAmb(); set(A.vox, volK(settings.vVox)); }
 const BUS = { mus: 0.21, sfx: 1.6, amb: 0.84 }; // v12 mix: music -6 dB, SFX +5 dB, ambient +6 dB vs v11 (0.42 / 0.9 / 0.42)
 const CAN_VIB = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 let userGestured = false; // v27: set by audioUnlock (runs inside every touch/click/key handler)
@@ -1420,6 +1437,7 @@ function ambEv(kind, name, x) {
 }
 function ambSync() {
   if (!A.ctx || !A.amb) return;
+  aimAmb();
   const prev = AMB.preview > performance.now(), live = state === 'play' && !paused;
   const want = settings.sound && settings.vAmb > 0 && (live || prev) ? AMB_KIND[state === 'play' ? bgCur : 0] || (prev ? 'waves' : null) : null;
   if (want !== AMB.kind) { ambStop(); if (want) ambStart(want); }
@@ -1511,7 +1529,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=51').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=52').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
@@ -1892,7 +1910,7 @@ const SHOP_SKIN = [
 const START_CASH = { free: 0, full: 1000 };
 const GENRES = [
   { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
-  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Played riffs for the menu, stages and bosses' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'A locked guitar-and-drum groove for the menu, stages and bosses' },
   { id: 'pop', name: 'POP', price: 12000, blurb: 'Piano, clean guitar and a hook' },
   { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings, piano and winds' },
   { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
@@ -7092,7 +7110,7 @@ function drawStore() {
   } else {
     const full = wallet.edition === 'full', rh = Math.min(72, (ah - 52) / GENRES.length);
     fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 6, 12, aw - 8, '#9fe8ff', null);
-    fitTxt('Rock CC0: aceinet, Billyguiro, bangcorrupt, Dusk225, MiDiGUy, lennartgreen.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
+    fitTxt('Rock CC0: aceinet, lennartgreen.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
     GENRES.forEach((g0, i) => {
       const y = c0 + 34 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
       rr(ax, y, aw, rh, 12); ctx.fillStyle = 'rgba(0,10,30,0.6)'; ctx.fill(); ctx.strokeStyle = eq ? '#ffe23d' : 'rgba(0,229,255,0.5)'; ctx.lineWidth = eq ? 3 : 1.5; ctx.stroke();
