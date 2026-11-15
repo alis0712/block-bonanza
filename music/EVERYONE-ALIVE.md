@@ -24,4 +24,4 @@ The title and the menu are still that one locked phrase. From v53, each stage is
 | 12 Solaris Keep | 0:27 | BaDoink, hard-rock chops, three rises |
 | 13 Vampire | 0:27 | BaDoink, drop-D at 105, half-time weight |
 
-The title is still aceinet's A-to-G phrase with lennartgreen's Gretsch kit, chorus at about 0:27. The menu is a separate laid-back electric track, BaDoink's Got Mo Bluez, chorus at about 0:20.
+The title is still aceinet's A-to-G phrase with lennartgreen's Gretsch kit, chorus at about 0:27. The menu is Johnmode's 125 BPM indie guitar and drum hook. It is one repeating minute, so the melody comes back every time it loops.
