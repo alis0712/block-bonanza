@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v47 additions
+- Indie rock no longer uses a soundfont guitar through a fuzz, or any synth notes. The guitars are recordings of a Fender electric guitar played through an amplifier (FreePats Distorted #2, CC0). The kit is a close-miked acoustic drum kit (MuldjordKit, CC BY 4.0). The bass is a picked Yamaha (CC0). Guitars and drums sit in front; the bass sits under them. The song is still an original fast instrumental. Pop, classical, techno, prices, the lock and saves are unchanged.
+- `game.js` is cache-busted to `v=47`.
+
 ## v46 additions
 - The rock bed was rebuilt. The old one held distorted fifths with no gap, and that drone read as bagpipes. Rhythm guitars are now FluidR3's muted and clean electric programs (real plucked notes), fuzzed afterwards, with a rest between every stab. The lead is a single guitar note doubled at the octave. A few short synth stabs show up in one chorus only. Pop, classical, techno, prices, the lock and saves are unchanged.
 - `game.js` is cache-busted to `v=46`.
