@@ -1433,8 +1433,8 @@ xmFetch(xmKey('loop', 0)).catch(() => {}); xmFetch('start-00').catch(() => {}); 
 const M = { timer: null, next: 0, step: 0, stage: 0, track: 0, E: null, pending: null, danger: false, sched: new Array(17).fill(0), lastT: [0, 0], fanAt: 0 };
 function ensureEngine() { if (!M.E && A.ctx) { M.E = makeMusic(A.ctx, A.mus, A.sfx); M.E.setTrack(M.track, A.ctx.currentTime); } return M.E; }
 const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
-// v47: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
-// Rock is recorded guitar, bass and an acoustic kit (no synth guitar).
+// v48: rock, pop and classical are rendered instrument loops, loaded the first time they are selected.
+// Rock is performed guitar, bass and drum recordings, not a note grid.
 // Techno vaporwave stays a synth. Menus stay on the default beds.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { rock: 'genre-rock', pop: 'genre-pop', classical: 'genre-classical' };
@@ -1467,7 +1467,7 @@ function genreFilePlay(id) {
   if (GR.buf[id]) { genreFileStart(id); return; }
   if (GR.pend[id]) return;
   const base = 'music/' + GENRE_REC[id];
-  const grab = (ext) => fetch(base + '.' + ext + '?v=47').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=48').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[id] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
@@ -1846,7 +1846,7 @@ const SHOP_SKIN = [
 const START_CASH = { free: 0, full: 1000 };
 const GENRES = [
   { id: 'vapor', name: 'VAPORWAVE', price: 0, blurb: 'The per-stage soundtrack' },
-  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Fast guitars, bass and a kit' },
+  { id: 'rock', name: 'INDIE ROCK', price: 8000, blurb: 'Played fuzz guitar and a live kit' },
   { id: 'pop', name: 'POP', price: 12000, blurb: 'Piano, clean guitar and a hook' },
   { id: 'classical', name: 'CLASSICAL', price: 18000, blurb: 'Strings, piano and winds' },
   { id: 'techno', name: 'TECHNO VAPOR', price: 15000, blurb: 'A club bed with a sheen' },
@@ -7036,10 +7036,11 @@ function drawStore() {
       button('skin_' + sk.id, ax + aw - bw2 / 2 - 10, y + rh / 2, bw2, bh2, eq ? 'EQUIPPED' : owned ? 'EQUIP' : money(sk.price), eq ? GOLD : owned ? TEAL : canAfford(sk.price) ? DEEP : GREY, { r: 10, fs: bh2 * 0.4 });
     });
   } else {
-    const full = wallet.edition === 'full', rh = Math.min(78, (ah - 28) / GENRES.length);
-    fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 8, 12, aw - 8, '#9fe8ff', null);
+    const full = wallet.edition === 'full', rh = Math.min(72, (ah - 52) / GENRES.length);
+    fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 6, 12, aw - 8, '#9fe8ff', null);
+    fitTxt('Rock CC0: Billyguiro, bangcorrupt, lennartgreen, CVLTIV8R.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
     GENRES.forEach((g0, i) => {
-      const y = c0 + 22 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
+      const y = c0 + 34 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
       rr(ax, y, aw, rh, 12); ctx.fillStyle = 'rgba(0,10,30,0.6)'; ctx.fill(); ctx.strokeStyle = eq ? '#ffe23d' : 'rgba(0,229,255,0.5)'; ctx.lineWidth = eq ? 3 : 1.5; ctx.stroke();
       fitTxt(g0.name, ax + 12, y + rh * 0.32, Math.min(16, rh * 0.28), aw * 0.48, '#ffe23d', '#03243a', 'left');
       fitTxt(locked ? 'REQUIRES FULL VERSION' : g0.blurb, ax + 12, y + rh * 0.68, Math.min(12, rh * 0.2), aw * 0.5, locked ? '#ffb3b3' : '#e0fff7', null, 'left');
