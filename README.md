@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v56 additions
+- The rock menu is a loud distorted-guitar, bass and drum riff at 140 BPM (BaDoink). The clean indie loop is gone. The title screen and every stage are unchanged.
+- `game.js` is cache-busted to `v=56`.
+
 ## v55 additions
 - The rock menu is a bright 125 BPM indie guitar and drum hook (Johnmode, CC BY). The title screen and every stage are unchanged.
 - `game.js` is cache-busted to `v=55`.
