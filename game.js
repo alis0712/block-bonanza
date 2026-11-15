@@ -1541,7 +1541,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=58').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=59').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
@@ -1597,7 +1597,7 @@ function musicTick() {
   let guard = 0;
   while (M.next < now + 0.15 && guard++ < 64) {
     if (M.pending && M.next >= M.pending.at - 0.001) {
-      M.track = M.pending.track; M.step = M.pending.bar * 16; M.E.setTrack(M.track, M.next); M.pending = null; M.lastSwitch = M.next;
+      M.track = Math.max(0, Math.min(TRACKS.length - 1, M.pending.track | 0)); M.step = M.pending.bar * 16; M.E.setTrack(M.track, M.next); M.pending = null; M.lastSwitch = M.next;
       if (xmUsable(M.track)) xmPlay(M.track, M.next); else { xmStopLoop(M.next); smp(M.E, M.E.crash, M.next, 0.5, M.E.perc); }
     }
     if (!xmUsable(M.track)) musicStep(M.E, M.track, M.step, M.next);
@@ -1645,7 +1645,7 @@ let pendBanner = null;
 function stageBanner(i, queued) {
   const show = () => showBanner('STAGE ' + (i + 1), STAGES[i].name, STAGES[i].c1, TWISTS[i]);
   if (queued || tuneId() === 'rock') show(); // rock crossfades on its own, no synth riser
-  else if (M.timer && aok()) { const at = requestTrack(i + 1, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
+  else if (M.timer && aok()) { const at = requestTrack(stageTrack(i), DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 function syncTrack() {
   if (tuneId() === 'rock') return; // the rock file for this stage is chosen in genreTick
@@ -3945,11 +3945,11 @@ function solPlay(key) {
   src.start(c.currentTime + 0.02); SOL.src = src; SOL.gain = gn; return SOL.buf[key].duration;
 }
 function solDur(key) { const b = SOL.buf[key]; return (b ? b.duration : (SOL_LEN[key] || 4.2)) + 0.35; }
-const VOX_AV = 39;
+const VOX_AV = 59;
 const VOX_LEN = {
   surfer: { intro: 1.11, chill: 2.41, stoked: 2.67, loose: 2.95, ouch1: 2.55, ouch2: 2.51, ouch3: 1.71, defeat: 3.97 },
   gator: { intro: 1.09, chuckle: 0.99, crikey: 2.45, gday: 2.53, tasty: 2.09, tasty2: 1.53, ouch1: 1.21, ouch2: 2.23, ouch3: 2.47, defeat: 4.03 },
-  vamp: { smug: 5.53, cackle: 4.41, gloat: 5.03, ouch1: 0.87, ouch2: 2.01, ouch3: 1.31, defeat: 2.25 },
+  vamp: { smug: 5.53, cackle: 4.41, gloat: 5.03, ouch1: 0.87, ouch2: 2.01, ouch3: 1.31, defeat: 2.25, hiss: 1.2, growl: 1.87, whisper: 0.86, chuckle: 1.48, shriek: 1.12 },
 };
 const VOX_KEYS = { surfer: Object.keys(VOX_LEN.surfer), gator: Object.keys(VOX_LEN.gator), vamp: Object.keys(VOX_LEN.vamp) };
 const VOX = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, gain: null, id: '', soon: null, warm: {} };
@@ -4093,6 +4093,32 @@ function voxPump() {
   if (!VOX.buf[id]) return;
   if (g.time > s.at + 0.6) { VOX.soon = null; return; }
   if (g.time >= s.at - 0.02) voxPlay(s.kind, s.key, Math.max(0, s.at - g.time));
+}
+// v59: performed creature sounds, separate from his spoken lines so a hiss never cuts a laugh off.
+const CREEP = { src: null };
+const CREEP_IDLE = ['hiss', 'growl', 'whisper', 'chuckle'];
+function creepPan() {
+  const x = vampPos().x, w = Math.max(1, W);
+  return Math.max(-0.85, Math.min(0.85, (x / w - 0.5) * 1.65));
+}
+function creepPlay(key) {
+  const id = 'vamp/' + key, b = g.boss;
+  if (!aok() || !b || b.hp <= 0 || state !== 'play' || g.stage !== BOSS) return false;
+  if (!VOX.buf[id]) { voxFetch('vamp', key); return false; }
+  if (key === 'shriek' && g.time - (b.creepShriek || -9) < 1.6) return false;
+  const c = A.ctx, src = c.createBufferSource(), gn = c.createGain();
+  if (CREEP.src) { try { CREEP.src.stop(); } catch (e) { /* ended */ } CREEP.src = null; }
+  src.buffer = VOX.buf[id];
+  gn.gain.value = key === 'shriek' ? 1 : key === 'hiss' ? 0.7 : 0.85;
+  src.connect(gn);
+  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = creepPan(); gn.connect(p); p.connect(A.vox || A.sfx); }
+  else gn.connect(A.vox || A.sfx);
+  src.onended = () => { if (CREEP.src === src) CREEP.src = null; };
+  src.start(c.currentTime + 0.02);
+  CREEP.src = src;
+  b.creeps = (b.creeps || 0) + 1; b.creepLast = key;
+  if (key === 'shriek') b.creepShriek = g.time;
+  return true;
 }
 function solJaw() {
   const S = g.sol && g.sol.cur;
@@ -5202,7 +5228,7 @@ function miniWin() {
 // (backdrop, twist, banner) begins at that same moment
 function miniNext() {
   const ep = effPop(), ns = Math.max(g.stage + 1, Math.min(LAST_STAGE, popsStage(ep)));
-  if (M.timer && aok() && M.E) { g.handoff = { ns, at: requestTrack(ns + 1, DROP_BAR, 1.2, true), t: g.time }; return; }
+  if (M.timer && aok() && M.E) { g.handoff = { ns, at: requestTrack(stageTrack(ns), DROP_BAR, 1.2, true), t: g.time }; return; }
   finishHandoff(ns, false);
 }
 function finishHandoff(ns, queued) {
@@ -5513,7 +5539,7 @@ function enterStage(ns, queued) {
   g.stage = ns; M.stage = ns; noteReach(ns); setBG(bgFor(ns)); g.twistT = 0; g.warn = null; g.glitch = null; g.fog = null; g.convWarn = null; g.bats = [];
   if (mechOf(ns) !== 11) g.sol = null;
   const kind = BOSS_OF[ns];
-  if (kind === 'vamp') { voxWarm('vamp'); g.boss = { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0 }; }
+  if (kind === 'vamp') { voxWarm('vamp'); g.boss = { hp: BOSS_HP, max: BOSS_HP, disp: BOSS_HP, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0, lastLaugh: -99, nextLaugh: (g.time || 0) + rand(5, 8), laughs: 0, why: {}, cries: 0, creepNext: (g.time || 0) + rand(3.5, 6.5), creepLast: '', creepShriek: -9, creeps: 0 }; }
   else g.boss = null;
   if (kind && kind !== 'vamp') { startMini(kind, true); return; }
   stageBanner(ns, queued);
@@ -5534,12 +5560,12 @@ function hitBoss(d) {
   // v14: every quarter of his health (75 / 50 / 25%) fires once: a goofier OUCH! each time + flinch, red flash, shaking bar
   let q = 0; for (const [k, th] of [[1, 0.75], [2, 0.5], [3, 0.25]]) if (!b.qd[k] && b.hp <= b.max * th) { b.qd[k] = true; b.ouches.push(k); q = k; }
   if (isMini()) { miniHit(b, d, q); return; }
-  if (b.hp <= 0) { b.laugh = 0; b.warn = null; g.bats = []; b.cries++; sfx.defeat(); shake(0.6, 14); flashA = 0.6; hurtA = 0.5; showBanner('VAMPIRE DEFEATED!', 'THE NIGHT IS SAVED!', '#ffd23d'); }
-  else if (q) {
-    b.ouch = Math.max(0.9, voxDur('vamp', 'ouch' + q)); b.ouchQ = q; b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; sfx.ouch(q); shake(0.25, 5 + q * 2); hurtA = 0.22 + q * 0.06; vib(40 + q * 20);
+    if (b.hp <= 0) { b.laugh = 0; b.warn = null; g.bats = []; b.cries++; sfx.defeat(); shake(0.6, 14); flashA = 0.6; hurtA = 0.5; showBanner('VAMPIRE DEFEATED!', 'THE NIGHT IS SAVED!', '#ffd23d'); }
+    else if (q) {
+    b.ouch = Math.max(0.9, voxDur('vamp', 'ouch' + q)); b.ouchQ = q; b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; sfx.ouch(q); creepPlay('shriek'); shake(0.25, 5 + q * 2); hurtA = 0.22 + q * 0.06; vib(40 + q * 20);
     floatText(['OUCH!', 'OUCH!!', 'OW-OW-OUCHIE!!!'][q - 1], L.bx + c * 5, L.by + c * 3.2, '#ff4d6a', c * (q === 3 ? 0.95 : 1.25), 1.4);
   }
-  else { sfx.hurt(); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => bossLaugh('furious'), 1200); } }
+  else { sfx.hurt(); creepPlay('shriek'); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => bossLaugh('furious'), 1200); } }
 }
 const at2 = (k) => g.board[(k / COLS) | 0][k % COLS];
 const clampX = (x) => Math.max(L.bx + L.cell * 2, Math.min(L.bx + L.cell * 8, x));
@@ -5639,6 +5665,14 @@ function updateTwists(dt) {
     const b = g.boss, per = b.hp < b.max * 0.35 ? 18 : 22;
     if (g.twistT > per - 2 && !b.warn) { b.warn = { t: 0 }; bossLaugh('bats'); }
     if (g.time >= b.nextLaugh) bossLaugh('idle'); // v14: he laughs every ~10-15 s (throttled)
+    if (g.time >= (b.creepNext || 0)) {
+      if (b.laugh > 0.4 || b.ouch > 0.3) b.creepNext = g.time + 2.2;
+      else {
+        const pool = CREEP_IDLE.filter((k) => k !== b.creepLast);
+        const played = creepPlay(pool[Math.random() * pool.length | 0]);
+        b.creepNext = g.time + (played ? rand(6.5, 11) : 0.45);
+      }
+    }
     if (b.warn) b.warn.t += dt;
     if (g.twistT > per) { g.twistT = 0; b.warn = null; batAttack(); }
   }
@@ -5717,7 +5751,7 @@ function batAttack() {
   for (let x = 0; x < COLS; x++) { let top = ROWS; for (let y = 0; y < ROWS; y++) if (g.board[y][x]) { top = y; break; } hs.push({ x, top }); }
   const ok = hs.filter((h) => h.top > HID + 5).sort((a, b2) => b2.top - a.top).slice(0, 6); // only the lower columns, never near the top
   if (!ok.length) return;
-  b.attacks++; sfx.bats();
+  b.attacks++; sfx.bats(); creepPlay('shriek');
   const vp = vampPos(), n = Math.min(2, ok.length), pick = ok.sort(() => Math.random() - 0.5).slice(0, n);
   pick.forEach((h, i) => g.bats.push({ col: h.x, t: -i * 0.18, d: 1.0, x0: vp.x, y0: vp.y }));
   floatText('BAT SWARM!', L.bx + L.cell * 5, L.by + L.cell * 4, '#ff3355', L.cell * 0.8, 1.2);
