@@ -28,4 +28,4 @@ The title and the menu are still that one locked phrase. From v53, each stage is
 | 16 Vampire's Tomb | rock-s13 | 0:27 | BaDoink, drop-D at 105, half-time weight |
 | 17 Vampire | rock-s13 | 0:27 | the same file as Vampire's Tomb |
 
-The title is still aceinet's A-to-G phrase with lennartgreen's Gretsch kit, chorus at about 0:27. The menu is BaDoink's distorted guitar, bass and drums at 140 BPM. The riff plays, comes back, and the file loops.
+The title is still aceinet's A-to-G phrase with lennartgreen's Gretsch kit, chorus at about 0:27. The menu is BaDoink's distorted guitar, bass and drums at 140 BPM, with the sung part removed. The riff plays, comes back, and the file loops.

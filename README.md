@@ -71,6 +71,10 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 - **Golden Coast Pier**: Sunny's stage is no longer named for a real pier. The backdrop is a gold pier under a warm vaporwave sky, with golden water highlights and a cartoon setting sun that smiles and blinks every few seconds (eyes stay open when Reduce Motion is on).
 - **Themed board frames** (playfield stays a 10×20 grid of round cells): Tropical Tides wave curl, Sewer Lair pipe, Neo Metropolis neon octagon, Sunny surfboard, Storm Planet lightning bolt, Event Horizon gravity warp, Deep Sea Abyss porthole, Gazza swamp log, Crystal Caverns crystal shard, Clockwork Factory gear, Haunted Forest gnarled vine, Tomorrow Park atomic orbit, Sunken Sixties bubble dome, Solaris Keep battlement, Vampire's Tomb gothic coffin. Frame wiggles freeze when Reduce Motion is on.
 
+## v58 additions
+- The rock menu is still BaDoink's distorted-guitar, bass and drum riff. The sung part is gone. Loudness stays about -12.5 LUFS, and the title and the stages are unchanged.
+- `game.js` is cache-busted to `v=58`.
+
 ## v57 additions
 - Seventeen stages. Each boss comes right after its own world: Neo Metropolis then Sunny, Deep Sea Abyss then Gazza, Sunken Sixties then Maw, Vampire's Tomb then the vampire. The stage select numbers them 1–17 and marks the four boss stages with a star.
 - No new music. Sunny still plays `rock-s03`, Gazza `rock-s06`, Maw `rock-s11`, and the vampire `rock-s13`. The regular stage in front of each boss plays that same file. Every other stage keeps the track it already had. The title and the menu are unchanged.

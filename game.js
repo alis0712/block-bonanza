@@ -1476,7 +1476,7 @@ const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
 // Techno vaporwave stays a synth.
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { pop: 'genre-pop', classical: 'genre-classical' };
-// title and menu are unchanged. Boss stages reuse the rock file of the world they follow.
+// Menu is the BaDoink riff with the sung part removed. Boss stages reuse the rock file of the world they follow.
 const ROCK_FILE = {
   title: 'rock-title', menu: 'rock-menu',
   s01: 'rock-s01', s02: 'rock-s02', s03: 'rock-s03', s04: 'rock-s04', s05: 'rock-s05',
@@ -1541,7 +1541,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=57').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=58').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
