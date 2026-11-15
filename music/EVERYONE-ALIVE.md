@@ -10,7 +10,7 @@ The title and the menu are still that one locked phrase. From v53, each stage is
 
 | Stage | Chorus arrives | Performance |
 | --- | --- | --- |
-| 1 Tropical Tides | 0:14 | BaDoink, two guitars, bass and drums, bright |
+| 1 Tropical Tides | 0:30 | ValentinSosnitskiy, grunge guitar, bass and drums. Thick low fuzz, quieter verse, loud chorus, breakdown, lead section, bigger final chorus |
 | 2 Sewer Lair | 0:20 | BaDoink, industrial rock at 120, darker |
 | 3 Sunny | 0:00 | BaDoink, dry hard rock at 130, opens on the chorus |
 | 4 Storm Planet | 0:33 | BaDoink, chordal hard rock, late chorus |
@@ -24,4 +24,4 @@ The title and the menu are still that one locked phrase. From v53, each stage is
 | 12 Solaris Keep | 0:27 | BaDoink, hard-rock chops, three rises |
 | 13 Vampire | 0:27 | BaDoink, drop-D at 105, half-time weight |
 
-The title (140) and the menu (128) still use aceinet's A-to-G phrase with lennartgreen's Gretsch kit. On the title the chorus is at about 0:27. The menu is the same shape, slowed.
+The title is still aceinet's A-to-G phrase with lennartgreen's Gretsch kit, chorus at about 0:27. The menu is a separate laid-back electric track, BaDoink's Got Mo Bluez, chorus at about 0:20.

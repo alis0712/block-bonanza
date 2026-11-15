@@ -1525,7 +1525,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=53').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=54').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {
@@ -7106,7 +7106,7 @@ function drawStore() {
   } else {
     const full = wallet.edition === 'full', rh = Math.min(72, (ah - 52) / GENRES.length);
     fitTxt(full ? 'Bought tracks replace the stage music. Menus stay as they are.' : 'Music shop requires the full version. Vaporwave stays free.', ax + aw / 2, c0 + 6, 12, aw - 8, '#9fe8ff', null);
-    fitTxt('Rock CC0: aceinet, lennartgreen, BaDoink, Seth_Makes_Sounds.', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
+    fitTxt('Rock: aceinet, lennartgreen, BaDoink, Seth (CC0); ValentinSosnitskiy (CC BY).', ax + aw / 2, c0 + 20, 11, aw - 8, '#d8c8ff', null);
     GENRES.forEach((g0, i) => {
       const y = c0 + 34 + i * (rh + 4), owned = wallet.tunes.indexOf(g0.id) >= 0, eq = tuneId() === g0.id, locked = !owned && g0.price > 0 && !full;
       rr(ax, y, aw, rh, 12); ctx.fillStyle = 'rgba(0,10,30,0.6)'; ctx.fill(); ctx.strokeStyle = eq ? '#ffe23d' : 'rgba(0,229,255,0.5)'; ctx.lineWidth = eq ? 3 : 1.5; ctx.stroke();
