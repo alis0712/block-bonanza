@@ -81,6 +81,14 @@ Measured and not used in v52, still CC0, so the earlier credits stay findable:
 
 Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use the FluidR3 programs from v45. Techno is still the synth in `game.js`.
 
+Vampire creature sounds, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). These play during his fight only. His spoken lines are unchanged.
+
+- Hiss, qubodup, ["Hiss"](https://freesound.org/people/qubodup/sounds/160350/) — a person hissing into a microphone
+- Growl, agaudiodesigns, ["vocal_groaning_male"](https://freesound.org/people/agaudiodesigns/sounds/500555/) — a low breathy male groan
+- Whisper, SoundBiterSFX, ["Whisper Evil Little Nothings to Me"](https://freesound.org/people/SoundBiterSFX/sounds/730965/) — a close whispered phrase
+- Chuckle, bbakersvoice, ["EvilManLaugh"](https://freesound.org/people/bbakersvoice/sounds/400503/) — a short sinister laugh on a Neumann mic
+- Shriek, doctorsex, ["burstscream"](https://freesound.org/people/doctorsex/sounds/699909/) — a short male scream
+
 `tools/render-rock-v53.py` builds the stage songs. The title and menu are the v52 renders. Techno stays a synth in `game.js`.
 
 Files:
