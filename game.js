@@ -1440,14 +1440,21 @@ const stepDur = (ti) => 60 / TRACKS[ti].bpm / 4;
 const GP = { live: false, next: 0, step: 0, bus: null, id: '' };
 const GENRE_REC = { pop: 'genre-pop', classical: 'genre-classical' };
 // title = start splash. menu = title screen, map, store. shore/murk/drive = stage groups. boss = stages 3, 6, 11 and 13.
-const ROCK_FILE = { title: 'rock-title', menu: 'rock-menu', shore: 'rock-shore', murk: 'rock-murk', drive: 'rock-drive', boss: 'rock-boss' };
+const ROCK_FILE = {
+  title: 'rock-title', menu: 'rock-menu', shore: 'rock-shore', murk: 'rock-murk', drive: 'rock-drive',
+  'boss-sunny': 'rock-boss-sunny', 'boss-gazza': 'rock-boss-gazza', 'boss-maw': 'rock-boss-maw', 'boss-vamp': 'rock-boss-vamp',
+};
 const GR = { buf: {}, pend: {}, src: null, g: null, key: '', fade: null };
 function tuneId() { const id = wallet.music || 'vapor'; return wallet.tunes && wallet.tunes.indexOf(id) >= 0 ? id : 'vapor'; }
 function rockSlot() {
   if (state === 'start') return 'title';
   if (state === 'play' || state === 'dying') {
     const st = (g && g.stage) | 0;
-    if (isMini() || st === 2 || st === 5 || st === 10 || st === BOSS) return 'boss';
+    const kind = isMini() && g.boss ? g.boss.kind : '';
+    if (kind === 'surfer' || st === 2) return 'boss-sunny';
+    if (kind === 'gator' || st === 5) return 'boss-gazza';
+    if (kind === 'maw' || st === 10) return 'boss-maw';
+    if (st === BOSS) return 'boss-vamp';
     if (st === 1 || st === 8) return 'murk';
     if (st === 3 || st === 4 || st === 7 || st === 11) return 'drive';
     return 'shore';
@@ -1489,8 +1496,11 @@ function genreFileStart(key) {
   const src = A.ctx.createBufferSource(), g = A.ctx.createGain();
   const t = A.ctx.currentTime, fade = prev ? 0.45 : 0.2;
   src.buffer = GR.buf[key]; src.loop = true;
+  // Rock files are mastered near -12 LUFS. 2.2 matches the vaporwave bus (XM.gain).
+  // Pop and classical stay at 1.05. SFX ducking only touches the vaporwave path.
+  const lvl = key.indexOf('rock:') === 0 ? 2.2 : 1.05;
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(1.05, t + fade);
+  g.gain.linearRampToValueAtTime(lvl, t + fade);
   src.connect(g); g.connect(A.mus);
   src.start();
   if (prev) { genreStopOne(prev, prevG, fade); GR.fade = { src: prev, g: prevG }; }
@@ -1501,7 +1511,7 @@ function genreFilePlay(key) {
   if (GR.buf[key]) { genreFileStart(key); return; }
   if (GR.pend[key]) return;
   const base = 'music/' + genreFileName(key);
-  const grab = (ext) => fetch(base + '.' + ext + '?v=49').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
+  const grab = (ext) => fetch(base + '.' + ext + '?v=50').then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
   GR.pend[key] = grab('ogg').catch(() => grab('mp3')).then((ab) => new Promise((res, rej) => {
     A.ctx.decodeAudioData(ab.slice(0), res, rej);
   })).then((b) => {

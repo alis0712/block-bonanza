@@ -38,29 +38,32 @@ partly from his own recordings, with help acknowledged in the upstream README
 (Suren M. Seron, Scott Hanan, Steve Aupperle, Chris Gillman, Alex Taubr, Chris
 Prola, Andrew Klenk, Winfried Hubbe, Dylan, Tim, Gort, Uros Katic, Ethan Winer).
 
-v49 keeps pop, classical and techno as the single tracks from v45/v48. Rock is six beds. Each one is built from a different person's guitar performance. They are not one loop copied onto every stage, and they are not a copy of any commercial song. Tempos are only nudged so a guitar phrase and a drum groove can share a length.
+v50 keeps pop, classical and techno as they were. Rock is nine full songs, about two minutes each, with a quiet verse, a loud chorus, a breakdown, a solo and a bigger final chorus. The shape is described in `EVERYONE-ALIVE.md`. None of the notes come from Local H.
 
-Freesound only hands the original WAV to a logged-in user. These beds use Freesound's high-quality preview MP3s of the CC0 recordings (about 190 kbps).
+The files are mastered around -12 LUFS, close to the vaporwave loops, and the game plays them at the same bus gain as those loops (2.2). Sound-effect ducking does not touch these files.
 
-| Bed | Where it plays | Guitar | Drums |
-| --- | --- | --- | --- |
-| `rock-title` | Start splash | ["A G Riff"](https://freesound.org/people/aceinet/sounds/417158/) by aceinet, heavy distorted A-to-G riff | lennartgreen, sped a little so three passes fill the riff |
-| `rock-menu` | Main menu, stage map, store, how-to, scores | ["074-grungy-guitar-loop"](https://freesound.org/people/GENERALMiDiGUy/sounds/431180/) by GENERALMiDiGUy, distorted chords at 74 BPM, nudged to 80 | lennartgreen at half speed, kept quiet |
-| `rock-shore` | Stages 1, 7 and 10 (Tropical Tides, Crystal Caverns, Tomorrow Park) | ["Grunge sad guitar 166bpm loop"](https://freesound.org/people/Billyguiro/sounds/845806/) by Billyguiro, FAIM guitar and a fuzz pedalboard | lennartgreen at 166. Bass is ["bass rock riff 4"](https://freesound.org/people/CVLTIV8R/sounds/799090/) by CVLTIV8R |
-| `rock-murk` | Stages 2 and 9 (Sewer Lair, Haunted Forest) | ["D sharp 80 bpm dirty"](https://freesound.org/people/aceinet/sounds/718847/) by aceinet | lennartgreen at half speed, louder than the menu |
-| `rock-drive` | Stages 4, 5, 8 and 12 (Storm Planet, Event Horizon, Clockwork Factory, Solaris Keep) | ["Rock Riff"](https://freesound.org/people/Dusk225/sounds/253076/) by Dusk225, guitar into a computer input | lennartgreen at the recorded 160 |
-| `rock-boss` | Stages 3, 6, 11 and 13 (Sunny, Gazza, Maw, the vampire), including the fights | ["Chug Riff"](https://freesound.org/people/bangcorrupt/sounds/832833/) by bangcorrupt, low-tuned power chords | lennartgreen about 12% faster |
+Freesound only hands the original WAV to a logged-in user. These beds use Freesound's high-quality preview MP3s of the CC0 recordings.
 
-The kit on five of the beds is the same Gretsch performance by lennartgreen ([sound 860527](https://freesound.org/people/lennartgreen/sounds/860527/)), played back at a different speed. The six guitar parts are six different recordings. All of the above are [CC0](https://creativecommons.org/publicdomain/zero/1.0/). The Music tab lists the names.
+Performances, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/):
 
-Pop and classical still use the FluidR3 programs from v45. Techno is still the synth in `game.js`.
+- aceinet, ["A G Riff"](https://freesound.org/people/aceinet/sounds/417158/), ["D sharp 80 bpm dirty"](https://freesound.org/people/aceinet/sounds/718847/), ["hot hot licks"](https://freesound.org/people/aceinet/sounds/418096/)
+- Billyguiro, ["Grunge sad guitar 166bpm loop"](https://freesound.org/people/Billyguiro/sounds/845806/)
+- bangcorrupt, ["Chug Riff"](https://freesound.org/people/bangcorrupt/sounds/832833/)
+- Dusk225, ["Rock Riff"](https://freesound.org/people/Dusk225/sounds/253076/)
+- GENERALMiDiGUy, ["074-grungy-guitar-loop"](https://freesound.org/people/GENERALMiDiGUy/sounds/431180/)
+- Vrezerino, ["gtr_distortRiff2"](https://freesound.org/people/Vrezerino/sounds/7977/)
+- dfhadhadghadgjhtokai, ["Guitar swell:solo"](https://freesound.org/s/155458/) (Tokai Strat through a POD)
+- lennartgreen, ["Uptempo Rock Drum Groove 160 BpM"](https://freesound.org/people/lennartgreen/sounds/860527/)
+- CVLTIV8R, ["bass rock riff 4"](https://freesound.org/people/CVLTIV8R/sounds/799090/), on the bright stage song only
 
-`tools/render-genres.py` is the arrangement and the render script. The techno
-vaporwave genre is still synthesized in `game.js` and does not use this bank.
+Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use the FluidR3 programs from v45. Techno is still the synth in `game.js`.
+
+`tools/render-rock-places.py` builds the rock songs. Techno stays a synth in `game.js`.
 
 Files:
 
-- `rock-title`, `rock-menu`, `rock-shore`, `rock-murk`, `rock-drive`, `rock-boss` (`.ogg` and `.mp3`)
+- `rock-title`, `rock-menu`, `rock-shore`, `rock-murk`, `rock-drive`
+- `rock-boss-sunny`, `rock-boss-gazza`, `rock-boss-maw`, `rock-boss-vamp`
 - `genre-pop.ogg` / `genre-pop.mp3`
 - `genre-classical.ogg` / `genre-classical.mp3`
 - `genre-rock.ogg` / `genre-rock.mp3` is the older single rock bed and is no longer played
