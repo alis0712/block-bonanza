@@ -38,20 +38,34 @@ partly from his own recordings, with help acknowledged in the upstream README
 (Suren M. Seron, Scott Hanan, Steve Aupperle, Chris Gillman, Alex Taubr, Chris
 Prola, Andrew Klenk, Winfried Hubbe, Dylan, Tim, Gort, Uros Katic, Ethan Winer).
 
-v52 keeps pop, classical and techno as they were. Rock is nine beds built from two performances that share one grid. The shape is in `EVERYONE-ALIVE.md`. None of the notes come from Local H.
+v53 keeps pop, classical and techno as they were. The title and the menu are still the v52 beds (aceinet's A-to-G phrase locked to lennartgreen's Gretsch kit). Every stage has its own full-band performance, played together so the guitar and the kit cannot drift apart. The shape of each stage song is different. See `EVERYONE-ALIVE.md`. None of the notes come from Local H.
 
-The Gretsch groove is stretched from 160 to 140 BPM with rubberband's R3 engine. aceinet's A-to-G riff is stretched onto that same grid with R3, then a small per-onset correction uses the R2 engine (rubberband 3.3's R3 time-map path reports NaN and writes the file unchanged). Only the four bars whose notes land on the kit are used. The other takes were measured and left out: the D-sharp riff, the licks, the Tokai solo, the fuzz loop, the chug and the bass each kept notes 25 ms or more off the kit. Stacking them is what made v51 flam.
-
-Songs that are not at 140 BPM are a rubberband R3 stretch of the finished mix, so the guitar and the kit cannot drift apart. While a genre bed is playing, stage ambience on `A.amb` is multiplied by 0.18 (about -15 dB). Gameplay hits stay on `A.sfx`.
+While a genre bed is playing, stage ambience on `A.amb` is multiplied by 0.45 (about -7 dB). The waves and the other beds stay audible under the song. Gameplay hits stay on `A.sfx`.
 
 The files are mastered near -12 LUFS and the game plays them at the same bus gain as the vaporwave loops (2.2).
 
 Freesound only hands the original WAV to a logged-in user. These beds use Freesound's high-quality preview MP3s of the CC0 recordings.
 
-Performances in the v52 beds, both [CC0](https://creativecommons.org/publicdomain/zero/1.0/):
+Title and menu, both [CC0](https://creativecommons.org/publicdomain/zero/1.0/):
 
 - aceinet, ["A G Riff"](https://freesound.org/people/aceinet/sounds/417158/)
 - lennartgreen, ["Uptempo Rock Drum Groove 160 BpM"](https://freesound.org/people/lennartgreen/sounds/860527/) (Gretsch Renown kick, toms, Mapex snare)
+
+Stage performances, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). F. Benjamin (BaDoink) played these himself except where noted:
+
+- Stage 1, ["Dry Mix Loop"](https://freesound.org/people/BaDoink/sounds/564458/) — drums, bass and two guitars
+- Stage 2, ["Industrial Metal Fusion 120"](https://freesound.org/people/BaDoink/sounds/566057/) — guitar, bass and drums at 120
+- Stage 3, ["Kick 130"](https://freesound.org/people/BaDoink/sounds/579754/) — dry hard rock at 130, D minor
+- Stage 4, ["Hard Rock Loop"](https://freesound.org/people/BaDoink/sounds/524240/) — chordal hard rock
+- Stage 5, ["HardKor2"](https://freesound.org/people/BaDoink/sounds/525136/) — fast hard rock
+- Stage 6, ["Fatter Freddy"](https://freesound.org/people/BaDoink/sounds/560623/) — drop-D heavy rock
+- Stage 7, ["Rockin_140"](https://freesound.org/people/BaDoink/sounds/568755/) — Ibanez and LTD guitars, Hydrogen drums, 140
+- Stage 8, ["Freddy's Best"](https://freesound.org/people/BaDoink/sounds/537961/) — guitars, bass and electric drums
+- Stage 9, ["WILLY NILLY GUITAR LOOP/BEAT"](https://freesound.org/people/Seth_Makes_Sounds/sounds/653517/) — Seth_Makes_Sounds, 99 BPM instrumental
+- Stage 10, ["Glitch Rock Loop"](https://freesound.org/people/BaDoink/sounds/585515/) — alt rock loop
+- Stage 11, ["Metal Hop Loop"](https://freesound.org/people/BaDoink/sounds/535233/) — guitars, bass and electric drums
+- Stage 12, ["Ivan Rockanov"](https://freesound.org/people/BaDoink/sounds/564596/) — hard-rock chops
+- Stage 13, ["Alive105_Dm"](https://freesound.org/people/BaDoink/sounds/570579/) — drop-D heavy rock at 105
 
 Measured and not used in v52, still CC0, so the earlier credits stay findable:
 
@@ -66,12 +80,12 @@ Measured and not used in v52, still CC0, so the earlier credits stay findable:
 
 Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use the FluidR3 programs from v45. Techno is still the synth in `game.js`.
 
-`tools/render-rock-v52.py` builds the rock songs. Techno stays a synth in `game.js`.
+`tools/render-rock-v53.py` builds the stage songs. The title and menu are the v52 renders. Techno stays a synth in `game.js`.
 
 Files:
 
-- `rock-title`, `rock-menu`, `rock-shore`, `rock-murk`, `rock-drive`
-- `rock-boss-sunny`, `rock-boss-gazza`, `rock-boss-maw`, `rock-boss-vamp`
+- `rock-title`, `rock-menu` (unchanged from v52)
+- `rock-s01` through `rock-s13`, one per stage
 - `genre-pop.ogg` / `genre-pop.mp3`
 - `genre-classical.ogg` / `genre-classical.mp3`
 - `genre-rock.ogg` / `genre-rock.mp3` is the older single rock bed and is no longer played

@@ -6,31 +6,22 @@ Local H is a two-piece. Lucas plays a guitar rig that sends the low strings to a
 
 These beds copy none of that recording. Not the riff, not a melody, not a lyric. What they copy is the shape of a song that long.
 
-v52 keeps that shape and drops every layer that would not sit on the drum grid. One guitar phrase and the kit share a 140 BPM grid. A song that is slower or faster is a stretch of that finished mix, so the two parts cannot drift apart. The last eighth before each chorus is silent, and both parts come back on the downbeat together. There is no separate lead. The licks and the solo sat 25 ms or more off the kit, so they are not in these beds. The riff is the hook.
+The title and the menu are still that one locked phrase. From v53, each stage is a different full-band performance, so the guitar and the drums were already played together. The loud chorus does not fall at the same time on every stage.
 
-Times below are the 140 BPM beds (title, shore, maw). The menu is 128, murk 132, the vampire 136, drive 146, Sunny and Gazza 148. Their sections scale by 140 divided by the tempo.
-
-| Section | Time at 140 | What you hear |
+| Stage | Chorus arrives | Performance |
 | --- | --- | --- |
-| Intro | 0:00–0:07 | Riff and kit, held back |
-| Verse | 0:07–0:21 | The groove, a step under the chorus |
-| Pre-chorus | 0:21–0:27 | A little louder, then a stop on the last eighth |
-| Chorus | 0:27–0:41 | Both parts at full |
-| Verse | 0:41–0:55 | Back down |
-| Pre-chorus | 0:55–1:02 | Builds, then the stop |
-| Breakdown | 1:02–1:15 | Kit drops out, the riff stays, stop at the end |
-| Chorus | 1:15–1:29 | Louder than the first |
-| Final chorus | 1:29–1:43 | Loudest |
-| Ending | 1:43–1:50 | Falls away so the loop can restart |
+| 1 Tropical Tides | 0:14 | BaDoink, two guitars, bass and drums, bright |
+| 2 Sewer Lair | 0:20 | BaDoink, industrial rock at 120, darker |
+| 3 Sunny | 0:00 | BaDoink, dry hard rock at 130, opens on the chorus |
+| 4 Storm Planet | 0:33 | BaDoink, chordal hard rock, late chorus |
+| 5 Event Horizon | 0:06 | BaDoink, fast hard rock |
+| 6 Gazza | 0:31 | BaDoink, drop-D heavy rock |
+| 7 Crystal Caverns | 0:03 | BaDoink, Ibanez and LTD guitars at 140 |
+| 8 Clockwork Factory | 0:23 | BaDoink, guitars, bass and electric drums at 125 |
+| 9 Haunted Forest | 0:34 | Seth_Makes_Sounds, slow 99 BPM guitar |
+| 10 Tomorrow Park | 0:35 | BaDoink, alt-rock loop |
+| 11 Maw | 0:14 | BaDoink, metal hop, guitars and electric drums |
+| 12 Solaris Keep | 0:27 | BaDoink, hard-rock chops, three rises |
+| 13 Vampire | 0:27 | BaDoink, drop-D at 105, half-time weight |
 
-| Bed | Tempo | Guitar | Kit |
-| --- | --- | --- | --- |
-| Title | 140 | aceinet A-to-G, the four bars that lock | lennartgreen Gretsch, 160 stretched to 140 |
-| Menu | 128 | same phrase, a step quieter | same kit, the whole mix slowed |
-| Shore (stages 1, 7, 10) | 140 | same phrase, a little hotter | same kit |
-| Murk (stages 2, 9) | 132 | same phrase, darker EQ | same kit, the whole mix slowed |
-| Drive (stages 4, 5, 8, 12) | 146 | same phrase | same kit, the whole mix sped up |
-| Sunny (stage 3) | 148 | same phrase | same kit, faster |
-| Gazza (stage 6) | 148 | same phrase, darker | same kit, faster |
-| Maw (stage 11) | 140 | same phrase, darker | same kit |
-| Vampire (stage 13) | 136 | same phrase, darker | same kit, a little slower |
+The title (140) and the menu (128) still use aceinet's A-to-G phrase with lennartgreen's Gretsch kit. On the title the chorus is at about 0:27. The menu is the same shape, slowed.
