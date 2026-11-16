@@ -81,13 +81,18 @@ Measured and not used in v52, still CC0, so the earlier credits stay findable:
 
 Which file plays where is in `EVERYONE-ALIVE.md`. Pop and classical still use the FluidR3 programs from v45. Techno is still the synth in `game.js`.
 
-Vampire creature sounds, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). These play during his fight only. His spoken lines are unchanged.
+Wordless boss vocals, all [CC0](https://creativecommons.org/publicdomain/zero/1.0/). No clip contains intelligible speech.
 
-- Hiss, qubodup, ["Hiss"](https://freesound.org/people/qubodup/sounds/160350/) — a person hissing into a microphone
-- Growl, agaudiodesigns, ["vocal_groaning_male"](https://freesound.org/people/agaudiodesigns/sounds/500555/) — a low breathy male groan
-- Whisper, SoundBiterSFX, ["Whisper Evil Little Nothings to Me"](https://freesound.org/people/SoundBiterSFX/sounds/730965/) — a close whispered phrase
-- Chuckle, bbakersvoice, ["EvilManLaugh"](https://freesound.org/people/bbakersvoice/sounds/400503/) — a short sinister laugh on a Neumann mic
-- Shriek, doctorsex, ["burstscream"](https://freesound.org/people/doctorsex/sounds/699909/) — a short male scream
+- Vampire hiss, qubodup, ["Hiss"](https://freesound.org/people/qubodup/sounds/160350/)
+- Vampire and Maw growls, agaudiodesigns, ["vocal_groaning_male"](https://freesound.org/people/agaudiodesigns/sounds/500555/) — two different groans
+- Vampire chuckle, bbakersvoice, ["EvilManLaugh"](https://freesound.org/people/bbakersvoice/sounds/400503/)
+- Vampire laugh, ckvoiceover, ["Evil Laugh"](https://freesound.org/people/ckvoiceover/sounds/401332/)
+- Vampire shriek, doctorsex, ["burstscream"](https://freesound.org/people/doctorsex/sounds/699909/)
+- Sunny's laugh and Solaris's chuckle, remarknl, ["Evil_chuckle"](https://freesound.org/people/remarknl/sounds/197411/) — two different chuckles, noise floor gated out
+- Sunny's grunt, ale-batec, ["Male Fight Grunts"](https://freesound.org/people/ale-batec/sounds/511023/)
+- Gazza's grunt and Maw's snarl, salemaudio, ["Soft Male Vocal, Short Pained/Exhertion Groans"](https://freesound.org/people/salemaudio/sounds/803168/)
+- Gazza's snarl, AuDRoger, ["Snarl 1"](https://freesound.org/people/AuDRoger/sounds/471145/)
+- Gazza's growl, Joao_Janz, ["Creature Throat Growl 1_3"](https://freesound.org/people/Joao_Janz/sounds/483823/)
 
 `tools/render-rock-v53.py` builds the stage songs. The title and menu are the v52 renders. Techno stays a synth in `game.js`.
 
