@@ -354,11 +354,11 @@ const sfx = {
   gears() { if (!aok()) return; const t = anow(); for (let i = 0; i < 10; i++) { noise(0.025, 0.22, 'bandpass', 1800 + (i % 2) * 600, { when: t + i * 0.13, q: 4 }); tone(i % 2 ? 210 : 160, 0.05, 'square', 0.04, { when: t + i * 0.13, lp: 900 }); } tone(70, 1.2, 'sawtooth', 0.06, { lp: 260, when: t, to: 110 }); },
   clunk() { tone(90, 0.25, 'square', 0.16, { lp: 600, to: 55 }); noise(0.18, 0.3, 'bandpass', 900, { q: 2 }); noise(0.5, 0.08, 'highpass', 4000); }, // conveyor shifts + steam hiss
   whoosh() { if (!aok()) return; const c = A.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g2 = c.createGain(); s.buffer = A.noise; s.loop = true; f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + 0.8); f.frequency.exponentialRampToValueAtTime(250, t + 1.8); g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.22, t + 0.6); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.9); s.connect(f); f.connect(g2); g2.connect(A.sfx); s.start(t); s.stop(t + 2); tone(220, 1.6, 'sine', 0.035, { when: t + 0.2, to: 180 }); }, // ghostly fog
-  laugh(base, v) { if (!aok()) return; vampLaugh(A.ctx, anow() + 0.02, M.E ? M.E.fx : A.sfx, base || 96, v || 0.42, A.noise); }, // old synth laugh (kept for the fallback music)
+  laugh() { return; },
   surfCrash(v, d) { if (!aok()) return false; surfCrash(A.ctx, anow() + 0.02 + (d || 0), A.sfx, A.noise, v || 1); xmSfxDuck(); return true; },
   womp(d) { if (!aok()) return false; wompWomp(A.ctx, anow() + 0.02 + (d || 0), A.sfx, 0.3); return true; },
   waveWhoosh(v) { if (!aok()) return false; waveWhoosh(A.ctx, anow() + 0.02, A.sfx, v || 0.55); return true; },
-  growl(key, d) { if (!aok()) return false; mawGrowl(A.ctx, anow() + 0.02 + (d || 0), A.sfx, key || 'rumble'); return true; },
+  growl(key, d) { if (!aok()) return false; voxPlay('maw', key === 'snarl' ? 'snarl' : 'growl', d || 0); return true; },
   glide() { if (!aok()) return false; mawGlide(A.ctx, anow() + 0.01, A.sfx); return true; },
   slap() { if (!aok()) return false; mawSlap(A.ctx, anow() + 0.01, A.sfx); return true; },
   bubbles() { if (!aok()) return false; mawBubbles(A.ctx, anow() + 0.01, A.sfx); return true; },
@@ -837,7 +837,7 @@ function laughJaw(kind, lt) {
   return 0;
 }
 const LAUGH_V = { smug: 1.35, cackle: 1.0, gloat: 1.15 }; // matched loudness
-function vampLaugh3(c, t, dest, kind) { voxPlay('vamp', kind || 'cackle'); return voxDur('vamp', kind || 'cackle'); }
+function vampLaugh3(c, t, dest, kind) { const key = kind === 'cackle' || kind === 'gloat' ? 'laugh' : 'chuckle'; creepPlay(key); return voxDur('vamp', key); }
 // cartoony "OUCH!" at each quarter of the boss's health: q = 1 (75%), 2 (50%), 3 (25%), each sillier + higher
 function ouchSpec(q, v) {
   const fs = 1.1 + q * 0.06;
@@ -861,9 +861,9 @@ function defeatSpec(v) {
     amp: [[0, 0], [0.05, 0.6], [0.2, 1], [1.5, 0.9], [2.0, 0.35], [2.1, 0.1], [2.16, 1], [2.7, 0.9], [3.0, 0.2], [3.1, 0], [3.4, 0]],
     br: [[0, 0.05], [2.1, 0.08], [2.2, 0.35], [2.9, 0.25], [3.05, 0.1]], ch: [[3.12, 0.28, 0.35, 1400]] };
 }
-function vampLaugh2(c, t, dest, base, v, nb) { return formantVoice(c, t, dest, laughSpec(base, v), nb); }
-function vampOuch(c, t, dest, q) { voxPlay('vamp', 'ouch' + q); return voxDur('vamp', 'ouch' + q); }
-function vampDefeatCry() { voxPlay('vamp', 'defeat'); return voxDur('vamp', 'defeat'); }
+function vampLaugh2() { creepPlay('laugh'); return voxDur('vamp', 'laugh'); }
+function vampOuch() { return 0.4; }
+function vampDefeatCry() { creepPlay('shriek', true); return voxDur('vamp', 'shriek'); }
 // ---- v16 mid-bosses: a tiny phoneme sequencer on top of formantVoice, so the surfer and the gator can say their lines.
 // Each line is a list of tokens [phoneme, length, pitch start, pitch end, loudness, pitch peak] (pitch relative to the
 // speaker's base). Vowels/sonorants glide through the formant bank, plosives are a closure + burst, fricatives are noise
@@ -985,7 +985,7 @@ const BOSS_VOX = { surfer: SURF_V, gator: GATOR_V };
 const LINE_V = { surfer: 0.62, gator: 0.6 };
 const SPEC_CACHE = {};
 function bossLineSpec(kind, key) { if (kind === 'solaris' || kind === 'maw') return null; const k = kind + ':' + key; return SPEC_CACHE[k] || (SPEC_CACHE[k] = phraseSpec(Object.assign({ toks: BOSS_LINES[kind][key].t.map((x) => x.filter((y, i) => i < 5 || y)) }, BOSS_VOX[kind]), LINE_V[kind])); }
-function bossSay(c, t, dest, kind, key, v, nb) { if (kind === 'solaris') return solPlay(key); if (kind === 'surfer' || kind === 'gator') return voxPlay(kind, key); const o = Object.assign({}, bossLineSpec(kind, key)); if (v) o.v = v; return formantVoice(c, t, dest, o, nb); }
+function bossSay(c, t, dest, kind, key) { const who = kind === 'solaris' ? 'sol' : kind; const clip = bossClip(who, key); return clip ? voxPlay(who, clip) : 0; }
 // v21 gator chase: a woody CHOMP (jaw snap + crunchy splinter crackle + thump) and a metallic CLANK with a tooth pinging
 // off (inharmonic struck-metal partials). Original synthesis.
 function gatorChomp(c, t, dest, nb, v) {
@@ -3904,7 +3904,7 @@ function drawBeachBall(x, y, r, rot) {
 const SOL_LEN = { a1: 5.85, a2: 4.79, a3: 3.17, a4: 4.01, a5: 3.77, a6: 5.49, a7: 4.39, a8: 5.01, a9: 6.49, a10: 5.39, a11: 3.23, a12: 4.55, a13: 3.39, a14: 5.25, a15: 5.39, a16: 3.47, a17: 5.31, a18: 4.97 };
 const SOL_AV = 37;
 const SOL = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, warm: false, mp3: {} };
-function solWarm() { if (SOL.warm) return; SOL.warm = true; for (const k of SOL_ORDER) solFetch(k); }
+function solWarm() { voxWarm('sol'); }
 function solFetch(key) {
   if (SOL.buf[key] || SOL.pend[key] || SOL.raw[key]) return SOL.pend[key] || Promise.resolve(SOL.buf[key] || null);
   const grab = (ext) => fetch('voice/sol/' + key + '.' + ext + '?v=' + SOL_AV).then((r) => { if (!r.ok) throw new Error(ext); return r.arrayBuffer(); });
@@ -3932,26 +3932,18 @@ function solEnv(b) {
   for (let i = 0; i < n; i++) env[i] = Math.min(1, env[i] / m);
   return env;
 }
-function solPlay(key) {
-  if (!aok()) return 0;
-  if (!SOL.buf[key]) { solDecode(key); return 0; }
-  const cur = g.sol && g.sol.cur;
-  // a line already speaking is left alone until it finishes, including its tail
-  if (SOL.src && cur && cur.key === key && cur.played && g.time - cur.t0 < SOL.buf[key].duration - 0.05) return SOL.buf[key].duration;
-  if (SOL.src) { try { SOL.src.stop(); } catch (e) { /* ended */ } SOL.src = null; SOL.gain = null; }
-  const c = A.ctx, src = c.createBufferSource(), gn = c.createGain();
-  src.buffer = SOL.buf[key]; gn.gain.value = 1; src.connect(gn); gn.connect(A.vox || A.sfx);
-  src.onended = () => { if (SOL.src === src) { SOL.src = null; SOL.gain = null; } };
-  src.start(c.currentTime + 0.02); SOL.src = src; SOL.gain = gn; return SOL.buf[key].duration;
-}
+function solPlay() { voxWarm('sol'); return voxPlay('sol', 'chuckle') ? voxDur('sol', 'chuckle') : 0; }
 function solDur(key) { const b = SOL.buf[key]; return (b ? b.duration : (SOL_LEN[key] || 4.2)) + 0.35; }
-const VOX_AV = 59;
+const VOX_AV = 60;
 const VOX_LEN = {
-  surfer: { intro: 1.11, chill: 2.41, stoked: 2.67, loose: 2.95, ouch1: 2.55, ouch2: 2.51, ouch3: 1.71, defeat: 3.97 },
-  gator: { intro: 1.09, chuckle: 0.99, crikey: 2.45, gday: 2.53, tasty: 2.09, tasty2: 1.53, ouch1: 1.21, ouch2: 2.23, ouch3: 2.47, defeat: 4.03 },
-  vamp: { smug: 5.53, cackle: 4.41, gloat: 5.03, ouch1: 0.87, ouch2: 2.01, ouch3: 1.31, defeat: 2.25, hiss: 1.2, growl: 1.87, whisper: 0.86, chuckle: 1.48, shriek: 1.12 },
+  surfer: { laugh: 0.7, grunt: 0.5 },
+  gator: { snarl: 0.86, grunt: 0.74, growl: 1.12 },
+  maw: { growl: 1.93, snarl: 0.84 },
+  vamp: { hiss: 1.2, growl: 1.87, chuckle: 1.48, shriek: 1.12, laugh: 2.36 },
+  sol: { chuckle: 0.56 },
 };
-const VOX_KEYS = { surfer: Object.keys(VOX_LEN.surfer), gator: Object.keys(VOX_LEN.gator), vamp: Object.keys(VOX_LEN.vamp) };
+const VOX_KEYS = {};
+for (const k in VOX_LEN) VOX_KEYS[k] = Object.keys(VOX_LEN[k]);
 const VOX = { raw: {}, buf: {}, jaw: {}, pend: {}, src: null, gain: null, id: '', soon: null, warm: {} };
 // v42: Maw's voice is a growl, not speech. Sines and one quiet triangle, cut off at 520 Hz, so there is no hiss.
 const GROWL = {
@@ -4096,14 +4088,15 @@ function voxPump() {
 }
 // v59: performed creature sounds, separate from his spoken lines so a hiss never cuts a laugh off.
 const CREEP = { src: null };
-const CREEP_IDLE = ['hiss', 'growl', 'whisper', 'chuckle'];
+const CREEP_IDLE = ['hiss', 'growl', 'chuckle'];
 function creepPan() {
   const x = vampPos().x, w = Math.max(1, W);
   return Math.max(-0.85, Math.min(0.85, (x / w - 0.5) * 1.65));
 }
-function creepPlay(key) {
+function creepPlay(key, force) {
   const id = 'vamp/' + key, b = g.boss;
-  if (!aok() || !b || b.hp <= 0 || state !== 'play' || g.stage !== BOSS) return false;
+  if (!aok() || !b || state !== 'play' || g.stage !== BOSS) return false;
+  if (!force && b.hp <= 0) return false;
   if (!VOX.buf[id]) { voxFetch('vamp', key); return false; }
   if (key === 'shriek' && g.time - (b.creepShriek || -9) < 1.6) return false;
   const c = A.ctx, src = c.createBufferSource(), gn = c.createGain();
@@ -5153,10 +5146,20 @@ function startMini(kind) {
   else if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
 // say one of the boss's lines (sound + the jaw/face animation follows it)
+function bossClip(kind, key) {
+  const pool = VOX_LEN[kind] ? Object.keys(VOX_LEN[kind]) : [];
+  if (!pool.length) return '';
+  if (kind === 'vamp') return VOX_LEN.vamp[key] ? key : 'chuckle';
+  if (key === 'defeat') return pool[pool.length - 1];
+  if (String(key).indexOf('ouch') === 0) return pool.length > 1 ? pool[1] : pool[0];
+  if (key === 'intro') return pool[0];
+  return pool[(Math.random() * pool.length) | 0];
+}
 function bossTalk(key, delay) {
   const b = g.boss; if (!isMini()) return false; delay = delay || 0;
-  const dur = voxDur(b.kind, key); b.talk = { key, t0: g.time + delay, dur }; b.said.push(key);
-  if (b.kind === 'maw') sfx.growl(key, delay); else voxPlay(b.kind, key, delay);
+  const clip = bossClip(b.kind, key); if (!clip) return false;
+  const dur = voxDur(b.kind, clip); b.talk = { key: clip, t0: g.time + delay, dur }; b.said.push(clip);
+  if (b.kind === 'maw') sfx.growl(clip, delay); else voxPlay(b.kind, clip, delay);
   return true;
 }
 function miniLaugh(why) {
@@ -5186,7 +5189,7 @@ function miniHit(b, d, q) {
     shake(0.3, 6); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     setTimeout(() => { if (g.boss === b) floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.55, 2.6); }, 900);
   } else if (b.hp <= 0 && b.kind === 'maw') {
-    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15); sfx.growl('roar', 0.2); setTimeout(() => { if (g.boss === b) sfx.bubbles(); }, 1200);
+    b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15); setTimeout(() => { if (g.boss === b) sfx.bubbles(); }, 1200);
     shake(0.4, 8); flashA = 0.35; hurtA = 0.22; showBanner(MB.win[0], MB.win[1], '#ffd23d');
     floatText(BOSS_LINES.maw.defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0) {
@@ -5205,7 +5208,7 @@ function miniHit(b, d, q) {
     setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.6 : 0.95), 1.6); }, 700);
   } else if (q && b.kind === 'maw') {
     const ln = BOSS_LINES.maw['ouch' + q];
-    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); sfx.growl('roar', 0.1); b.ouch = b.talk.dur; b.ouchQ = q;
+    b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     shake(0.22, 4 + q); hurtA = 0.12 + q * 0.04; vib(24 + q * 8);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff9ad5', c * 0.7, 1.5);
   } else if (q) {
@@ -5213,7 +5216,7 @@ function miniHit(b, d, q) {
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     tone(700 + q * 200, 0.07, 'square', 0.035, { to: 420 }); shake(0.22, 4 + q * 2); hurtA = 0.15 + q * 0.04; vib(30 + q * 15);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.5);
-  } else if (b.kind === 'maw') sfx.growl(d >= 8 ? 'hurt' : 'hit');
+  }   else if (b.kind === 'maw') sfx.growl(d >= 8 ? 'snarl' : 'growl');
   else sfx.hurt();
 }
 // after the defeat line + bonus, the next stage starts
@@ -5565,7 +5568,7 @@ function hitBoss(d) {
     b.ouch = Math.max(0.9, voxDur('vamp', 'ouch' + q)); b.ouchQ = q; b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; sfx.ouch(q); creepPlay('shriek'); shake(0.25, 5 + q * 2); hurtA = 0.22 + q * 0.06; vib(40 + q * 20);
     floatText(['OUCH!', 'OUCH!!', 'OW-OW-OUCHIE!!!'][q - 1], L.bx + c * 5, L.by + c * 3.2, '#ff4d6a', c * (q === 3 ? 0.95 : 1.25), 1.4);
   }
-  else { sfx.hurt(); creepPlay('shriek'); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => bossLaugh('furious'), 1200); } }
+  else { creepPlay('shriek'); if (b.hp < b.max * 0.35 && b.hp + d >= b.max * 0.35) { showBanner('HE\'S FURIOUS!', 'ALMOST THERE - KEEP POPPING!', '#ff3355'); setTimeout(() => bossLaugh('furious'), 1200); } }
 }
 const at2 = (k) => g.board[(k / COLS) | 0][k % COLS];
 const clampX = (x) => Math.max(L.bx + L.cell * 2, Math.min(L.bx + L.cell * 8, x));
@@ -5706,18 +5709,12 @@ function dropStone() {
   sfx.clunk(); floatText('LOOSE STONE!', L.bx + c * 5, py - c * 0.4, '#ffb347', c * 0.6, 0.9);
 }
 function updateSolaris() {
-  if (g.stage !== 11 || state !== 'play' || g.tut) return;
-  solWarm(); solPump();
-  const S = g.sol || (g.sol = { next: (g.time || 0) + 14, i: -1, cur: null });
-  if (S.cur && g.time - S.cur.t0 > S.cur.dur) S.cur = null;
-  if (S.cur && !S.cur.played && aok() && g.time - S.cur.t0 < 0.45 && solPlay(S.cur.key)) S.cur.played = true;
-  if (S.cur || g.time < S.next) return;
-  const key = SOL_ORDER[(S.i = (S.i + 1) % SOL_ORDER.length)];
-  const dur = solDur(key);
-  S.cur = { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false };
-  S.next = g.time + dur + rand(20, 28);
-  S.said = (S.said || 0) + 1;
-  if (solPlay(key)) S.cur.played = true;
+  if (mech() !== 11 || state !== 'play' || g.tut) return;
+  voxWarm('sol');
+  const S = g.sol || (g.sol = { next: (g.time || 0) + 18 });
+  if (g.time < S.next) return;
+  voxPlay('sol', 'chuckle');
+  S.next = g.time + rand(22, 34);
 }
 function shiftConveyor() {
   const p = g.piece, row = CONV_ROW;
@@ -5863,7 +5860,7 @@ const dbg = {
     if (piece) { g.piece = { t: piece.t, r: piece.r || 0, x: piece.x, y: piece.y == null ? 2 : piece.y, cols: [...piece.cols].map((ch) => LETTERS[ch]) }; g.lock = 0; g.resets = 0; g.lowY = g.piece.y; }
   },
   setStage(i) { g.popped = STAGE_EP[i] || 0; g.bossPops = 0; g.level = Math.floor(g.popped / LEVEL_POPS) + 1; enterStage(i); bgFade = 0; },
-  solSay(i) { if (mech() !== 11) return 0; solWarm(); const key = SOL_ORDER[((i | 0) % SOL_ORDER.length + SOL_ORDER.length) % SOL_ORDER.length]; const dur = solDur(key); g.sol = { next: g.time + dur + 24, i: SOL_ORDER.indexOf(key), cur: { key, t0: g.time, dur, text: BOSS_LINES.solaris[key].text, played: false }, said: ((g.sol && g.sol.said) || 0) + 1 }; if (solPlay(key)) g.sol.cur.played = true; return dur; }, solReady(k) { return !!(SOL.buf[k || 'a1']); }, warmSol() { solWarm(); solPump(); },
+  solSay() { if (mech() !== 11) return 0; return solPlay(); }, solReady() { return !!VOX.buf['sol/chuckle']; }, warmSol() { voxWarm('sol'); },
   get reach() { return reach; },
   bossHP(n) { if (g.boss) { g.boss.hp = n; g.boss.disp = n; } return !!g.boss; },
   bossHit(d) { if (!g.boss) return false; hitBoss(d); return true; }, bossLaugh(w, force) { if (force && g.boss) { g.boss.lastLaugh = -99; g.boss.ouch = 0; if (g.boss.lunge && g.boss.lunge.done) g.boss.lunge = null; } return bossLaugh(w || 'test'); },
@@ -7311,7 +7308,7 @@ function setSlider(id, x) {
 function sliderPreview(key, release) { // live preview of the bus being adjusted
   const now = performance.now(); if (!release && now - opt.lastPrev < 160) return; opt.lastPrev = now;
   if (key === 'vSfx') { if (release) sfx.pop(1, 4); else sfx.blip(); }
-  else if (key === 'vVox') { if (release && aok()) bossSay(A.ctx, anow() + 0.02, A.sfx, 'surfer', 'intro', 0, A.noise); }
+  else if (key === 'vVox') { if (release && aok()) { voxWarm('surfer'); voxPlay('surfer', 'laugh'); } }
   else if (key === 'vAmb') { AMB.preview = now + 4000; if (release && AMB.L) { const k = AMB.L.kind, d = AMB_DEF[k]; if (d.drip) ambEv(k, 'drip', W / 2); } }
 }
 function optToggle(id) {
