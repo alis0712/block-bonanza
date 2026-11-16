@@ -5217,7 +5217,6 @@ function miniHit(b, d, q) {
     tone(700 + q * 200, 0.07, 'square', 0.035, { to: 420 }); shake(0.22, 4 + q * 2); hurtA = 0.15 + q * 0.04; vib(30 + q * 15);
     floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.5);
   }   else if (b.kind === 'maw') sfx.growl(d >= 8 ? 'snarl' : 'growl');
-  else sfx.hurt();
 }
 // after the defeat line + bonus, the next stage starts
 function miniWin() {
