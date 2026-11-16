@@ -73,7 +73,7 @@ a synth-brass fanfare that lands on the beat, a green/cyan burst and a **$500 x 
 
 ## v60 additions
 - Computer-generated and text-to-speech voices are gone. Bosses and Solaris use wordless human recordings: laughs, grunts, growls, a hiss and a shriek. Nothing they play says a word. The vampire's spoken whisper was dropped because the words could be made out.
-- `game.js` is cache-busted to `v=61`.
+- `game.js` is cache-busted to `v=62`.
 
 ## v59 additions
 - The vampire makes extra sounds during his fight: a hiss, a breathy growl, a whisper, a short laugh, and a scream when he attacks or gets hit. They are performed recordings, panned to his side of the screen. His old lines and the boss music are unchanged.
