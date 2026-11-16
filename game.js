@@ -5141,7 +5141,7 @@ function startMini(kind) {
   g.boss = { kind, hp: MB.hp, max: MB.hp, disp: MB.hp, hit: 0, laugh: 0, warn: null, attacks: 0, dmg: 0, qd: {}, ouches: [], ouch: 0, ouchQ: 0, barShake: 0,
     lastLaugh: g.time, nextLaugh: g.time + rand(8, 11), laughs: 0, why: {}, cries: 0, kinds: {}, lv: null, talk: null, said: [], hz: 0, nudges: 0, drops: 0, murks: 0, deadT: 0, doneAt: 0, start: g.time };
   setBG(MB.bg);
-  const show = () => { showBanner(MB.banner[0], MB.banner[1], MB.c1, MB.twist); setTimeout(() => { if (isMini() && g.boss.kind === kind && g.boss.hp > 0) { bossTalk('intro'); floatText(BOSS_LINES[kind].intro.text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.7, 1.6); } }, 1100); };
+  const show = () => { showBanner(MB.banner[0], MB.banner[1], MB.c1, MB.twist); setTimeout(() => { if (isMini() && g.boss.kind === kind && g.boss.hp > 0) bossTalk('intro'); }, 1100); };
   if (tuneId() === 'rock') show();
   else if (M.timer && aok()) { const at = requestTrack(MB.track, DROP_BAR, 1.2, true); pendBanner = { at, show }; } else show();
 }
@@ -5169,11 +5169,10 @@ function miniLaugh(why) {
   const kind = why === 'hazard' || why === 'danger' || why === 'test' ? big : (b.lv === t0 ? t2 : t0);
   b.lv = kind; b.lastLaugh = g.time; b.nextLaugh = g.time + rand(10, 15); b.laughs++; b.why[why] = (b.why[why] || 0) + 1; b.kinds[kind] = (b.kinds[kind] || 0) + 1;
   if (b.kind === 'gator') { // v21: every taunt is a lunge at the boat; he says it as he chomps
-    gatorLunge(b); b.nextLunge = g.time + rand(6, 8); b.laugh = LUNGE.chomp + 0.08 + voxDur(b.kind, kind); bossTalk(kind, LUNGE.chomp + 0.08);
-    setTimeout(() => { if (isMini() && g.boss === b) floatText(BOSS_LINES[b.kind][kind].text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.55, 1.4); }, 700); return true;
+    gatorLunge(b); b.nextLunge = g.time + rand(6, 8); b.laugh = LUNGE.chomp + 0.08 + voxDur(b.kind, bossClip(b.kind, kind)); bossTalk(kind, LUNGE.chomp + 0.08);
+    return true;
   }
-  b.laugh = voxDur(b.kind, kind); bossTalk(kind);
-  floatText(BOSS_LINES[b.kind][kind].text, L.bx + L.cell * 5, L.by + L.cell * 2.6, MB.c2, L.cell * 0.55, 1.4);
+  b.laugh = voxDur(b.kind, bossClip(b.kind, kind)); bossTalk(kind);
   return true;
 }
 function miniHit(b, d, q) {
@@ -5182,40 +5181,32 @@ function miniHit(b, d, q) {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; b.wipe = null; sfx.waveWhoosh(0.55); bossTalk('defeat', 0.3);
     b.crashes = (b.crashes || 0) + 1;
     shake(0.4, 8); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
-    floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0 && b.kind === 'gator') { // v21: one last greedy bite on the outboard - there go the rest of his teeth
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; gatorLunge(b, { hard: true, fin: true, x: 0.5, what: 'motor' });
     bossTalk('defeat', LUNGE.chomp + 0.45); setTimeout(() => { if (g.boss === b) sfx.miniDefeat(b.kind); }, 1000 * (LUNGE.chomp + 0.45 + bossLineSpec(b.kind, 'defeat').dur + 0.1));
     shake(0.3, 6); flashA = 0.3; hurtA = 0.2; showBanner(MB.win[0], MB.win[1], '#ffd23d');
-    setTimeout(() => { if (g.boss === b) floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.55, 2.6); }, 900);
   } else if (b.hp <= 0 && b.kind === 'maw') {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat', 0.15); setTimeout(() => { if (g.boss === b) sfx.bubbles(); }, 1200);
     shake(0.4, 8); flashA = 0.35; hurtA = 0.22; showBanner(MB.win[0], MB.win[1], '#ffd23d');
-    floatText(BOSS_LINES.maw.defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (b.hp <= 0) {
     b.laugh = 0; b.warn = null; g.bats = []; g.wave = null; b.cries++; b.ouch = 0; b.deadT = g.time; bossTalk('defeat'); sfx.miniDefeat(b.kind);
     shake(0.45, 10); flashA = 0.4; hurtA = 0.3; showBanner(MB.win[0], MB.win[1], '#ffd23d');
-    floatText(BOSS_LINES[b.kind].defeat.text, L.bx + c * 5, L.by + c * 3.2, MB.c2, c * 0.6, 2.2);
   } else if (q && b.kind === 'surfer') { // v18: a big wave crashes over him, he wipes out, yells a gnarly line, paddles back
     const ln = BOSS_LINES[b.kind]['ouch' + q];
     b.wipe = { q, t0: g.time }; b.wipes = (b.wipes || []); b.wipes.push(q); b.crashes = (b.crashes || 0) + 1; sfx.surfCrash(0.8 + q * 0.1);
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q, 0.3); b.ouch = b.talk.dur + 0.3; b.ouchQ = q;
     shake(0.25, 4 + q * 2); hurtA = 0.12 + q * 0.04; vib(30 + q * 15);
-    setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#5ee7ff', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.6); }, 300);
   } else if (q && b.kind === 'gator') { // v21: he chomps something hard and a tooth snaps off
     const ln = BOSS_LINES[b.kind]['ouch' + q], H2 = STERN_HARD[q - 1]; gatorLunge(b, { hard: true, q, x: H2.x, what: H2.what }); b.nextLunge = g.time + 6;
     b.laugh = 0; b.barShake = 0.8; bossTalk('ouch' + q, LUNGE.chomp + 0.12); b.ouch = b.talk.dur + LUNGE.chomp + 0.12; b.ouchQ = q; b.ouchAt = g.time + LUNGE.chomp; hurtA = 0.12 + q * 0.04;
-    setTimeout(() => { if (isMini() && g.boss === b) floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.6 : 0.95), 1.6); }, 700);
   } else if (q && b.kind === 'maw') {
     const ln = BOSS_LINES.maw['ouch' + q];
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     shake(0.22, 4 + q); hurtA = 0.12 + q * 0.04; vib(24 + q * 8);
-    floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff9ad5', c * 0.7, 1.5);
   } else if (q) {
     const ln = BOSS_LINES[b.kind]['ouch' + q];
     b.laugh = 0; b.hit = 0.9; b.barShake = 0.8; bossTalk('ouch' + q); b.ouch = b.talk.dur; b.ouchQ = q;
     tone(700 + q * 200, 0.07, 'square', 0.035, { to: 420 }); shake(0.22, 4 + q * 2); hurtA = 0.15 + q * 0.04; vib(30 + q * 15);
-    floatText(ln.text, L.bx + c * 5, L.by + c * 3.2, '#ff6b5a', c * (ln.text.length > 16 ? 0.62 : 0.95), 1.5);
   }   else if (b.kind === 'maw') sfx.growl(d >= 8 ? 'snarl' : 'growl');
 }
 // after the defeat line + bonus, the next stage starts
